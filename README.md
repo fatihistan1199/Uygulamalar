@@ -1,0 +1,2 @@
+# Uygulamalar
+sag-tik-duzenle
