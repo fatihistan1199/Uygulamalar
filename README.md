@@ -1,2 +1,20 @@
 # Uygulamalar
-sag-tik-duzenle
+Sağ Tık Düzenle — Gizlilik Politikası
+Son güncelleme: 5 Eylül 2026
+
+Sağ Tık Düzenle telemetri, analitik veya reklam kullanmaz. Parolaları, çerezleri, tarama geçmişini veya oturum bilgilerini toplamaz.
+
+Yerel veriler
+Menü işlemleri, görünüm tercihleri ve site kuralları chrome.storage.local içinde cihazda saklanır. Kullanıcı açarsa sınırlı genel tercihler chrome.storage.sync ile tarayıcı hesabı üzerinden eşitlenebilir.
+
+Çevrimiçi işlemler
+Google Lens, ChatGPT veya kullanıcı tarafından tanımlanan bir URL işlemi yalnızca kullanıcı ilgili komutu seçtiğinde açılır. Bu durumda işlemin gerektirdiği seçili metin, sayfa adresi, bağlantı veya görsel adresi hedef hizmetin URL'sine eklenebilir. Bu hizmetlerin kendi gizlilik politikaları geçerlidir.
+
+İzinler
+Eklenti, özel sağ tık menüsünü web sayfalarında göstermek ve tercihleri saklamak için gerekli erişimleri kullanır. Pano okuma, indirme ve kullanıcı betikleri izinleri isteğe bağlıdır ve yalnızca ilgili özellik kullanıcı tarafından açıldığında istenir.
+
+Paylaşım ve satış
+Geliştirici kullanıcı verilerini satmaz, reklam amacıyla kullanmaz veya üçüncü taraflarla paylaşmaz. Kullanıcının açıkça başlattığı çevrimiçi işlemler bunun dışındadır.
+
+İletişim
+İletişim: [fatihistan1199@gmail.com]
