@@ -1,0 +1,26 @@
+name: Gundem Radari Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'gundem-radari-android/**'
+      - '.github/workflows/build-gundem-radari-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: gradle:8.10.2-jdk17
+    defaults:
+      run:
+        working-directory: gundem-radari-android
+    steps:
+      - uses: actions/checkout@v4
+      - name: Debug APK olustur
+        run: gradle :app:assembleDebug --no-daemon
+      - name: APK'yi yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: GundemRadari-debug-apk
+          path: gundem-radari-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
