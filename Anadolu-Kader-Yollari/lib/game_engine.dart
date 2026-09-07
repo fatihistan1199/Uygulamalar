@@ -243,9 +243,45 @@ class GameEngine {
 
   void _runNpcGoals(){
     if(state.day%7!=0)return;
-    final acting=state.npcs.values.elementAt(_rng.nextInt(state.npcs.length));
+    final actors=state.npcs.values.where((n)=>n.alive&&n.age>=16).toList()..sort((a,b)=>a.id.compareTo(b.id));
+    if(actors.isEmpty)return;
+    final acting=actors[_rng.nextInt(actors.length)];
     final faction=state.factions[acting.factionId]!;
-    if(_rng.nextDouble()<.45)faction.power=clamp100(faction.power+_rng.nextInt(3)-1);
+    final city=state.cities[acting.cityId]!;
+    switch(acting.factionId){
+      case 'tuccar':
+        city.trade=clamp100(city.trade+1);
+        if(_rng.nextInt(100)<45)city.prosperity=clamp100(city.prosperity+1);
+        faction.power=clamp100(faction.power+(_rng.nextInt(100)<58?1:0));
+      case 'ahi':
+        city.order=clamp100(city.order+1);
+        if(_rng.nextInt(100)<40)city.trade=clamp100(city.trade+1);
+        faction.power=clamp100(faction.power+(_rng.nextInt(100)<52?1:0));
+      case 'yonetim':
+        city.security=clamp100(city.security+1);
+        if(city.banditry>0&&_rng.nextInt(100)<55)city.banditry=clamp100(city.banditry-1);
+        faction.power=clamp100(faction.power+(_rng.nextInt(100)<48?1:0));
+      case 'medrese':
+        if(_rng.nextInt(100)<55)city.order=clamp100(city.order+1);
+        if(_rng.nextInt(100)<38)city.prosperity=clamp100(city.prosperity+1);
+        faction.power=clamp100(faction.power+(_rng.nextInt(100)<42?1:0));
+    }
+    if(acting.id=='mahmud'&&city.id=='kayseri'&&city.food<60){
+      city.stock['grain']=math.max(5,(city.stock['grain']??50)-2);
+      city.trade=clamp100(city.trade+1);
+      state.tension=clamp100(state.tension+1);
+    }
+    if(acting.goal.contains('güvenli')||acting.goal.contains('güvenliğini')){
+      city.security=clamp100(city.security+1);
+      city.banditry=clamp100(city.banditry-1);
+    }
+    if(acting.goal.contains('vergi')){
+      state.tension=clamp100(state.tension+1);
+      city.prosperity=clamp100(city.prosperity-1);
+    }
+    if(state.day%28==0){
+      state.chronicle.add('${state.day}. gün — ${acting.name}, ${city.name} içinde kendi hedefleri doğrultusunda hareket etti.');
+    }
   }
 
   /// Dünya takvimi: ayda bir sosyal bağlar, yılda bir yaşlanma çözülür.
@@ -370,6 +406,38 @@ class GameEngine {
         if(city.food<50)state.factions['ahi']!.reputation=clamp100(state.factions['ahi']!.reputation-8);
       }else if(effect.type=='rumor_spreads'){
         state.factions['yonetim']!.reputation=clamp100(state.factions['yonetim']!.reputation-2);
+      }else if(effect.type=='social_reputation'){
+        final source=state.npcs[effect.payload['sourceNpc']];
+        final signal=(effect.payload['signal'] as num?)?.toInt()??0;
+        if(source!=null&&signal!=0&&_rng.nextInt(100)<76){
+          final sign=signal>0?1:-1;
+          final strength=math.max(1,math.min(4,signal.abs()~/5));
+          final faction=state.factions[source.factionId];
+          if(faction!=null)faction.reputation=clamp100(faction.reputation+sign*strength);
+          final contacts=source.npcRelations.entries.where((e)=>(e.value.trust>=45||e.value.affection>=45)&&state.npcs[e.key]?.alive==true).toList()..sort((a,b)=>a.key.compareTo(b.key));
+          for(final contact in contacts.take(3)){
+            if(_rng.nextInt(100)>=62)continue;
+            final target=state.npcs[contact.key]!;
+            target.relation.change(trust:sign*math.max(1,strength~/2),respect:sign,suspicion:sign<0?strength: -1);
+            target.memories.add(MemoryEntry(text:'${source.name} çevresinden oyuncu hakkında haber aldı',day:state.day,importance:20+strength*5,trust:0,respect:0,fear:0,affection:0,suspicion:0));
+          }
+          state.chronicle.add('${state.day}. gün — ${source.name} çevresinde önceki davranışının yankıları duyuldu.');
+        }
+      }else if(effect.type=='family_echo'){
+        final source=state.family[effect.payload['sourceFamily']];
+        final signal=(effect.payload['signal'] as num?)?.toInt()??0;
+        final current=state.family[state.playerFamilyId];
+        if(source!=null&&current!=null&&signal!=0){
+          final sign=signal>0?1:-1;
+          final listeners=state.family.values.where((m)=>m.alive&&m.id!=source.id&&m.id!=current.id&&(source.relations[m.id]?.trust??0)>=45).toList()..sort((a,b)=>a.id.compareTo(b.id));
+          if(listeners.isNotEmpty&&_rng.nextInt(100)<70){
+            final listener=listeners[_rng.nextInt(listeners.length)];
+            final bond=listener.relations.putIfAbsent(current.id,()=>RelationState());
+            current.relations.putIfAbsent(listener.id,()=>RelationState());
+            bond.change(trust:sign*2,affection:sign,suspicion:sign<0?2:-1);
+            current.relations[listener.id]!.change(trust:sign*2,affection:sign,suspicion:sign<0?2:-1);
+          }
+        }
       }
       state.delayedEffects.remove(effect);
     }
@@ -634,6 +702,55 @@ class GameEngine {
     return result;
   }
 
+  bool _choiceRequirementsMet(List<Map<String,dynamic>> requirements){
+    for(final requirement in requirements){
+      final type=requirement['type'] as String? ?? '';
+      if(type=='skill_at_least'||type=='attribute_at_least')continue;
+      if(!_conditionsMet([requirement]))return false;
+    }
+    return true;
+  }
+
+  int _challengeChance(Map<String,dynamic> challenge){
+    return actionChance(
+      attribute:challenge['attribute'] as String? ?? 'willpower',
+      skill:challenge['skill'] as String? ?? 'localCulture',
+      difficulty:(challenge['difficulty'] as num?)?.toInt()??35,
+      modifier:(challenge['modifier'] as num?)?.toInt()??0,
+      opponentAttribute:(challenge['opponentAttribute'] as num?)?.toInt(),
+      opponentSkill:(challenge['opponentSkill'] as num?)?.toInt(),
+      secondarySkill:challenge['secondarySkill'] as String?,
+    );
+  }
+
+  String _publicChoiceHint(EventChoiceDefinition choice){
+    final hint=_renderText(choice.hint);
+    if(choice.challenge==null)return hint;
+    final label=chanceLabel(_challengeChance(choice.challenge!));
+    if(hint.isEmpty)return 'Başarı şansı: $label';
+    return '$hint • Başarı şansı: $label';
+  }
+
+  void _scheduleSocialPropagation(NpcState npc,int signal,String reason){
+    if(signal.abs()<4)return;
+    final due=state.day+3+_rng.nextInt(10);
+    state.delayedEffects.add(DelayedEffect(
+      id:'social_${npc.id}_${state.day}_${state.delayedEffects.length}',
+      dueDay:due,type:'social_reputation',source:'npc_memory',
+      payload:{'sourceNpc':npc.id,'signal':signal,'reason':reason},
+    ));
+  }
+
+  void _scheduleFamilyEcho(FamilyMember member,int signal){
+    if(signal.abs()<5)return;
+    final due=state.day+2+_rng.nextInt(8);
+    state.delayedEffects.add(DelayedEffect(
+      id:'family_echo_${member.id}_${state.day}_${state.delayedEffects.length}',
+      dueDay:due,type:'family_echo',source:'family_memory',
+      payload:{'sourceFamily':member.id,'signal':signal},
+    ));
+  }
+
   EventView pickEvent(){
     for(final id in List<String>.from(state.pendingEvents)){
       final def=catalog[id];
@@ -674,8 +791,8 @@ class GameEngine {
   }
 
   EventView _toView(EventDefinition def){
-    final options=def.choices.where((choice)=>_conditionsMet(choice.requirements)).map(
-      (choice)=>EventOption(choice.id,_renderText(choice.title),_renderText(choice.hint))
+    final options=def.choices.where((choice)=>_choiceRequirementsMet(choice.requirements)).map(
+      (choice)=>EventOption(choice.id,_renderText(choice.title),_publicChoiceHint(choice))
     ).toList();
     return EventView(id:def.id,title:_renderText(def.title),body:_renderText(def.body),options:options);
   }
