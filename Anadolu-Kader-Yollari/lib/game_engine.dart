@@ -775,12 +775,56 @@ class GameEngine {
     return 0;
   }
 
+  KnowledgeEntry? _latestUnverifiedKnowledge([String? factId]){
+    final candidates=state.knowledge.where((k)=>!k.confirmed&&!k.refuted&&(factId==null||k.factId==factId)).toList();
+    if(candidates.isEmpty)return null;
+    candidates.sort((a,b)=>b.day.compareTo(a.day));
+    return candidates.first;
+  }
+
   String _renderText(String text){
     var result=text.replaceAll('{{player}}',state.playerName).replaceAll('{{city}}',state.city.name);
+    final rumor=_latestUnverifiedKnowledge();
+    result=result.replaceAll('{{rumor}}',rumor?.text??'duyduğun söylenti');
+    result=result.replaceAll('{{rumor_source}}',rumor?.source??'belirsiz kaynak');
     for(final role in ['spouse','parent','elder_parent','sibling','child','adult_child']){
       result=result.replaceAll('{{$role}}',_familyRole(role)?.name??'yakının');
     }
     return result;
+  }
+
+  String storyDirectorMode(){
+    if(state.day-state.lastMajorEventDay<6)return 'recovery';
+    if(state.tension>=70||state.city.order<35)return 'pressure';
+    if(state.tension>=40)return 'build';
+    return 'calm';
+  }
+
+  int directorWeightForTest(String eventId){
+    final def=catalog[eventId];
+    return def==null?0:_directorWeight(def);
+  }
+
+  int _directorWeight(EventDefinition def){
+    var weight=math.max(1,def.weight).toDouble();
+    final mode=storyDirectorMode();
+    final tags=def.tags.toSet();
+    if(state.recentEventIds.contains(def.id))weight*=.28;
+    if(mode=='recovery'){
+      if(tags.any({'family','social','knowledge','memory','travel'}.contains))weight*=1.55;
+      if(tags.any({'crisis','danger','politics'}.contains))weight*=.48;
+    }else if(mode=='pressure'){
+      if(tags.any({'crisis','danger','politics','faction'}.contains))weight*=1.5;
+      if(tags.any({'knowledge','rumor'}.contains))weight*=1.18;
+    }else if(mode=='build'){
+      if(tags.any({'economy','faction','rumor','secret'}.contains))weight*=1.25;
+    }else{
+      if(tags.any({'social','knowledge','family','travel','memory'}.contains))weight*=1.32;
+      if(tags.contains('crisis'))weight*=.72;
+    }
+    if(_latestUnverifiedKnowledge()!=null&&tags.any({'knowledge','rumor','secret'}.contains))weight*=1.35;
+    if(def.chainId!=null&&state.eventLastDay.keys.any((id)=>catalog[id]?.chainId==def.chainId))weight*=1.45;
+    return math.max(1,weight.round());
   }
 
   bool _choiceRequirementsMet(List<Map<String,dynamic>> requirements){
@@ -850,11 +894,12 @@ class GameEngine {
     if(candidates.isEmpty){
       chosen=catalog['rumor']??catalog.events.values.first;
     }else{
-      final total=candidates.fold<int>(0,(sum,e)=>sum+math.max(1,e.weight));
+      final weights={for(final event in candidates)event.id:_directorWeight(event)};
+      final total=weights.values.fold<int>(0,(sum,w)=>sum+w);
       var roll=_rng.nextInt(total);
       chosen=candidates.last;
       for(final event in candidates){
-        roll-=math.max(1,event.weight);
+        roll-=weights[event.id]!;
         if(roll<0){chosen=event;break;}
       }
       _sync();
@@ -972,6 +1017,9 @@ class GameEngine {
     if(def.major)state.lastMajorEventDay=state.day;
     state.eventLastDay[def.id]=state.day;
     state.pendingEvents.remove(def.id);
+    state.recentEventIds.remove(def.id);
+    state.recentEventIds.add(def.id);
+    while(state.recentEventIds.length>6)state.recentEventIds.removeAt(0);
 
     ActionRollResult? rolled;
     var resultText=_renderText(choice.resultText);
