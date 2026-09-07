@@ -15,26 +15,31 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import tr.com.gundemradari.data.*
 import tr.com.gundemradari.research.EventResearchReport
 import tr.com.gundemradari.research.EventResearchService
@@ -45,6 +50,7 @@ import java.util.*
 import kotlin.math.roundToInt
 
 enum class FeedTab(val label:String,val icon:ImageVector){
+    SEARCH("Arananlar",Icons.Default.Search),
     TURKEY("Türkiye",Icons.Default.Flag),
     WORLD("Dünya",Icons.Default.Public),
     RELIGION("Din",Icons.Default.MenuBook)
@@ -63,6 +69,10 @@ class GundemViewModel(context:Context):ViewModel(){
     val researchLoading=MutableStateFlow(false)
     val researchReport=MutableStateFlow<EventResearchReport?>(null)
     val researchError=MutableStateFlow<String?>(null)
+    val activeSearchQuery=MutableStateFlow("")
+    private val searchResults=MutableStateFlow<List<EventEntity>>(emptyList())
+    private val hiddenSearchIds=MutableStateFlow<Set<String>>(emptySet())
+    private var searchJob:Job?=null
     private val rankingClock=MutableStateFlow(System.currentTimeMillis())
 
     val sources=dao.sources()
@@ -71,12 +81,18 @@ class GundemViewModel(context:Context):ViewModel(){
     val lastScan=dao.lastScan()
         .stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),null)
 
-    val events=combine(tab,rankingClock){t,now->t to now}
-        .flatMapLatest{(t,now)->
-            when(t){
+    val events=combine(tab,rankingClock,hiddenSearchIds){t,now,hidden->
+        Triple(t,now,hidden)
+    }
+        .flatMapLatest{(t,now,hidden)->
+            val feed=when(t){
+                FeedTab.SEARCH->searchResults
                 FeedTab.TURKEY->dao.turkeyFeed(now)
                 FeedTab.WORLD->dao.worldFeed(now)
                 FeedTab.RELIGION->dao.religionFeed(now)
+            }
+            feed.map{list->
+                if(t==FeedTab.SEARCH)list else list.filterNot{it.id in hidden}
             }
         }
         .stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
@@ -100,7 +116,85 @@ class GundemViewModel(context:Context):ViewModel(){
         }
     }
 
-    fun scan()=viewModelScope.launch{runScan()}
+    fun scan()=viewModelScope.launch{
+        resetSearch()
+        runScan()
+    }
+
+    fun startSearch(query:String){
+        val clean=query.trim()
+        if(clean.isBlank())return
+
+        searchJob?.cancel()
+        activeSearchQuery.value=clean
+        searchResults.value=emptyList()
+        hiddenSearchIds.value=emptySet()
+        tab.value=FeedTab.SEARCH
+
+        searchJob=viewModelScope.launch{
+            val terms=normalizeSearch(clean)
+                .split(" ")
+                .filter{it.length>=2}
+                .distinct()
+
+            if(terms.isEmpty())return@launch
+
+            suspend fun collectScope(scope:String){
+                val now=System.currentTimeMillis()
+                val rows=dao.searchEvents(
+                    scope=scope,
+                    pattern="%${terms.first()}%",
+                    now=now
+                )
+
+                val hits=rows
+                    .filter{row->
+                        val hay=normalizeSearch(row.searchText)
+                        terms.all{hay.contains(it)}
+                    }
+                    .map{it.event}
+
+                if(hits.isNotEmpty()){
+                    val merged=(searchResults.value+hits)
+                        .distinctBy{it.id}
+                        .sortedByDescending{event->
+                            event.importance -
+                                kotlin.math.min(
+                                    30.0,
+                                    kotlin.math.max(
+                                        0.0,
+                                        ((now-event.updatedAt)/3600000.0)*0.55
+                                    )
+                                )
+                        }
+                    searchResults.value=merged
+                    hiddenSearchIds.value=merged.map{it.id}.toSet()
+                }
+            }
+
+            collectScope("turkey")
+            delay(350)
+            collectScope("world")
+            delay(450)
+            collectScope("religion")
+        }
+    }
+
+    fun resetSearch(){
+        searchJob?.cancel()
+        searchJob=null
+        activeSearchQuery.value=""
+        searchResults.value=emptyList()
+        hiddenSearchIds.value=emptySet()
+        if(tab.value==FeedTab.SEARCH)tab.value=FeedTab.TURKEY
+    }
+
+    private fun normalizeSearch(text:String):String=
+        text.lowercase(Locale("tr","TR"))
+            .replace(Regex("[^\\p{L}\\p{N}]+")," ")
+            .replace(Regex("\\s+")," ")
+            .trim()
+
     fun setSource(id:String,enabled:Boolean)=viewModelScope.launch{dao.setSource(id,enabled)}
     fun action(mode:Int)=viewModelScope.launch{dao.setAll(mode)}
 
@@ -148,6 +242,12 @@ class GundemViewModel(context:Context):ViewModel(){
     val research by vm.researchReport.collectAsStateWithLifecycle()
     val researchLoading by vm.researchLoading.collectAsStateWithLifecycle()
     val researchError by vm.researchError.collectAsStateWithLifecycle()
+    val activeSearchQuery by vm.activeSearchQuery.collectAsStateWithLifecycle()
+    var searchText by rememberSaveable{mutableStateOf("")}
+
+    LaunchedEffect(activeSearchQuery){
+        if(activeSearchQuery.isBlank())searchText=""
+    }
 
     val pagerState=rememberPagerState(initialPage=FeedTab.entries.indexOf(tab)){FeedTab.entries.size}
     val scope=rememberCoroutineScope()
@@ -226,19 +326,61 @@ class GundemViewModel(context:Context):ViewModel(){
             }
         }
 
-        HorizontalPager(state=pagerState,modifier=Modifier.fillMaxSize()){
-            val pageTab=FeedTab.entries[it]
-            if(pageTab!=tab){
-                Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){
-                    CircularProgressIndicator()
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ){
+            HorizontalPager(
+                state=pagerState,
+                modifier=Modifier.fillMaxSize()
+            ){
+                val pageTab=FeedTab.entries[it]
+                if(pageTab!=tab){
+                    Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){
+                        CircularProgressIndicator()
+                    }
+                }else{
+                    EventList(
+                        tab=pageTab,
+                        events=events,
+                        onResearch={event->vm.research(event)}
+                    )
                 }
-            }else{
-                EventList(
-                    tab=pageTab,
-                    events=events,
-                    onResearch={event->vm.research(event)}
-                )
             }
+
+            OutlinedTextField(
+                value=searchText,
+                onValueChange={searchText=it},
+                modifier=Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end=14.dp,bottom=12.dp)
+                    .widthIn(min=210.dp,max=290.dp),
+                singleLine=true,
+                placeholder={
+                    Text(
+                        if(activeSearchQuery.isBlank())"Haber ara"
+                        else "Aranan: $activeSearchQuery"
+                    )
+                },
+                shape=RoundedCornerShape(28.dp),
+                keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),
+                keyboardActions=KeyboardActions(
+                    onSearch={vm.startSearch(searchText)}
+                ),
+                trailingIcon={
+                    IconButton(
+                        onClick={vm.startSearch(searchText)},
+                        enabled=searchText.isNotBlank()
+                    ){
+                        Icon(Icons.Default.Search,contentDescription="Haber ara")
+                    }
+                },
+                colors=OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor=MaterialTheme.colorScheme.surface.copy(alpha=.94f),
+                    unfocusedContainerColor=MaterialTheme.colorScheme.surface.copy(alpha=.90f)
+                )
+            )
         }
     }
 
@@ -279,6 +421,7 @@ class GundemViewModel(context:Context):ViewModel(){
 
 @Composable private fun tabAccent(tab:FeedTab):Color=
     when(tab){
+        FeedTab.SEARCH->MaterialTheme.colorScheme.primary
         FeedTab.TURKEY->MaterialTheme.colorScheme.primary
         FeedTab.WORLD->MaterialTheme.colorScheme.secondary
         FeedTab.RELIGION->MaterialTheme.colorScheme.tertiary
@@ -292,10 +435,11 @@ class GundemViewModel(context:Context):ViewModel(){
     if(events.isEmpty()){
         Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){
             Text(
-                if(tab==FeedTab.RELIGION)
-                    "Takip edilen konularla ilgili henüz kayıt yok."
-                else
-                    "Bu bölümde henüz önemli olay yok."
+                when(tab){
+                    FeedTab.SEARCH->"Sağ alttaki alandan haber ara."
+                    FeedTab.RELIGION->"Takip edilen kişilerle ilgili henüz kayıt yok."
+                    else->"Bu bölümde henüz önemli olay yok."
+                }
             )
         }
         return
@@ -307,7 +451,7 @@ class GundemViewModel(context:Context):ViewModel(){
         LazyColumn(
             state=listState,
             modifier=Modifier.fillMaxSize().padding(end=10.dp),
-            contentPadding=PaddingValues(vertical=10.dp),
+            contentPadding=PaddingValues(top=10.dp,bottom=82.dp),
             verticalArrangement=Arrangement.spacedBy(10.dp)
         ){
             items(events,key={it.id}){e->

@@ -1,18 +1,18 @@
 [
-  {"id":"trt_turkiye","name":"TRT Haber Türkiye","group":"turkey","endpoint":"https://www.trthaber.com/turkiye_articles.rss","kind":"rss","trust":0.82,"enabled":true,"staged":false,"note":"Doğrulanmış Türkçe Türkiye RSS"},
-  {"id":"trt_gundem","name":"TRT Haber Gündem","group":"turkey","endpoint":"https://www.trthaber.com/gundem_articles.rss","kind":"rss","trust":0.82,"enabled":true,"staged":false,"note":"Doğrulanmış Türkçe gündem RSS"},
-  {"id":"haberturk","name":"Habertürk Gündem","group":"turkey","endpoint":"https://www.haberturk.com/rss/kategori/gundem.xml","kind":"rss","trust":0.68,"enabled":true,"staged":false,"note":"Doğrulanmış Türkçe gündem RSS"},
-  {"id":"sozcu","name":"Sözcü Gündem","group":"turkey","endpoint":"https://www.sozcu.com.tr/feeds-rss-category-gundem","kind":"rss","trust":0.62,"enabled":true,"staged":false,"note":"Sözcü resmî RSS servisinden"},
+  {"id":"trt_turkiye","name":"TRT Haber Türkiye","group":"turkey","endpoint":"https://www.trthaber.com/turkiye_articles.rss","kind":"rss","trust":0.82,"enabled":true,"staged":false,"note":"Türkçe Türkiye RSS"},
+  {"id":"trt_gundem","name":"TRT Haber Gündem","group":"turkey","endpoint":"https://www.trthaber.com/gundem_articles.rss","kind":"rss","trust":0.82,"enabled":true,"staged":false,"note":"Türkçe gündem RSS"},
+  {"id":"haberturk","name":"Habertürk Gündem","group":"turkey","endpoint":"https://www.haberturk.com/rss/kategori/gundem.xml","kind":"rss","trust":0.68,"enabled":true,"staged":false,"note":"Türkçe gündem RSS"},
+  {"id":"sozcu","name":"Sözcü Gündem","group":"turkey","endpoint":"https://www.sozcu.com.tr/feeds-rss-category-gundem","kind":"rss","trust":0.62,"enabled":true,"staged":false,"note":"Türkçe gündem RSS"},
 
-  {"id":"trt_dunya","name":"TRT Haber Dünya","group":"world_tr","endpoint":"https://www.trthaber.com/dunya_articles.rss","kind":"rss","trust":0.82,"enabled":true,"staged":false,"note":"Doğrulanmış Türkçe dünya RSS"},
+  {"id":"trt_dunya","name":"TRT Haber Dünya","group":"world_tr","endpoint":"https://www.trthaber.com/dunya_articles.rss","kind":"rss","trust":0.82,"enabled":true,"staged":false,"note":"Türkçe dünya RSS"},
   {"id":"bbc_turkce","name":"BBC News Türkçe","group":"world_tr","endpoint":"https://feeds.bbci.co.uk/turkce/rss.xml","kind":"rss","trust":0.84,"enabled":true,"staged":false,"note":"BBC Türkçe haber akışı"},
-  {"id":"dw_turkce","name":"DW Türkçe","group":"world_tr","endpoint":"https://rss.dw.com/rdf/rss-tur-all","kind":"rss","trust":0.78,"enabled":true,"staged":false,"note":"Doğrulanmış Türkçe RSS"},
-  {"id":"euronews_tr","name":"Euronews Türkçe","group":"world_tr","endpoint":"https://tr.euronews.com/rss?format=mrss&level=theme&name=news","kind":"rss","trust":0.74,"enabled":true,"staged":false,"note":"Doğrulanmış Türkçe MRSS"},
-  {"id":"haberturk_dunya","name":"Habertürk Dünya","group":"world_tr","endpoint":"https://www.haberturk.com/rss/kategori/dunya.xml","kind":"rss","trust":0.68,"enabled":true,"staged":false,"note":"Doğrulanmış Türkçe dünya RSS"},
-  {"id":"sozcu_dunya","name":"Sözcü Dünya","group":"world_tr","endpoint":"https://www.sozcu.com.tr/feeds-rss-category-dunya","kind":"rss","trust":0.62,"enabled":true,"staged":false,"note":"Sözcü resmî RSS servisinden"},
+  {"id":"dw_turkce","name":"DW Türkçe","group":"world_tr","endpoint":"https://rss.dw.com/rdf/rss-tur-all","kind":"rss","trust":0.78,"enabled":true,"staged":false,"note":"DW Türkçe RSS"},
+  {"id":"euronews_tr","name":"Euronews Türkçe","group":"world_tr","endpoint":"https://tr.euronews.com/rss?format=mrss&level=theme&name=news","kind":"rss","trust":0.74,"enabled":true,"staged":false,"note":"Euronews Türkçe MRSS"},
+  {"id":"haberturk_dunya","name":"Habertürk Dünya","group":"world_tr","endpoint":"https://www.haberturk.com/rss/kategori/dunya.xml","kind":"rss","trust":0.68,"enabled":true,"staged":false,"note":"Türkçe dünya RSS"},
+  {"id":"sozcu_dunya","name":"Sözcü Dünya","group":"world_tr","endpoint":"https://www.sozcu.com.tr/feeds-rss-category-dunya","kind":"rss","trust":0.62,"enabled":true,"staged":false,"note":"Türkçe dünya RSS"},
 
-  {"id":"diyanet_haber","name":"Diyanet Haber","group":"religion_direct","endpoint":"https://www.diyanethaber.com.tr/rss","kind":"rss","trust":0.90,"enabled":true,"staged":false,"note":"Doğrulanmış Diyanet Haber RSS · Din sekmesi"},
-  {"id":"religion_watch","name":"Din takip araması","group":"religion_search","endpoint":"","kind":"religion_watch","trust":0.60,"enabled":true,"staged":false,"note":"Yalnız verdiğiniz takip listesini web haber aramasında izler"},
+  {"id":"religion_people_google","name":"Din takip kişileri · Google News","group":"religion_search","endpoint":"","kind":"religion_watch","trust":0.62,"enabled":true,"staged":false,"note":"Yalnız takip edilen kişilerin haber eşleşmeleri"},
+  {"id":"religion_people_youtube","name":"Din takip kişileri · YouTube","group":"religion_search","endpoint":"","kind":"religion_youtube","trust":0.48,"enabled":true,"staged":false,"note":"Yalnız takip edilen kişilerin ilgili video/açıklamaları"},
 
-  {"id":"ibrahim_haskologlu","name":"İbrahim Haskoloğlu","group":"social","endpoint":"https://t.me/s/ibrahimhaskologlu","kind":"telegram","trust":0.45,"enabled":true,"staged":false,"note":"Telegram erken haber sinyali · doğrulama yerine geçmez"}
+  {"id":"ibrahim_haskologlu","name":"İbrahim Haskoloğlu","group":"social","endpoint":"https://t.me/s/ibrahimhaskologlu","kind":"telegram","trust":0.45,"enabled":true,"staged":false,"note":"Telegram erken haber sinyali"}
 ]

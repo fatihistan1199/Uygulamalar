@@ -51,6 +51,11 @@ data class ResearchItemRow(
 data class ClassificationItemRow(
     val sourceId:String, val groupName:String, val title:String, val summary:String)
 
+data class SearchEventRow(
+    @Embedded val event:EventEntity,
+    val searchText:String
+)
+
 @Dao interface GundemDao {
     @Query("SELECT * FROM sources ORDER BY groupName,name")
     fun sources():Flow<List<SourceEntity>>
@@ -172,6 +177,31 @@ data class ClassificationItemRow(
         ORDER BY s.trust DESC, COALESCE(r.publishedAt,r.firstSeenAt) DESC
     """)
     suspend fun researchItems(eventId:String):List<ResearchItemRow>
+
+
+    @Query("""
+        SELECT e.*,
+               (
+                   e.title || ' ' || e.summary || ' ' ||
+                   COALESCE(GROUP_CONCAT(r.title || ' ' || r.summary,' '),'')
+               ) AS searchText
+        FROM events e
+        LEFT JOIN event_items ei ON ei.eventId=e.id
+        LEFT JOIN raw_items r ON r.url=ei.rawUrl
+        WHERE e.scope=:scope AND e.noise < 70
+          AND (
+              e.title LIKE :pattern COLLATE NOCASE OR
+              e.summary LIKE :pattern COLLATE NOCASE OR
+              r.title LIKE :pattern COLLATE NOCASE OR
+              r.summary LIKE :pattern COLLATE NOCASE
+          )
+        GROUP BY e.id
+        ORDER BY (
+            e.importance - MIN(30.0, MAX(0.0, ((:now-e.updatedAt)/3600000.0)*0.55))
+        ) DESC, e.updatedAt DESC
+        LIMIT 100
+    """)
+    suspend fun searchEvents(scope:String,pattern:String,now:Long):List<SearchEventRow>
 
     @Insert suspend fun scan(row:ScanHistoryEntity)
     @Query("SELECT max(finishedAt) FROM scan_history")

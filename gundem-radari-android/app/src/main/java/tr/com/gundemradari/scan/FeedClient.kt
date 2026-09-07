@@ -29,12 +29,13 @@ class FeedClient {
     private val religionWatcher=ReligionWebWatcher()
 
     suspend fun fetch(source:SourceEntity):List<FetchedItem> {
-        if(source.kind=="religion_watch")return religionWatcher.fetch(source)
+        if(source.kind=="religion_watch")return religionWatcher.fetchGoogleNews(source)
+        if(source.kind=="religion_youtube")return religionWatcher.fetchYouTube(source)
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val conn=(URL(source.endpoint).openConnection() as HttpURLConnection).apply {
                 connectTimeout=15000
                 readTimeout=15000
-                setRequestProperty("User-Agent","Mozilla/5.0 (Android) GundemRadari/0.8")
+                setRequestProperty("User-Agent","Mozilla/5.0 (Android) GundemRadari/0.11")
                 setRequestProperty("Accept","application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.7")
                 instanceFollowRedirects=true
             }
