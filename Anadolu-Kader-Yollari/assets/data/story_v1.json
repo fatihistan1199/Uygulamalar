@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "scenes": [
+    {
+      "id": "intro_identity",
+      "kicker": "Başlangıç",
+      "title": "Sen Kimsin?",
+      "body": "Sen {{player}}. {{age}} yaşında, Anadolu'nun yollarının hem ticaret hem tehlike taşıdığı bir çağda Konya'da yaşayan genç birisin. Büyük bir unvanın yok; önünde hazır çizilmiş bir kader de yok. Ailen, geçmişin ve vereceğin kararlar sana bazı kapıları daha kolay açacak, bazılarını ise zorlaştıracak.",
+      "continueLabel": "Hayatımı tanı"
+    },
+    {
+      "id": "background_koylu",
+      "kicker": "Ailen",
+      "title": "Toprağın Çocuğu",
+      "body": "Ailen geçimini topraktan, hayvandan ve mevsimin insafından sağladı. Küçük yaşta emeğin değerini, kıtlığın ne demek olduğunu ve bir köyde herkesin birbirini nasıl tanıdığını öğrendin. Şehir hayatı sana yabancı değil ama orada güven, çoğu zaman akrabalıktan daha pahalı.",
+      "continueLabel": "Konya'ya bak"
+    },
+    {
+      "id": "background_tuccar",
+      "kicker": "Ailen",
+      "title": "Hesap Defterlerinin Arasında",
+      "body": "Ailenin sofrasında yalnız yemek değil; fiyat, borç, yol güvenliği ve kervan haberleri de konuşulurdu. Paranın tek başına güç olmadığını erken öğrendin: doğru kişiye verilen söz, bazen bir kese akçeden daha değerlidir.",
+      "continueLabel": "Konya'ya bak"
+    },
+    {
+      "id": "background_medrese",
+      "kicker": "Geçmişin",
+      "title": "Mürekkep ve Münazara",
+      "body": "Gençliğinin önemli kısmı ders halkalarında, kitapların ve tartışmaların arasında geçti. İnsanların aynı meseleye farklı delillerle nasıl baktığını gördün. Şimdi bilginin, kâğıt üzerindeki hükümden şehir sokaklarındaki hayata nasıl taşındığını öğreneceksin.",
+      "continueLabel": "Konya'ya bak"
+    },
+    {
+      "id": "background_asker",
+      "kicker": "Ailen",
+      "title": "Silah Gölgesinde Büyümek",
+      "body": "Ailende nöbet, sefer ve yol güvenliği gündelik kelimelerdi. Kuvvetin işe yaradığı kadar yanlış zamanda kullanılan kuvvetin insanı nasıl yalnız bıraktığını da gördün. Önünde yalnız savaşçılığın değil, bambaşka hayatların kapıları var.",
+      "continueLabel": "Konya'ya bak"
+    },
+    {
+      "id": "city_konya",
+      "kicker": "Şehir",
+      "title": "Konya",
+      "body": "Konya'da medrese kapılarıyla han avluları, saray görevlileriyle çarşı esnafı aynı gün içinde birbirine değebilir. Şehir dışarıdan sakin görünse de her dükkânın, her vakfın ve her güçlü ailenin kendi hesabı vardır. {{city_mood}} Burada duyduğun her söz doğru olmayacak; ama doğru zamanda doğru sözü duymak hayatının yönünü değiştirebilir.",
+      "continueLabel": "Yolumu gör"
+    },
+    {
+      "id": "city_kayseri",
+      "kicker": "Şehre Varış",
+      "title": "Kayseri",
+      "body": "Kayseri seni hanların, ambarların ve tüccar seslerinin arasından karşılıyor. Erzak ve kervan akışı bu şehrin damarları gibi; bir yol kapanırsa pazardaki fiyat, sonra sofradaki ekmek değişir. {{city_mood}} Burada para kadar söylenti de hızlı el değiştiriyor.",
+      "continueLabel": "Şehre gir"
+    },
+    {
+      "id": "city_sivas",
+      "kicker": "Şehre Varış",
+      "title": "Sivas",
+      "body": "Sivas doğuya uzanan yolların sert kavşağıdır. Kervanlar, askerî birlikler ve uzak beldelerden gelen haberler burada birbirine karışır. {{city_mood}} Şehrin dışındaki yol bazen içerideki siyasetten daha tehlikelidir.",
+      "continueLabel": "Şehre gir"
+    },
+    {
+      "id": "city_ankara",
+      "kicker": "Şehre Varış",
+      "title": "Ankara",
+      "body": "Ankara'nın kalesi yüksekten bakarken aşağıdaki çarşılarda dokumacılar, tüccarlar ve yerel güç sahipleri kendi düzenlerini kurar. {{city_mood}} Burada küçük görünen bir fiyat tartışması bile lonca ile yönetim arasında daha büyük bir çekişmenin işareti olabilir.",
+      "continueLabel": "Şehre gir"
+    },
+    {
+      "id": "city_antalya",
+      "kicker": "Şehre Varış",
+      "title": "Antalya",
+      "body": "Antalya'da tuzlu deniz havasına yabancı diller, gemi sesleri ve gümrük pazarlıkları karışır. Liman, Anadolu'nun içinden gelen malları uzak ülkelere; uzak ülkelerin haberlerini de şehrin sokaklarına taşır. {{city_mood}} Bir tercümanın sözü burada bazen bir askerin kılıcından daha etkili olabilir.",
+      "continueLabel": "Şehre gir"
+    },
+    {
+      "id": "city_return",
+      "kicker": "Yeniden Varış",
+      "title": "{{city}}",
+      "body": "{{city}}'e yeniden geldin. Şehir aynı yerde duruyor ama sen ayrıldığından beri insanlar kararlar verdi, fiyatlar değişti ve bazı ilişkiler güçlenip bazıları zayıfladı. {{city_mood}} Daha önce tanıdığın sokaklarda şimdi farklı fırsatlar ve farklı tehlikeler olabilir.",
+      "continueLabel": "Şehre dön"
+    },
+    {
+      "id": "intro_path",
+      "kicker": "Yaşam Yolu",
+      "title": "Önünde Bir Hayat Var",
+      "body": "Senden yalnızca olay seçmen beklenmiyor. Önce geçimini sağlaman gerekecek. Şehirde iş bulabilir, insanların meselelerine karışıp görevler üstlenebilir, dost ve düşman edinebilirsin. Zamanla evlenebilir, çocuk sahibi olabilir ve kurduğun hayatı senden sonraki nesle bırakabilirsin. Hiçbiri zorunlu bir sıra değil; ama her biri dünyada iz bırakır.",
+      "continueLabel": "Hayatıma başla"
+    },
+    {
+      "id": "milestone_first_work",
+      "kicker": "Yaşam Yolu",
+      "title": "İlk Kazancın",
+      "body": "Bugün ilk kez kendi emeğinle akçe kazandın. Küçük bir işti; fakat şehirde bir insanı tanınır kılan şey çoğu zaman büyük kahramanlıklar değil, tekrar tekrar yaptığı işlerdir. İnsanlar seni ne için çağırabileceklerini yavaş yavaş öğrenmeye başlayacak.",
+      "continueLabel": "Devam et"
+    },
+    {
+      "id": "milestone_first_task",
+      "kicker": "Yaşam Yolu",
+      "title": "Bir Meseleye Karıştın",
+      "body": "Artık yalnız şehrin içinden geçen biri değilsin. Bir meselede taraf oldun ve insanlar verdiğin kararı hatırlayacak. Bundan sonraki olaylar, önceki seçimlerinin izlerini taşıyabilir.",
+      "continueLabel": "Devam et"
+    }
+  ]
+}
