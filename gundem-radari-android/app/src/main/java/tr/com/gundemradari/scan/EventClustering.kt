@@ -56,24 +56,35 @@ private fun overlap(a:Set<String>,b:Set<String>):Double =
     else a.intersect(b).size.toDouble()/minOf(a.size,b.size)
 
 private fun eventKind(text:String):String{
-    val t=text.lowercase(clusterLocale)
+    val ts=tokens(text)
+
+    fun hasStem(vararg stems:String):Boolean =
+        ts.any{token->
+            stems.any{stem->token.startsWith(stem)}
+        }
+
+    val waterDisaster=
+        ts.contains("sel") ||
+        hasStem("heyelan")
+
+    val transport=
+        (
+            hasStem("gemi","tekne","feribot") &&
+            hasStem("kaza","bat")
+        ) || (
+            hasStem("uçak","helikopter","tren") &&
+            hasStem("kaza","düş")
+        )
+
     return when{
-        t.contains("deprem")->"earthquake"
-        t.contains("yanardağ")||t.contains("volkan")->"volcano"
-        t.contains("seçim")||t.contains("referandum")->"election"
-        t.contains("yangın")->"fire"
-        t.contains("sel")||t.contains("heyelan")->"flood"
-        t.contains("saldırı")||t.contains("füze")||t.contains("çatışma")->"attack"
-        t.contains("faiz")||t.contains("enflasyon")->"economy"
-        t.contains("gemi kazası")||
-        t.contains("gemi battı")||
-        t.contains("batan gemi")||
-        (t.contains("gemi")&&t.contains("batan"))||
-        t.contains("tekne battı")||
-        t.contains("feribot battı")||
-        t.contains("uçak kazası")||
-        t.contains("uçak düştü")||
-        t.contains("tren kazası")->"transport"
+        hasStem("deprem")->"earthquake"
+        hasStem("yanardağ","volkan")->"volcano"
+        hasStem("seçim","referandum")->"election"
+        hasStem("yangın")->"fire"
+        waterDisaster->"flood"
+        hasStem("saldır","füze","çatış")->"attack"
+        hasStem("faiz","enflasyon")->"economy"
+        transport->"transport"
         else->"general"
     }
 }

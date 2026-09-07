@@ -100,4 +100,20 @@ class SearchMergeAndSourceQualityTest {
         assertTrue(sourceFamily("haberturk")==sourceFamily("haberturk_dunya"))
         assertTrue(sourceFamily("sozcu")==sourceFamily("sozcu_dunya"))
     }
+    @Test
+    fun risingDeathCountDoesNotBecomeFlood(){
+        val ship=event(
+            "a",
+            "Gemi kazasında can kaybı 14'e yükseldi",
+            "Arama kurtarma çalışmaları sürüyor."
+        )
+        val other=event(
+            "b",
+            "Batan gemide ölü sayısı 14 oldu",
+            "Kazanın ardından arama kurtarma devam ediyor."
+        )
+
+        assertTrue(likelySameSearchEvent(ship,other))
+    }
+
 }
