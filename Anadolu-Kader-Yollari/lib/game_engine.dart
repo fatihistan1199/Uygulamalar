@@ -787,6 +787,7 @@ class GameEngine {
     final rumor=_latestUnverifiedKnowledge();
     result=result.replaceAll('{{rumor}}',rumor?.text??'duyduğun söylenti');
     result=result.replaceAll('{{rumor_source}}',rumor?.source??'belirsiz kaynak');
+    result=result.replaceAll('{{verification_result}}',(state.eventFlags['last_verification_result'] as String?)??'Bilginin doğruluğu hâlâ kesinleşmedi.');
     for(final role in ['spouse','parent','elder_parent','sibling','child','adult_child']){
       result=result.replaceAll('{{$role}}',_familyRole(role)?.name??'yakının');
     }
@@ -974,6 +975,12 @@ class GameEngine {
           if(state.eventFlags[condition['key']]!=value)return false;
         case 'flag_not_set':
           if(state.eventFlags.containsKey(condition['key']))return false;
+        case 'knowledge_unverified_exists':
+          if(_latestUnverifiedKnowledge()==null)return false;
+        case 'knowledge_fact_unverified':
+          if(_latestUnverifiedKnowledge(condition['factId'] as String?)==null)return false;
+        case 'world_fact_equals':
+          if(state.worldFacts[condition['key']]!=value)return false;
       }
     }
     return true;
@@ -1116,6 +1123,7 @@ class GameEngine {
           source:_renderText(effect['source'] as String),
           reliability:(effect['reliability'] as num).toInt(),
           day:state.day,
+          factId:effect['factId'] as String?,
         ));
       case 'knowledge_random':
         final min=(effect['minReliability'] as num).toInt();
@@ -1127,7 +1135,27 @@ class GameEngine {
           source:_renderText(effect['source'] as String),
           reliability:reliability,
           day:state.day,
+          factId:effect['factId'] as String?,
         ));
+      case 'knowledge_adjust_recent':
+        final factId=effect['factId'] as String?;
+        final entry=_latestUnverifiedKnowledge(factId);
+        if(entry!=null)entry.reliability=clamp100(entry.reliability+amount);
+      case 'knowledge_verify_recent':
+        final requested=effect['factId'] as String?;
+        final entry=_latestUnverifiedKnowledge(requested);
+        final factId=requested??entry?.factId;
+        if(entry!=null&&factId!=null&&state.worldFacts.containsKey(factId)){
+          final truth=state.worldFacts[factId]!;
+          entry.confirmed=truth;
+          entry.refuted=!truth;
+          entry.reliability=100;
+          state.eventFlags['last_verification_result']=truth
+            ?'Söylenti güvenilir kanıtlarla doğrulandı.'
+            :'Söylenti güvenilir kanıtlarla yanlışlandı.';
+        }else{
+          state.eventFlags['last_verification_result']='Bilgiyi kesinleştirecek bağımsız bir gerçek kaydı bulunamadı.';
+        }
       case 'npc_relation':
         final npc=state.npcs[effect['npc']];
         if(npc!=null){
