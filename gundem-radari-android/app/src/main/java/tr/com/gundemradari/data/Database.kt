@@ -11,7 +11,9 @@ import kotlinx.coroutines.flow.Flow
     val kind:String, val trust:Double, val enabled:Boolean, val staged:Boolean, val note:String)
 @Entity(tableName="raw_items") data class RawItemEntity(
     @PrimaryKey val url:String, val sourceId:String, val title:String, val summary:String,
-    val publishedAt:Long?, val firstSeenAt:Long, val exactHash:String)
+    val publishedAt:Long?, val firstSeenAt:Long, val exactHash:String,
+    @ColumnInfo(defaultValue="''") val originalTitle:String="",
+    @ColumnInfo(defaultValue="''") val originalSummary:String="")
 @Entity(tableName="events") data class EventEntity(
     @PrimaryKey val id:String, val title:String, val summary:String, val scope:String,
     val importance:Double, val noise:Double, val verification:Int, val velocity:Double,
@@ -30,6 +32,8 @@ data class ResearchItemRow(
     val groupName:String,
     val title:String,
     val summary:String,
+    val originalTitle:String,
+    val originalSummary:String,
     val publishedAt:Long?,
     val firstSeenAt:Long,
     val trust:Double
@@ -44,18 +48,19 @@ data class ResearchItemRow(
     @Query("UPDATE sources SET enabled=CASE WHEN staged=0 AND :mode=1 THEN 1 WHEN :mode=0 THEN 0 ELSE enabled END") suspend fun setAll(mode:Int)
     @Query("SELECT EXISTS(SELECT 1 FROM raw_items WHERE url=:url)") suspend fun rawExists(url:String):Boolean
     @Insert(onConflict=OnConflictStrategy.IGNORE) suspend fun addRaw(row:RawItemEntity):Long
-    @Query("SELECT * FROM events WHERE updatedAt > :after ORDER BY importance DESC LIMIT 120") suspend fun recentEvents(after:Long):List<EventEntity>
+    @Query("SELECT * FROM events WHERE updatedAt > :after ORDER BY importance DESC LIMIT 140") suspend fun recentEvents(after:Long):List<EventEntity>
     @Query("SELECT * FROM events WHERE id=:id") suspend fun event(id:String):EventEntity?
     @Insert(onConflict=OnConflictStrategy.REPLACE) suspend fun putEvent(row:EventEntity)
     @Insert(onConflict=OnConflictStrategy.IGNORE) suspend fun link(row:EventItemEntity)
     @Insert suspend fun addVersion(row:EventVersionEntity)
-    @Query("SELECT * FROM events WHERE noise < 50 ORDER BY importance DESC,updatedAt DESC LIMIT 60") fun mainFeed():Flow<List<EventEntity>>
     @Query("SELECT * FROM events WHERE scope='turkey' AND noise < 50 ORDER BY importance DESC,updatedAt DESC LIMIT 60") fun turkeyFeed():Flow<List<EventEntity>>
     @Query("SELECT * FROM events WHERE scope='world' AND noise < 50 ORDER BY importance DESC,updatedAt DESC LIMIT 60") fun worldFeed():Flow<List<EventEntity>>
     @Query("SELECT * FROM events WHERE religionPriority > 0 AND noise < 70 ORDER BY religionPriority DESC,importance DESC,updatedAt DESC LIMIT 80") fun religionFeed():Flow<List<EventEntity>>
     @Query("SELECT * FROM events WHERE importance >= 55 AND firstSeenAt > :after AND noise < 50 ORDER BY importance DESC") fun missedFeed(after:Long):Flow<List<EventEntity>>
     @Query("""
-        SELECT s.name AS sourceName, s.groupName AS groupName, r.title AS title, r.summary AS summary,
+        SELECT s.name AS sourceName, s.groupName AS groupName,
+               r.title AS title, r.summary AS summary,
+               r.originalTitle AS originalTitle, r.originalSummary AS originalSummary,
                r.publishedAt AS publishedAt, r.firstSeenAt AS firstSeenAt, s.trust AS trust
         FROM event_items ei
         JOIN raw_items r ON r.url=ei.rawUrl
@@ -69,7 +74,7 @@ data class ResearchItemRow(
 
 @Database(
     entities=[SourceEntity::class,RawItemEntity::class,EventEntity::class,EventItemEntity::class,EventVersionEntity::class,ScanHistoryEntity::class],
-    version=4,
+    version=5,
     exportSchema=false
 )
 abstract class AppDatabase:RoomDatabase(){
@@ -98,9 +103,19 @@ abstract class AppDatabase:RoomDatabase(){
                 db.execSQL("DELETE FROM raw_items")
             }
         }
+        private val MIGRATION_4_5=object:Migration(4,5){
+            override fun migrate(db:SupportSQLiteDatabase){
+                db.execSQL("ALTER TABLE raw_items ADD COLUMN originalTitle TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE raw_items ADD COLUMN originalSummary TEXT NOT NULL DEFAULT ''")
+                db.execSQL("DELETE FROM event_items")
+                db.execSQL("DELETE FROM event_versions")
+                db.execSQL("DELETE FROM events")
+                db.execSQL("DELETE FROM raw_items")
+            }
+        }
         fun get(context:Context)=INSTANCE?: synchronized(this){
             INSTANCE?:Room.databaseBuilder(context.applicationContext,AppDatabase::class.java,"gundem-radari.db")
-                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5)
                 .build()
                 .also{INSTANCE=it}
         }

@@ -3,6 +3,9 @@ package tr.com.gundemradari.research
 import tr.com.gundemradari.data.EventEntity
 import tr.com.gundemradari.data.GundemDao
 import tr.com.gundemradari.data.ResearchItemRow
+import tr.com.gundemradari.web.NewsWebSearch
+import tr.com.gundemradari.web.WebNewsResult
+import tr.com.gundemradari.web.buildExtractiveWebSummary
 import java.util.Locale
 
 data class EventResearchReport(
@@ -13,10 +16,16 @@ data class EventResearchReport(
     val socialSourceCount:Int,
     val commonTerms:List<String>,
     val firstAt:Long?,
-    val latestAt:Long?
+    val latestAt:Long?,
+    val webResults:List<WebNewsResult>,
+    val webSummary:List<String>,
+    val webError:String?=null
 )
 
-class EventResearchService(private val dao:GundemDao){
+class EventResearchService(
+    private val dao:GundemDao,
+    private val webSearch:NewsWebSearch=NewsWebSearch()
+){
     private val stopWords=setOf(
         "olan","olarak","için","ile","ama","ancak","daha","sonra","önce","gibi","kadar","üzerine",
         "arasında","karşı","son","yeni","göre","dedi","diyor","etti","ediyor","oldu","oluyor","olacak",
@@ -29,15 +38,25 @@ class EventResearchService(private val dao:GundemDao){
         val distinctSources=rows.distinctBy{it.sourceName}
         val common=commonTerms(distinctSources)
         val times=rows.map{it.publishedAt?:it.firstSeenAt}
+        val query=rows.firstOrNull{it.originalTitle.isNotBlank()}?.originalTitle ?: event.title
+
+        val web=runCatching{
+            webSearch.search(query,limit=10,expandDescriptions=true)
+        }
+        val webRows=web.getOrElse{emptyList()}
+
         return EventResearchReport(
             event=event,
             sources=rows,
             independentSourceCount=distinctSources.size,
-            officialSourceCount=distinctSources.count{it.groupName=="official"},
+            officialSourceCount=distinctSources.count{it.groupName=="official"||it.groupName=="religion_direct"},
             socialSourceCount=distinctSources.count{it.groupName=="social"},
             commonTerms=common,
             firstAt=times.minOrNull(),
-            latestAt=times.maxOrNull()
+            latestAt=times.maxOrNull(),
+            webResults=webRows,
+            webSummary=buildExtractiveWebSummary(webRows),
+            webError=web.exceptionOrNull()?.message
         )
     }
 

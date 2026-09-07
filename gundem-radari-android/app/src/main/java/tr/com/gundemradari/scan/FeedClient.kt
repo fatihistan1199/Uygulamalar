@@ -4,6 +4,7 @@ import android.text.Html
 import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
 import tr.com.gundemradari.data.SourceEntity
+import tr.com.gundemradari.religion.ReligionWebWatcher
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -14,25 +15,38 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.TimeZone
 
-data class FetchedItem(val source:SourceEntity,val url:String,val title:String,val summary:String,val publishedAt:Long?=null)
+data class FetchedItem(
+    val source:SourceEntity,
+    val url:String,
+    val title:String,
+    val summary:String,
+    val publishedAt:Long?=null,
+    val originalTitle:String=title,
+    val originalSummary:String=summary
+)
 
 class FeedClient {
-    suspend fun fetch(source:SourceEntity):List<FetchedItem> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        val conn=(URL(source.endpoint).openConnection() as HttpURLConnection).apply {
-            connectTimeout=15000
-            readTimeout=15000
-            setRequestProperty("User-Agent","Mozilla/5.0 (Android) GundemRadari/0.1")
-            setRequestProperty("Accept","application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.7")
-            instanceFollowRedirects=true
-        }
-        try {
-            if(conn.responseCode !in 200..299) error("HTTP ${conn.responseCode}")
-            val text=conn.inputStream.bufferedReader().readText()
-            when(source.kind){
-                "telegram" -> parseTelegram(text,source)
-                else -> parseXml(text,source)
+    private val religionWatcher=ReligionWebWatcher()
+
+    suspend fun fetch(source:SourceEntity):List<FetchedItem> {
+        if(source.kind=="religion_watch")return religionWatcher.fetch(source)
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val conn=(URL(source.endpoint).openConnection() as HttpURLConnection).apply {
+                connectTimeout=15000
+                readTimeout=15000
+                setRequestProperty("User-Agent","Mozilla/5.0 (Android) GundemRadari/0.4")
+                setRequestProperty("Accept","application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.7")
+                instanceFollowRedirects=true
             }
-        } finally { conn.disconnect() }
+            try {
+                if(conn.responseCode !in 200..299) error("HTTP ${conn.responseCode}")
+                val text=conn.inputStream.bufferedReader().readText()
+                when(source.kind){
+                    "telegram" -> parseTelegram(text,source)
+                    else -> parseXml(text,source)
+                }
+            } finally { conn.disconnect() }
+        }
     }
 
     private fun parseXml(xml:String,source:SourceEntity):List<FetchedItem>{

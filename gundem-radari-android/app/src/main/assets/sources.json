@@ -9,11 +9,12 @@
   {"id":"euronews_tr","name":"Euronews Türkçe","group":"turkey","endpoint":"https://tr.euronews.com/rss?format=mrss&level=theme&name=news","kind":"rss","trust":0.72,"enabled":true,"staged":false,"note":"Resmî Türkçe MRSS"},
   {"id":"birgun","name":"BirGün","group":"turkey","endpoint":"https://www.birgun.net/rss/home","kind":"rss","trust":0.62,"enabled":true,"staged":false,"note":"Resmî tüm içerikler RSS"},
 
-  {"id":"diyanet_haber","name":"Diyanet Haber","group":"religion_direct","endpoint":"https://www.diyanethaber.com.tr/rss","kind":"rss","trust":0.90,"enabled":true,"staged":false,"note":"Diyanet Haber resmî RSS · din içerikleri Din sayfasında öncelikli"},
+  {"id":"diyanet_haber","name":"Diyanet Haber","group":"religion_direct","endpoint":"https://www.diyanethaber.com.tr/rss","kind":"rss","trust":0.90,"enabled":true,"staged":false,"note":"Diyanet kaynağı · yalnız Din sekmesinde"},
+  {"id":"religion_watch","name":"Din takip araması","group":"religion_search","endpoint":"","kind":"religion_watch","trust":0.60,"enabled":true,"staged":false,"note":"Verdiğiniz 8 isim/başlığı ücretsiz web haber aramasında takip eder"},
 
-  {"id":"bbc_world","name":"BBC World","group":"world","endpoint":"https://feeds.bbci.co.uk/news/world/rss.xml","kind":"rss","trust":0.84,"enabled":true,"staged":false,"note":"World RSS · Türkçeye çevrilir"},
-  {"id":"al_jazeera","name":"Al Jazeera","group":"world","endpoint":"https://www.aljazeera.com/xml/rss/all.xml","kind":"rss","trust":0.76,"enabled":true,"staged":false,"note":"All news RSS · Türkçeye çevrilir"},
-  {"id":"cnn_world","name":"CNN World","group":"world","endpoint":"https://rss.cnn.com/rss/edition_world.rss","kind":"rss","trust":0.76,"enabled":true,"staged":false,"note":"World RSS · Türkçeye çevrilir"},
+  {"id":"bbc_world","name":"BBC World","group":"world","endpoint":"https://feeds.bbci.co.uk/news/world/rss.xml","kind":"rss","trust":0.84,"enabled":true,"staged":false,"note":"World RSS · Türkçe eşdeğer haber bulunursa onu kullanır"},
+  {"id":"al_jazeera","name":"Al Jazeera","group":"world","endpoint":"https://www.aljazeera.com/xml/rss/all.xml","kind":"rss","trust":0.76,"enabled":true,"staged":false,"note":"All news RSS · Türkçe eşdeğer haber bulunursa onu kullanır"},
+  {"id":"cnn_world","name":"CNN World","group":"world","endpoint":"https://rss.cnn.com/rss/edition_world.rss","kind":"rss","trust":0.76,"enabled":true,"staged":false,"note":"World RSS · Türkçe eşdeğer haber bulunursa onu kullanır"},
 
   {"id":"gdacs","name":"GDACS","group":"official","endpoint":"https://www.gdacs.org/xml/rss.xml","kind":"rss","trust":0.95,"enabled":true,"staged":false,"note":"Küresel afet RSS · Türkçeye çevrilir"},
   {"id":"usgs","name":"USGS","group":"official","endpoint":"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.atom","kind":"rss","trust":1.0,"enabled":true,"staged":false,"note":"Son bir saat depremleri · Türkçeye çevrilir"},
