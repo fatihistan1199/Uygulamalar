@@ -1,4 +1,4 @@
-# build-revision: 3
+# build-revision: 4
 name: Anadolu Kader Yollari Android
 
 on:
@@ -35,5 +35,5 @@ jobs:
       - name: APK artefaktını yükle
         uses: actions/upload-artifact@v4
         with:
-          name: Anadolu-Kader-Yollari-v0.6-debug
+          name: Anadolu-Kader-Yollari-v0.7-debug
           path: Anadolu-Kader-Yollari/build/app/outputs/flutter-apk/app-debug.apk
