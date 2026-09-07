@@ -9,6 +9,7 @@ class EventChoiceDefinition {
     required this.resultText,
     required this.effects,
     required this.requirements,
+    this.challenge,
   });
 
   final String id;
@@ -17,6 +18,7 @@ class EventChoiceDefinition {
   final String resultText;
   final List<Map<String, dynamic>> effects;
   final List<Map<String, dynamic>> requirements;
+  final Map<String, dynamic>? challenge;
 
   factory EventChoiceDefinition.fromJson(Map<String, dynamic> j) =>
       EventChoiceDefinition(
@@ -30,6 +32,7 @@ class EventChoiceDefinition {
         requirements: ((j['requirements'] as List?) ?? const [])
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList(),
+        challenge: j['challenge'] == null ? null : Map<String, dynamic>.from(j['challenge'] as Map),
       );
 }
 
