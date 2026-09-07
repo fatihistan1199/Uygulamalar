@@ -235,4 +235,75 @@ void main(){
     expect(restored.delayedEffects.any((x)=>x.type=='event_followup'),isTrue);
   });
 
+
+  test('oyuncu cinsiyeti ve aile bağları save load ile korunur',(){
+    final s=GameEngine.newGame(seed:1401,name:'Ayşe',background:'Tüccar ailesi',gender:'female');
+    expect(s.playerGender,'female');
+    expect(s.family['player']!.gender,'female');
+    expect(s.family['player']!.relations['sibling_1']!.trust,61);
+    final restored=GameState.fromJson(Map<String,dynamic>.from(jsonDecode(jsonEncode(s.toJson()))));
+    expect(restored.playerGender,'female');
+    expect(restored.family['player']!.relations['sibling_1']!.affection,58);
+  });
+
+  test('aile evlilik olayı eş ve gecikmiş çocuk zinciri üretir',(){
+    final s=GameEngine.newGame(seed:1402,name:'Hasan',background:'Tüccar ailesi',gender:'male');
+    final e=GameEngine(s,catalog);
+    s.pendingEvents.add('family_marriage_offer');
+    final marriage=e.pickEvent();
+    expect(marriage.id,'family_marriage_offer');
+    final before=s.family.length;
+    e.resolve(marriage,'accept');
+    final player=s.family[s.playerFamilyId]!;
+    expect(player.spouseId,isNotNull);
+    expect(s.family.length,before+1);
+    expect(s.delayedEffects.any((x)=>x.payload['eventId']=='family_child_birth'),isTrue);
+    final due=s.delayedEffects.firstWhere((x)=>x.payload['eventId']=='family_child_birth').dueDay;
+    e.advance(due-s.day);
+    expect(s.pendingEvents,contains('family_child_birth'));
+    final birth=e.pickEvent();
+    expect(birth.id,'family_child_birth');
+    final childrenBefore=player.childIds.length;
+    e.resolve(birth,'family_help');
+    expect(player.childIds.length,childrenBefore+1);
+    expect(s.family[player.childIds.last]!.parentIds,contains(player.id));
+  });
+
+  test('akrabalık şablonları gerçek isimlerle render edilir ve bağ etkisi uygulanır',(){
+    final s=GameEngine.newGame(seed:1403,name:'Hasan',background:'Köylü ailesi',gender:'male');
+    final e=GameEngine(s,catalog);
+    s.pendingEvents.add('family_sibling_debt');
+    final event=e.pickEvent();
+    expect(event.id,'family_sibling_debt');
+    expect(event.title,contains('Zehra'));
+    expect(event.body,contains('Zehra'));
+    expect(event.body,contains('{{sibling}}'),isFalse);
+    final before=s.family['player']!.relations['sibling_1']!.trust;
+    e.resolve(event,'refuse');
+    expect(s.family['player']!.relations['sibling_1']!.trust,before-9);
+    expect(s.family['sibling_1']!.relations['player']!.trust,before-9);
+  });
+
+  test('aile olayı koşulları eş durumuna göre seçenek havuzunu değiştirir',(){
+    final s=GameEngine.newGame(seed:1404,name:'Hasan',background:'Asker ailesi',gender:'male');
+    final e=GameEngine(s,catalog);
+    s.pendingEvents.add('family_marriage_offer');
+    final marriage=e.pickEvent();
+    expect(marriage.id,'family_marriage_offer');
+    e.resolve(marriage,'accept');
+    s.pendingEvents.add('family_marriage_offer');
+    final next=e.pickEvent();
+    expect(next.id,isNot('family_marriage_offer'));
+  });
+
+  test('halef seçildiğinde cinsiyet de gerçek aile üyesinden devralınır',(){
+    final s=GameEngine.newGame(seed:1405,name:'Hasan',background:'Medrese öğrencisi',gender:'male');
+    final e=GameEngine(s,catalog);
+    e.forceDamageForTest(200,cause:'Test ölümü');
+    expect(e.successorOptions(),contains('Zehra'));
+    e.assumeSuccessor('Zehra');
+    expect(s.playerGender,'female');
+    expect(s.family[s.playerFamilyId]!.gender,'female');
+  });
+
 }
