@@ -47,7 +47,7 @@ void main(){
     expect(event.id,'grain');
     e.resolve(event,'judge');
     expect(s.delayedEffects,isNotEmpty);
-    final due=s.delayedEffects.first.dueDay;
+    final due=s.delayedEffects.firstWhere((x)=>x.type=='event_followup'&&x.payload['eventId']=='grain_followup').dueDay;
     e.advance(due-s.day);
     expect(s.delayedEffects.any((x)=>x.type=='event_followup'&&x.payload['eventId']=='grain_followup'),isFalse);
     expect(s.pendingEvents,contains('grain_followup'));
