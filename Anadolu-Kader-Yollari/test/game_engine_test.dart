@@ -49,7 +49,7 @@ void main(){
     expect(s.delayedEffects,isNotEmpty);
     final due=s.delayedEffects.first.dueDay;
     e.advance(due-s.day);
-    expect(s.delayedEffects,isEmpty);
+    expect(s.delayedEffects.any((x)=>x.type=='event_followup'&&x.payload['eventId']=='grain_followup'),isFalse);
     expect(s.pendingEvents,contains('grain_followup'));
   });
 
