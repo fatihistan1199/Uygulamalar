@@ -52,4 +52,33 @@ void main(){
     expect(s.factions.length,4);
     expect(s.cities.length,5);
   });
+
+  test('kıt stok fiyatı yükseltir ve pazar envanteri değiştirir',(){
+    final s=GameEngine.newGame(seed:77,name:'Hasan',background:'Tüccar ailesi');
+    final e=GameEngine(s);
+    s.currentCityId='kayseri';
+    s.cities['kayseri']!.stock['grain']=30;
+    final scarce=e.marketPrice('grain');
+    s.cities['kayseri']!.stock['grain']=90;
+    final abundant=e.marketPrice('grain');
+    expect(scarce,greaterThan(abundant));
+    final beforeMoney=s.money;
+    final result=e.buyGood('grain');
+    expect(result,contains('ödedin'));
+    expect(s.inventory['grain'],1);
+    expect(s.money,lessThan(beforeMoney));
+  });
+
+  test('hikâye yönetmeni büyük olayları art arda yığmaz',(){
+    final s=GameEngine.newGame(seed:91,name:'Hasan',background:'Tüccar ailesi');
+    final e=GameEngine(s);
+    s.currentCityId='kayseri';
+    final major=e.pickEvent();
+    expect(major.id,'grain');
+    e.resolve(major,'talk');
+    final next=e.pickEvent();
+    expect(next.id,'rumor');
+    e.advance(10);
+    expect(e.pickEvent().id,'grain');
+  });
 }
