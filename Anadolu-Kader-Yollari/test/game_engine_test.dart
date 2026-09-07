@@ -277,7 +277,7 @@ void main(){
     expect(event.id,'family_sibling_debt');
     expect(event.title,contains('Zehra'));
     expect(event.body,contains('Zehra'));
-    expect(event.body,contains('{{sibling}}'),isFalse);
+    expect(event.body, isNot(contains('{{sibling}}')));
     final before=s.family['player']!.relations['sibling_1']!.trust;
     e.resolve(event,'refuse');
     expect(s.family['player']!.relations['sibling_1']!.trust,before-9);
