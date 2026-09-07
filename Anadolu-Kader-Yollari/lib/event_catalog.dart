@@ -48,6 +48,7 @@ class EventDefinition {
     this.chainId,
     this.chainStage,
     this.emergency = false,
+    this.scheduledOnly = false,
   });
 
   final String id;
@@ -63,6 +64,7 @@ class EventDefinition {
   final String? chainId;
   final int? chainStage;
   final bool emergency;
+  final bool scheduledOnly;
 
   factory EventDefinition.fromJson(Map<String, dynamic> j) => EventDefinition(
         id: j['id'] as String,
@@ -83,6 +85,7 @@ class EventDefinition {
         chainId: j['chainId'] as String?,
         chainStage: j['chainStage'] as int?,
         emergency: j['emergency'] as bool? ?? false,
+        scheduledOnly: j['scheduledOnly'] as bool? ?? false,
       );
 }
 
