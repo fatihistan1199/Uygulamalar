@@ -42,10 +42,10 @@ class NpcState {
 
 /// Oyuncu hanesinin, NPC dizininden bağımsız kalıcı soy kaydı.
 class FamilyMember {
-  FamilyMember({required this.id,required this.name,required this.age,required this.cityId,this.alive=true,this.spouseId,this.parentIds=const[],List<String>? childIds,this.isPlayerLine=false}):childIds=childIds??[];
-  final String id; String name,cityId; int age; bool alive,isPlayerLine; String? spouseId; final List<String> parentIds,childIds;
-  Map<String,dynamic> toJson()=>{'id':id,'name':name,'age':age,'cityId':cityId,'alive':alive,'spouseId':spouseId,'parentIds':parentIds,'childIds':childIds,'isPlayerLine':isPlayerLine};
-  factory FamilyMember.fromJson(Map<String,dynamic> j)=>FamilyMember(id:j['id'],name:j['name'],age:j['age']??18,cityId:j['cityId']??'konya',alive:j['alive']??true,spouseId:j['spouseId'],parentIds:((j['parentIds'] as List?)??[]).cast<String>(),childIds:((j['childIds'] as List?)??[]).cast<String>(),isPlayerLine:j['isPlayerLine']??false);
+  FamilyMember({required this.id,required this.name,required this.age,required this.cityId,this.gender='unknown',this.alive=true,this.spouseId,this.parentIds=const[],List<String>? childIds,this.isPlayerLine=false,Map<String,RelationState>? relations}):childIds=childIds??[],relations=relations??{};
+  final String id; String name,cityId,gender; int age; bool alive,isPlayerLine; String? spouseId; final List<String> parentIds,childIds; final Map<String,RelationState> relations;
+  Map<String,dynamic> toJson()=>{'id':id,'name':name,'age':age,'cityId':cityId,'gender':gender,'alive':alive,'spouseId':spouseId,'parentIds':parentIds,'childIds':childIds,'isPlayerLine':isPlayerLine,'relations':relations.map((k,v)=>MapEntry(k,v.toJson()))};
+  factory FamilyMember.fromJson(Map<String,dynamic> j)=>FamilyMember(id:j['id'],name:j['name'],age:j['age']??18,cityId:j['cityId']??'konya',gender:j['gender']??'unknown',alive:j['alive']??true,spouseId:j['spouseId'],parentIds:((j['parentIds'] as List?)??[]).cast<String>(),childIds:((j['childIds'] as List?)??[]).cast<String>(),isPlayerLine:j['isPlayerLine']??false,relations:((j['relations'] as Map?)??{}).map((k,v)=>MapEntry(k.toString(),RelationState.fromJson(Map<String,dynamic>.from(v)))));
 }
 
 class CityState {
@@ -97,22 +97,22 @@ class GameState {
     Map<String,int>? inventory,int? lastMajorEventDay,Map<String,int>? attributes,Map<String,int>? skills,
     int? health,int? age,int? generation,bool? alive,List<Injury>? injuries,List<String>? lineage,String? deathCause,
     Map<String,dynamic>? eventFlags,List<String>? pendingEvents,Map<String,int>? eventLastDay,
-    Map<String,FamilyMember>? family,String? playerFamilyId,int? nextLifeId
+    Map<String,FamilyMember>? family,String? playerFamilyId,int? nextLifeId,String? playerGender
   }):inventory=inventory??{},lastMajorEventDay=lastMajorEventDay??-999,
     attributes=attributes??{'strength':40,'agility':40,'intellect':40,'rhetoric':40,'intuition':40,'willpower':40},
     skills=skills??{'trade':25,'diplomacy':25,'law':20,'medicine':15,'religion':20,'military':20,'tracking':15,'espionage':10,'leadership':20,'localCulture':30},
     health=health??100,age=age??22,generation=generation??1,alive=alive??true,injuries=injuries??[],lineage=lineage??[],deathCause=deathCause??'',
     eventFlags=eventFlags??{},pendingEvents=pendingEvents??[],eventLastDay=eventLastDay??{},
-    family=family??{},playerFamilyId=playerFamilyId??'player',nextLifeId=nextLifeId??1 {
+    family=family??{},playerFamilyId=playerFamilyId??'player',nextLifeId=nextLifeId??1,playerGender=playerGender??'unknown' {
       // v0.5 kayıtlarında soy alanı yoktu; dünya verisine dokunmadan ince bir başlangıç ağacı üret.
       if(this.family.isEmpty){
-        this.family['player']=FamilyMember(id:'player',name:playerName,age:this.age,cityId:currentCityId,isPlayerLine:true);
+        this.family['player']=FamilyMember(id:'player',name:playerName,age:this.age,cityId:currentCityId,gender:this.playerGender,isPlayerLine:true);
       }
     }
 
   final int version,seed;
   int rngState,day,money,tension,lastMajorEventDay,health,age,generation;
-  String playerName,background,currentCityId,deathCause;
+  String playerName,background,currentCityId,deathCause,playerGender;
   bool alive;
   final Map<String,CityState> cities; final Map<String,NpcState> npcs; final Map<String,FactionState> factions;
   final List<KnowledgeEntry> knowledge; final List<DelayedEffect> delayedEffects; final List<String> chronicle;
@@ -130,7 +130,7 @@ class GameState {
     'chronicle':chronicle,'inventory':inventory,'lastMajorEventDay':lastMajorEventDay,'attributes':attributes,'skills':skills,
     'health':health,'age':age,'generation':generation,'alive':alive,'injuries':injuries.map((i)=>i.toJson()).toList(),
     'lineage':lineage,'deathCause':deathCause,'eventFlags':eventFlags,'pendingEvents':pendingEvents,'eventLastDay':eventLastDay,
-    'family':family.map((k,v)=>MapEntry(k,v.toJson())),'playerFamilyId':playerFamilyId,'nextLifeId':nextLifeId
+    'family':family.map((k,v)=>MapEntry(k,v.toJson())),'playerFamilyId':playerFamilyId,'nextLifeId':nextLifeId,'playerGender':playerGender
   };
 
   factory GameState.fromJson(Map<String,dynamic> j)=>GameState(
@@ -150,7 +150,7 @@ class GameState {
     pendingEvents:((j['pendingEvents'] as List?)??[]).cast<String>(),
     eventLastDay:Map<String,int>.from((j['eventLastDay'] as Map?)??{}),
     family:((j['family'] as Map?)??{}).map((k,v)=>MapEntry(k.toString(),FamilyMember.fromJson(Map<String,dynamic>.from(v)))),
-    playerFamilyId:j['playerFamilyId']??'player',nextLifeId:j['nextLifeId']??1
+    playerFamilyId:j['playerFamilyId']??'player',nextLifeId:j['nextLifeId']??1,playerGender:j['playerGender']??'unknown'
   );
 }
 
@@ -161,7 +161,7 @@ class GameEngine {
   GameEngine(this.state,this.catalog):_rng=KaderRng(state.rngState);
   final GameState state; final EventCatalog catalog; final KaderRng _rng;
 
-  static GameState newGame({required int seed,required String name,required String background}){
+  static GameState newGame({required int seed,required String name,required String background,String gender='unknown'}){
     final cities=<String,CityState>{
       'konya':CityState(id:'konya',name:'Konya',food:66,trade:78,order:61,security:68,prosperity:72,banditry:21,stock:{'grain':70,'cloth':55,'salt':50,'leather':60}),
       'kayseri':CityState(id:'kayseri',name:'Kayseri',food:52,trade:88,order:54,security:61,prosperity:74,banditry:24,stock:{'grain':35,'cloth':65,'salt':55,'leather':75}),
@@ -209,13 +209,18 @@ class GameEngine {
     if(background=='Medrese öğrencisi'){attrs['intellect']=54;attrs['willpower']=45;skills['religion']=50;skills['law']=46;}
     if(background=='Asker ailesi'){attrs['strength']=52;attrs['agility']=46;attrs['willpower']=48;skills['military']=52;skills['leadership']=36;}
     final family=<String,FamilyMember>{
-      'parent_1':FamilyMember(id:'parent_1',name:'Hüseyin',age:48,cityId:'konya',isPlayerLine:true),
-      'parent_2':FamilyMember(id:'parent_2',name:'Emine',age:45,cityId:'konya',isPlayerLine:true,spouseId:'parent_1'),
-      'player':FamilyMember(id:'player',name:name,age:22,cityId:'konya',parentIds:['parent_1','parent_2'],isPlayerLine:true),
-      'sibling_1':FamilyMember(id:'sibling_1',name:'Zehra',age:19,cityId:'konya',parentIds:['parent_1','parent_2'],isPlayerLine:true),
+      'parent_1':FamilyMember(id:'parent_1',name:'Hüseyin',age:48,cityId:'konya',gender:'male',isPlayerLine:true),
+      'parent_2':FamilyMember(id:'parent_2',name:'Emine',age:45,cityId:'konya',gender:'female',isPlayerLine:true,spouseId:'parent_1'),
+      'player':FamilyMember(id:'player',name:name,age:22,cityId:'konya',gender:gender,parentIds:['parent_1','parent_2'],isPlayerLine:true),
+      'sibling_1':FamilyMember(id:'sibling_1',name:gender=='female'?'Mehmet':'Zehra',age:19,cityId:'konya',gender:gender=='female'?'male':'female',parentIds:['parent_1','parent_2'],isPlayerLine:true),
     };
     family['parent_1']!.spouseId='parent_2';family['parent_1']!.childIds.addAll(['player','sibling_1']);family['parent_2']!.childIds.addAll(['player','sibling_1']);
-    return GameState(version:6,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999,attributes:attrs,skills:skills,health:100,age:22,generation:1,alive:true,injuries:[],lineage:[],eventFlags:{},pendingEvents:[],eventLastDay:{},family:family,playerFamilyId:'player',nextLifeId:1);
+    void linkFamily(String a,String b,{int trust=65,int affection=60,int respect=55}){
+      family[a]!.relations[b]=RelationState(trust:trust,affection:affection,respect:respect);
+      family[b]!.relations[a]=RelationState(trust:trust,affection:affection,respect:respect);
+    }
+    linkFamily('player','parent_1',trust:72,affection:68,respect:66);linkFamily('player','parent_2',trust:75,affection:72,respect:64);linkFamily('player','sibling_1',trust:61,affection:58,respect:48);linkFamily('parent_1','parent_2',trust:70,affection:66,respect:61);linkFamily('sibling_1','parent_1',trust:68,affection:65,respect:60);linkFamily('sibling_1','parent_2',trust:72,affection:70,respect:59);
+    return GameState(version:7,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999,attributes:attrs,skills:skills,health:100,age:22,generation:1,alive:true,injuries:[],lineage:[],eventFlags:{},pendingEvents:[],eventLastDay:{},family:family,playerFamilyId:'player',nextLifeId:1,playerGender:gender);
   }
 
   void _sync()=>state.rngState=_rng.state;
@@ -241,6 +246,14 @@ class GameEngine {
       state.age++;
       for(final member in state.family.values){if(member.alive)member.age++;}
       for(final npc in state.npcs.values){if(npc.alive)npc.age++;}
+      final familyElders=state.family.values.where((m)=>m.alive&&m.age>=70).toList()..sort((a,b)=>a.id.compareTo(b.id));
+      for(final elder in familyElders){
+        if(_rng.nextInt(100)<math.min(45,elder.age-64)){
+          elder.alive=false;
+          if(elder.spouseId!=null)state.family[elder.spouseId!]?.spouseId=null;
+          state.chronicle.add('${state.day}. gün — Aileden ${elder.name} yaşlılık nedeniyle hayata veda etti.');
+        }
+      }
       final elders=state.npcs.values.where((n)=>n.alive&&n.age>=70).toList()..sort((a,b)=>a.id.compareTo(b.id));
       for(final elder in elders){
         if(_rng.nextInt(100)<math.min(45,elder.age-64)){
@@ -273,6 +286,49 @@ class GameEngine {
         if(_rng.nextInt(100)<12)entry.value.change(trust:_rng.nextInt(3)-1,affection:_rng.nextInt(3)-1,suspicion:_rng.nextInt(3)-1);
       }
     }
+    _runFamilyHousehold();
+  }
+
+  void _runFamilyHousehold(){
+    final adults=state.family.values.where((m)=>m.alive&&m.age>=18&&m.age<=48).toList()..sort((a,b)=>a.id.compareTo(b.id));
+    for(final member in adults){
+      if(state.family.length>=30)break;
+      if(member.id==state.playerFamilyId||!member.isPlayerLine||member.spouseId!=null)continue;
+      if(_rng.nextInt(100)<4)_addFamilySpouse(member);
+    }
+    final couples=state.family.values.where((m)=>m.alive&&m.spouseId!=null&&m.id.compareTo(m.spouseId!)<0).toList()..sort((a,b)=>a.id.compareTo(b.id));
+    for(final a in couples){
+      if(state.family.length>=30)break;
+      final b=state.family[a.spouseId!];
+      if(b==null||!b.alive||a.age>45||b.age>45)continue;
+      if(a.id==state.playerFamilyId||b.id==state.playerFamilyId)continue;
+      if(a.childIds.length>=4||b.childIds.length>=4)continue;
+      if(_rng.nextInt(100)<3)_addFamilyChild(a,b);
+    }
+  }
+
+  FamilyMember _addFamilySpouse(FamilyMember member){
+    final id='family_spouse_${state.nextLifeId++}';
+    final spouseGender=member.gender=='female'?'male':'female';
+    final names=spouseGender=='female'?['Aysel','Hatice','Meryem','Safiye','Zehra']:['Ali','Mehmed','Yusuf','İlyas','Ömer'];
+    final spouse=FamilyMember(id:id,name:names[_rng.nextInt(names.length)],age:math.max(18,member.age-3+_rng.nextInt(7)),cityId:member.cityId,gender:spouseGender,spouseId:member.id,isPlayerLine:false);
+    state.family[id]=spouse;member.spouseId=id;
+    member.relations[id]=RelationState(trust:58,affection:60,respect:52);spouse.relations[member.id]=RelationState(trust:58,affection:60,respect:52);
+    state.chronicle.add('${state.day}. gün — ${member.name} ile ${spouse.name} evlendi.');
+    return spouse;
+  }
+
+  FamilyMember? _addFamilyChild(FamilyMember a,FamilyMember b){
+    if(state.family.length>=30)return null;
+    final id='family_child_${state.nextLifeId++}';
+    final female=_rng.nextInt(2)==0;
+    final names=female?['Elif','Hatice','Zehra','Safiye','Ayla']:['Mehmed','Yusuf','Ali','Musa','Ömer'];
+    final child=FamilyMember(id:id,name:names[_rng.nextInt(names.length)],age:0,cityId:a.cityId,gender:female?'female':'male',parentIds:[a.id,b.id],isPlayerLine:a.isPlayerLine||b.isPlayerLine);
+    state.family[id]=child;a.childIds.add(id);b.childIds.add(id);
+    a.relations[id]=RelationState(trust:78,affection:85,respect:45);b.relations[id]=RelationState(trust:78,affection:85,respect:45);
+    child.relations[a.id]=RelationState(trust:78,affection:85,respect:45);child.relations[b.id]=RelationState(trust:78,affection:85,respect:45);
+    state.chronicle.add('${state.day}. gün — ${a.name} ve ${b.name} ailesine ${child.name} katıldı.');
+    return child;
   }
 
   void _addNpcChild(NpcState a,NpcState b){
@@ -420,13 +476,14 @@ class GameEngine {
     for(final member in state.family.values){if(member.name==name&&member.alive&&member.age>=16&&member.id!=state.playerFamilyId){heir=member;break;}}
     if(heir==null){
       final id='heir_${state.nextLifeId++}';
-      heir=FamilyMember(id:id,name:name,age:18,cityId:state.currentCityId,parentIds:[state.playerFamilyId],isPlayerLine:true);
+      final femaleNames=<String>{'Zeynep','Ayşe','Meryem','Fatma','Selma'};
+      heir=FamilyMember(id:id,name:name,age:18,cityId:state.currentCityId,gender:femaleNames.contains(name)?'female':'male',parentIds:[state.playerFamilyId],isPlayerLine:true);
       state.family[id]=heir;state.family[state.playerFamilyId]?.childIds.add(id);
     }
     final former=state.family[state.playerFamilyId];
     if(former!=null){former.alive=false;former.cityId=state.currentCityId;}
     heir.isPlayerLine=true;heir.cityId=state.currentCityId;
-    state.lineage.add(old);state.playerFamilyId=heir.id;state.playerName=heir.name;state.background='Aile mirasçısı';state.generation++;state.age=heir.age;state.health=100;state.alive=true;state.deathCause='';state.injuries.clear();
+    state.lineage.add(old);state.playerFamilyId=heir.id;state.playerName=heir.name;state.playerGender=heir.gender;state.background='Aile mirasçısı';state.generation++;state.age=heir.age;state.health=100;state.alive=true;state.deathCause='';state.injuries.clear();
     state.money=(state.money*.8).round();
     for(final key in state.inventory.keys.toList()){state.inventory[key]=(state.inventory[key]!*.75).floor();}
     for(final key in state.attributes.keys.toList()){state.attributes[key]=clamp100((state.attributes[key]!*0.68+22).round());}
@@ -439,6 +496,58 @@ class GameEngine {
     }
     state.chronicle.add('${state.day}. gün — $name, $old karakterinin mirasını devraldı. Dünya kaldığı yerden devam ediyor.');
     return '$name ile ${state.generation}. nesil başladı.';
+  }
+
+  List<FamilyMember> _familyRoleCandidates(String role){
+    final current=state.family[state.playerFamilyId];
+    if(current==null)return [];
+    final all=state.family.values.where((m)=>m.alive&&m.id!=current.id).toList()..sort((a,b)=>a.id.compareTo(b.id));
+    switch(role){
+      case 'spouse':
+        final id=current.spouseId;return id!=null&&state.family[id]?.alive==true?[state.family[id]!]:[];
+      case 'parent':
+        return current.parentIds.map((id)=>state.family[id]).whereType<FamilyMember>().where((m)=>m.alive).toList()..sort((a,b)=>a.id.compareTo(b.id));
+      case 'elder_parent':
+        return current.parentIds.map((id)=>state.family[id]).whereType<FamilyMember>().where((m)=>m.alive&&m.age>=45).toList()..sort((a,b)=>a.id.compareTo(b.id));
+      case 'sibling':
+        return all.where((m)=>m.parentIds.any(current.parentIds.contains)).toList();
+      case 'child':
+        return current.childIds.map((id)=>state.family[id]).whereType<FamilyMember>().where((m)=>m.alive).toList()..sort((a,b)=>a.id.compareTo(b.id));
+      case 'adult_child':
+        return current.childIds.map((id)=>state.family[id]).whereType<FamilyMember>().where((m)=>m.alive&&m.age>=16).toList()..sort((a,b)=>a.id.compareTo(b.id));
+      case 'adult_relative':
+        return all.where((m)=>m.age>=16&&m.isPlayerLine).toList();
+    }
+    return [];
+  }
+
+  FamilyMember? _familyRole(String role){final list=_familyRoleCandidates(role);return list.isEmpty?null:list.first;}
+
+  RelationState _familyBond(FamilyMember other){
+    final current=state.family[state.playerFamilyId]!;
+    final a=current.relations.putIfAbsent(other.id,()=>RelationState());
+    other.relations.putIfAbsent(current.id,()=>RelationState());
+    return a;
+  }
+
+  int _relationAxis(RelationState relation,String axis){
+    switch(axis){
+      case 'trust':return relation.trust;
+      case 'respect':return relation.respect;
+      case 'fear':return relation.fear;
+      case 'affection':return relation.affection;
+      case 'suspicion':return relation.suspicion;
+      case 'debt':return relation.debt;
+    }
+    return 0;
+  }
+
+  String _renderText(String text){
+    var result=text.replaceAll('{{player}}',state.playerName).replaceAll('{{city}}',state.city.name);
+    for(final role in ['spouse','parent','elder_parent','sibling','child','adult_child']){
+      result=result.replaceAll('{{$role}}',_familyRole(role)?.name??'yakının');
+    }
+    return result;
   }
 
   EventView pickEvent(){
@@ -482,9 +591,9 @@ class GameEngine {
 
   EventView _toView(EventDefinition def){
     final options=def.choices.where((choice)=>_conditionsMet(choice.requirements)).map(
-      (choice)=>EventOption(choice.id,choice.title,choice.hint)
+      (choice)=>EventOption(choice.id,_renderText(choice.title),_renderText(choice.hint))
     ).toList();
-    return EventView(id:def.id,title:def.title,body:def.body,options:options);
+    return EventView(id:def.id,title:_renderText(def.title),body:_renderText(def.body),options:options);
   }
 
   bool _conditionsMet(List<Map<String,dynamic>> conditions){
@@ -516,6 +625,24 @@ class GameEngine {
           if((state.factions[condition['faction']]?.reputation??0)<=((value as num).toInt()))return false;
         case 'faction_rep_below':
           if((state.factions[condition['faction']]?.reputation??0)>=((value as num).toInt()))return false;
+        case 'player_age_at_least':
+          if(state.age<((value as num).toInt()))return false;
+        case 'player_age_at_most':
+          if(state.age>((value as num).toInt()))return false;
+        case 'player_has_spouse':
+          if(state.family[state.playerFamilyId]?.spouseId==null)return false;
+        case 'player_no_spouse':
+          if(state.family[state.playerFamilyId]?.spouseId!=null)return false;
+        case 'family_living_count_at_least':
+          if(state.family.values.where((m)=>m.alive).length<((value as num).toInt()))return false;
+        case 'family_role_exists':
+          if(_familyRoleCandidates(condition['role'] as String).isEmpty)return false;
+        case 'family_role_age_at_least':
+          final member=_familyRole(condition['role'] as String);if(member==null||member.age<((value as num).toInt()))return false;
+        case 'family_relation_at_least':
+          final member=_familyRole(condition['role'] as String);if(member==null||_relationAxis(_familyBond(member),condition['axis'] as String)<((value as num).toInt()))return false;
+        case 'family_relation_below':
+          final member=_familyRole(condition['role'] as String);if(member==null||_relationAxis(_familyBond(member),condition['axis'] as String)>=((value as num).toInt()))return false;
         case 'flag_equals':
           if(state.eventFlags[condition['key']]!=value)return false;
         case 'flag_not_set':
@@ -565,9 +692,9 @@ class GameEngine {
     state.pendingEvents.remove(def.id);
 
     for(final effect in choice.effects)_applyEventEffect(effect,def.id);
-    state.chronicle.add('${state.day}. gün — ${def.title}: ${choice.title}.');
+    state.chronicle.add('${state.day}. gün — ${_renderText(def.title)}: ${_renderText(choice.title)}.');
     _sync();
-    return choice.resultText;
+    return _renderText(choice.resultText);
   }
 
   void _applyEventEffect(Map<String,dynamic> effect,String sourceEventId){
@@ -600,8 +727,8 @@ class GameEngine {
       case 'knowledge':
         state.knowledge.add(KnowledgeEntry(
           id:'${effect['id']}_${state.day}_${state.knowledge.length}',
-          text:effect['text'] as String,
-          source:effect['source'] as String,
+          text:_renderText(effect['text'] as String),
+          source:_renderText(effect['source'] as String),
           reliability:(effect['reliability'] as num).toInt(),
           day:state.day,
         ));
@@ -619,7 +746,7 @@ class GameEngine {
       case 'npc_relation':
         final npc=state.npcs[effect['npc']];
         if(npc!=null){
-          final memory=(effect['memory'] as String?)??'Bu olayda oyuncunun tavrını hatırlıyor';
+          final memory=_renderText((effect['memory'] as String?)??'Bu olayda oyuncunun tavrını hatırlıyor');
           npc.remember(MemoryEntry(
             text:memory,day:state.day,importance:(effect['importance'] as num?)?.toInt()??30,
             trust:(effect['trust'] as num?)?.toInt()??0,
@@ -630,6 +757,23 @@ class GameEngine {
           ));
           npc.relation.change(debt:(effect['debt'] as num?)?.toInt()??0);
         }
+      case 'family_relation':
+        final member=_familyRole(effect['role'] as String);
+        if(member!=null){
+          final current=state.family[state.playerFamilyId]!;
+          final a=_familyBond(member);final b=member.relations.putIfAbsent(current.id,()=>RelationState());
+          final trust=(effect['trust'] as num?)?.toInt()??0,respect=(effect['respect'] as num?)?.toInt()??0,fear=(effect['fear'] as num?)?.toInt()??0,affection=(effect['affection'] as num?)?.toInt()??0,suspicion=(effect['suspicion'] as num?)?.toInt()??0,debt=(effect['debt'] as num?)?.toInt()??0;
+          a.change(trust:trust,respect:respect,fear:fear,affection:affection,suspicion:suspicion,debt:debt);b.change(trust:trust,respect:respect,fear:fear,affection:affection,suspicion:suspicion,debt:-debt);
+        }
+      case 'family_add_spouse':
+        final current=state.family[state.playerFamilyId];
+        if(current!=null&&current.spouseId==null){final spouse=_addFamilySpouse(current);state.playerGender=current.gender;spouse.isPlayerLine=false;}
+      case 'family_add_child':
+        final current=state.family[state.playerFamilyId];
+        final spouse=current?.spouseId==null?null:state.family[current!.spouseId!];
+        if(current!=null&&spouse!=null)_addFamilyChild(current,spouse);
+      case 'family_move':
+        final member=_familyRole(effect['role'] as String);if(member!=null)member.cityId=state.currentCityId;
       case 'schedule_event':
         final min=(effect['minDays'] as num?)?.toInt()??1;
         final max=(effect['maxDays'] as num?)?.toInt()??min;
@@ -643,7 +787,7 @@ class GameEngine {
         if(amount>0)advance(amount);
       case 'chronicle':
         final text=effect['text'] as String?;
-        if(text!=null)state.chronicle.add('${state.day}. gün — $text');
+        if(text!=null)state.chronicle.add('${state.day}. gün — ${_renderText(text)}');
     }
   }
 
