@@ -204,14 +204,22 @@ class GameEngine {
   void _runDueEffects(){
     final due=state.delayedEffects.where((e)=>e.dueDay<=state.day).toList();
     for(final effect in due){
-      if(effect.type=='grain_investigation'){
+      if(effect.type=='event_followup'){
+        final eventId=effect.payload['eventId'] as String?;
+        if(eventId!=null&&!state.pendingEvents.contains(eventId))state.pendingEvents.add(eventId);
+      }else if(effect.type=='grain_investigation'){
         final city=state.cities['kayseri']!;
-        if(city.food<60){city.order=clamp100(city.order-12);state.tension=clamp100(state.tension+12);state.factions['yonetim']!.reputation=clamp100(state.factions['yonetim']!.reputation+4);state.factions['tuccar']!.reputation=clamp100(state.factions['tuccar']!.reputation-5);state.chronicle.add('${state.day}. gün — Kayseri’de tahıl soruşturması büyüdü; eski kararın yeniden gündeme geldi.');state.npcs['mahmud']!.remember(MemoryEntry(text:'Tahıl soruşturmasında oyuncunun tutumu',day:state.day,importance:72,trust:-8,respect:0,fear:3,affection:-4,suspicion:12));}
+        if(city.food<60){
+          city.order=clamp100(city.order-12);
+          state.tension=clamp100(state.tension+12);
+          state.factions['yonetim']!.reputation=clamp100(state.factions['yonetim']!.reputation+4);
+          state.factions['tuccar']!.reputation=clamp100(state.factions['tuccar']!.reputation-5);
+        }
       }else if(effect.type=='crisis_profiteering'){
         final city=state.cities['kayseri']!;
-        if(city.food<50){state.factions['ahi']!.reputation=clamp100(state.factions['ahi']!.reputation-8);state.npcs['yusuf']!.remember(MemoryEntry(text:'Kıtlık sırasında tahıldan çıkar sağladı',day:state.day,importance:78,trust:-12,respect:-6,fear:0,affection:-8,suspicion:16));state.chronicle.add('${state.day}. gün — Kıtlıkta yaptığın alışveriş Ahi çevrelerinde konuşulmaya başladı.');}
+        if(city.food<50)state.factions['ahi']!.reputation=clamp100(state.factions['ahi']!.reputation-8);
       }else if(effect.type=='rumor_spreads'){
-        state.factions['yonetim']!.reputation=clamp100(state.factions['yonetim']!.reputation-2);state.chronicle.add('${state.day}. gün — Vergi söylentisi şehirler arasında yayıldı.');
+        state.factions['yonetim']!.reputation=clamp100(state.factions['yonetim']!.reputation-2);
       }
       state.delayedEffects.remove(effect);
     }
@@ -337,34 +345,208 @@ class GameEngine {
   }
 
   EventView pickEvent(){
-    final c=state.city;final sinceMajor=state.day-state.lastMajorEventDay;
-    if(c.id=='kayseri'&&c.food<40)return const EventView(id:'grain',title:'Kayseri’de Tahıl Meselesi',body:'Tahıl fiyatları yükseliyor. Esnaf, Tüccar Mahmud’un zahire depoladığını söylüyor; fakat söylentinin önemli kısmı rakiplerinden geliyor.',options:[EventOption('talk','Mahmud’u dinle','Bilgi kazanırsın; onun anlatısına da maruz kalırsın.'),EventOption('judge','Kadıyı haberdar et','Meşru yol; gecikmiş siyasi sonucu olabilir.'),EventOption('buy','15 akçelik tahıl al','Ekonomik fırsat; ahlaki ve sosyal bedeli belirsiz.'),EventOption('ignore','Karışma','Tarafsızlık da dünyanın gidişini değiştirebilir.')]);
-    if(sinceMajor>=10&&c.id=='kayseri'&&c.food<60)return const EventView(id:'grain',title:'Kayseri’de Tahıl Meselesi',body:'Tahıl fiyatları yükseliyor. Esnaf, Tüccar Mahmud’un zahire depoladığını söylüyor; fakat söylentinin önemli kısmı rakiplerinden geliyor.',options:[EventOption('talk','Mahmud’u dinle','Bilgi kazanırsın; onun anlatısına da maruz kalırsın.'),EventOption('judge','Kadıyı haberdar et','Meşru yol; gecikmiş siyasi sonucu olabilir.'),EventOption('buy','15 akçelik tahıl al','Ekonomik fırsat; ahlaki ve sosyal bedeli belirsiz.'),EventOption('ignore','Karışma','Tarafsızlık da dünyanın gidişini değiştirebilir.')]);
-    if(sinceMajor>=8&&state.tension>55)return const EventView(id:'faction_dispute',title:'Han Avlusunda Tartışma',body:'Bir Ahi ustasıyla vergi memuru sert biçimde tartışıyor. İki taraf da seni tanıyor; sessiz kalman bile yorumlanabilir.',options:[EventOption('ahi','Ahi ustasını destekle','Esnaf seni hatırlayacak.'),EventOption('official','Memuru destekle','Yönetim desteğini not edecek.'),EventOption('mediate','Arabuluculuk et','Başarısı ilişkilerine bağlı.'),EventOption('leave','Uzaklaş','Taraflar bunu çekingenlik sayabilir.')]);
-    return const EventView(id:'rumor',title:'Handaki Fısıltılar',body:'Yan masadaki iki yolcu yaklaşan yeni vergilerden söz ediyor. Birinin sarhoş olduğu açık; diğerinin kaynağını bilmiyorsun.',options:[EventOption('listen','Dinlemeye devam et','Kaynağı belirsiz bir bilgi edinebilirsin.'),EventOption('verify','Başka bir kaynak ara','Daha fazla zaman karşılığında güveni yükseltebilirsin.'),EventOption('ignore','Önemseme','Yanlış bilgiden korunursun; gerçek uyarıyı kaçırabilirsin.')]);
+    for(final id in List<String>.from(state.pendingEvents)){
+      final def=catalog[id];
+      if(def!=null&&_conditionsMet(def.conditions)){
+        final view=_toView(def);
+        if(view.options.isNotEmpty)return view;
+      }
+    }
+
+    final candidates=catalog.events.values.where((def){
+      if(!_eventEligible(def))return false;
+      return _toView(def).options.isNotEmpty;
+    }).toList()..sort((a,b)=>a.id.compareTo(b.id));
+
+    EventDefinition chosen;
+    if(candidates.isEmpty){
+      chosen=catalog['rumor']??catalog.events.values.first;
+    }else{
+      final total=candidates.fold<int>(0,(sum,e)=>sum+math.max(1,e.weight));
+      var roll=_rng.nextInt(total);
+      chosen=candidates.last;
+      for(final event in candidates){
+        roll-=math.max(1,event.weight);
+        if(roll<0){chosen=event;break;}
+      }
+      _sync();
+    }
+    return _toView(chosen);
   }
 
-  String resolve(EventView e,String choice){if(e.id!='rumor')state.lastMajorEventDay=state.day;if(e.id=='grain')return _grain(choice);if(e.id=='rumor')return _rumor(choice);if(e.id=='faction_dispute')return _dispute(choice);return 'Sonuç oluşmadı.';}
-
-  String _grain(String c){
-    final mahmud=state.npcs['mahmud']!;
-    if(c=='talk'){mahmud.remember(MemoryEntry(text:'Tahıl krizinde beni dinledi',day:state.day,importance:38,trust:7,respect:2,fear:0,affection:2,suspicion:-2));state.knowledge.add(KnowledgeEntry(id:'mahmud_claim_${state.day}',text:'Mahmud, fiyat artışının yol güvenliğinden kaynaklandığını söylüyor.',source:'Tüccar Mahmud',reliability:58,day:state.day));state.tension=clamp100(state.tension-3);return 'Mahmud fiyat artışını yol güvenliğine bağlıyor. Söylediği mümkün; fakat doğrulanmış değil.';}
-    if(c=='judge'){state.factions['yonetim']!.reputation=clamp100(state.factions['yonetim']!.reputation+4);mahmud.remember(MemoryEntry(text:'Tahıl meselesini kadıya taşıdı',day:state.day,importance:67,trust:-7,respect:3,fear:3,affection:-4,suspicion:10));state.delayedEffects.add(DelayedEffect(id:'grain_investigation_${state.day}',dueDay:state.day+30+_rng.nextInt(31),type:'grain_investigation',source:'grain'));state.tension=clamp100(state.tension+7);_sync();return 'Kadıya haber verdin. Mahmud bunu unutmayacak; soruşturmanın sonucu daha sonra ortaya çıkabilir.';}
-    if(c=='buy'){if(state.money<15)return 'Yeterli akçen yok.';state.money-=15;state.city.food=clamp100(state.city.food-3);mahmud.relation.change(trust:5,debt:3);state.factions['tuccar']!.reputation=clamp100(state.factions['tuccar']!.reputation+3);state.delayedEffects.add(DelayedEffect(id:'crisis_profit_${state.day}',dueDay:state.day+45+_rng.nextInt(46),type:'crisis_profiteering',source:'grain'));_sync();return 'Tahıl aldın. Mahmud memnun; ancak kriz ağırlaşırsa bu alışveriş başka çevrelerde farklı hatırlanabilir.';}
-    state.city.food=clamp100(state.city.food-5);state.npcs['yusuf']!.relation.change(suspicion:2);return 'Karışmadın. Şehirdeki gıda baskısı kendi başına ilerliyor.';
+  bool _eventEligible(EventDefinition def){
+    if(!_conditionsMet(def.conditions))return false;
+    final last=state.eventLastDay[def.id];
+    if(last!=null&&state.day-last<def.cooldownDays)return false;
+    if(def.major&&!def.emergency&&state.day-state.lastMajorEventDay<8)return false;
+    return true;
   }
 
-  String _rumor(String c){
-    if(c=='listen'){final rel=24+_rng.nextInt(43);state.knowledge.add(KnowledgeEntry(id:'tax_rumor_${state.day}_${state.knowledge.length}',text:'Yakında yeni bir vergi konulacağı söyleniyor.',source:'Handaki yolcular',reliability:rel,day:state.day));state.delayedEffects.add(DelayedEffect(id:'rumor_spreads_${state.day}',dueDay:state.day+10+_rng.nextInt(15),type:'rumor_spreads',source:'rumor'));_sync();return 'Söylentiyi not ettin. Güvenilirliği düşük; gerçek bilgi olarak kabul edilmemeli.';}
-    if(c=='verify'){advance(1);final rel=64+_rng.nextInt(25);state.knowledge.add(KnowledgeEntry(id:'tax_check_${state.day}_${state.knowledge.length}',text:'Vergi düzenlemesi ihtimali bazı kâtipler arasında da konuşuluyor.',source:'Yerel kâtip çevresi',reliability:rel,day:state.day));_sync();return 'Bir gün harcayıp ikinci kaynak buldun. Bilgi daha güçlü, yine de kesin değil.';}
-    return 'Söylentiyi kayda almadın.';
+  EventView _toView(EventDefinition def){
+    final options=def.choices.where((choice)=>_conditionsMet(choice.requirements)).map(
+      (choice)=>EventOption(choice.id,choice.title,choice.hint)
+    ).toList();
+    return EventView(id:def.id,title:def.title,body:def.body,options:options);
   }
 
-  String _dispute(String c){
-    final ahi=state.factions['ahi']!,gov=state.factions['yonetim']!;
-    if(c=='ahi'){ahi.reputation=clamp100(ahi.reputation+8);gov.reputation=clamp100(gov.reputation-6);state.npcs['yusuf']!.remember(MemoryEntry(text:'Vergi tartışmasında Ahileri destekledi',day:state.day,importance:54,trust:9,respect:6,fear:0,affection:3,suspicion:-4));return 'Ahi ustasını destekledin. Esnaf çevresi memnun; yönetim bunu taraf seçmek olarak görüyor.';}
-    if(c=='official'){gov.reputation=clamp100(gov.reputation+8);ahi.reputation=clamp100(ahi.reputation-7);state.npcs['celal']!.relation.change(trust:5,respect:4);return 'Memuru destekledin. Yönetim çevresi bunu olumlu kaydetti; Ahiler rahatsız.';}
-    if(c=='mediate'){final ok=state.npcs['yusuf']!.relation.trust+_rng.nextInt(60)>75;_sync();if(ok){ahi.reputation=clamp100(ahi.reputation+4);gov.reputation=clamp100(gov.reputation+4);state.tension=clamp100(state.tension-8);return 'Tarafları geçici olarak uzlaştırdın. İki çevrede de saygınlığın arttı.';}state.tension=clamp100(state.tension+5);return 'Arabuluculuğun sonuç vermedi. İki taraf da seni diğerine fazla yakın buldu.';}
-    state.npcs['yusuf']!.relation.change(respect:-2);state.npcs['celal']!.relation.change(respect:-2);return 'Uzaklaştın. Kriz senden bağımsız devam ediyor.';
+  bool _conditionsMet(List<Map<String,dynamic>> conditions){
+    for(final condition in conditions){
+      final type=condition['type'] as String? ?? '';
+      final value=condition['value'];
+      switch(type){
+        case 'city_is':
+          if(state.currentCityId!=value)return false;
+        case 'city_stat_below':
+          if(_cityStat(condition['stat'] as String)>=((value as num).toInt()))return false;
+        case 'city_stat_above':
+          if(_cityStat(condition['stat'] as String)<=((value as num).toInt()))return false;
+        case 'tension_above':
+          if(state.tension<=((value as num).toInt()))return false;
+        case 'tension_below':
+          if(state.tension>=((value as num).toInt()))return false;
+        case 'skill_at_least':
+          if((state.skills[condition['skill']]??0)<((value as num).toInt()))return false;
+        case 'attribute_at_least':
+          if((state.attributes[condition['attribute']]??0)<((value as num).toInt()))return false;
+        case 'money_at_least':
+          if(state.money<((value as num).toInt()))return false;
+        case 'health_below':
+          if(state.health>=((value as num).toInt()))return false;
+        case 'generation_at_least':
+          if(state.generation<((value as num).toInt()))return false;
+        case 'faction_rep_above':
+          if((state.factions[condition['faction']]?.reputation??0)<=((value as num).toInt()))return false;
+        case 'faction_rep_below':
+          if((state.factions[condition['faction']]?.reputation??0)>=((value as num).toInt()))return false;
+        case 'flag_equals':
+          if(state.eventFlags[condition['key']]!=value)return false;
+        case 'flag_not_set':
+          if(state.eventFlags.containsKey(condition['key']))return false;
+      }
+    }
+    return true;
   }
+
+  int _cityStat(String stat){
+    final city=state.city;
+    switch(stat){
+      case 'food':return city.food;
+      case 'trade':return city.trade;
+      case 'order':return city.order;
+      case 'security':return city.security;
+      case 'prosperity':return city.prosperity;
+      case 'banditry':return city.banditry;
+    }
+    return 0;
+  }
+
+  void _changeCityStat(String stat,int amount){
+    final city=state.city;
+    switch(stat){
+      case 'food':city.food=clamp100(city.food+amount);
+      case 'trade':city.trade=clamp100(city.trade+amount);
+      case 'order':city.order=clamp100(city.order+amount);
+      case 'security':city.security=clamp100(city.security+amount);
+      case 'prosperity':city.prosperity=clamp100(city.prosperity+amount);
+      case 'banditry':city.banditry=clamp100(city.banditry+amount);
+    }
+  }
+
+  String resolve(EventView event,String choiceId){
+    final def=catalog[event.id];
+    if(def==null)return 'Olay verisi bulunamadı.';
+    EventChoiceDefinition? choice;
+    for(final candidate in def.choices){
+      if(candidate.id==choiceId){choice=candidate;break;}
+    }
+    if(choice==null)return 'Seçenek bulunamadı.';
+    if(!_conditionsMet(choice.requirements))return 'Bu seçenek için gereken şartları artık karşılamıyorsun.';
+
+    if(def.major)state.lastMajorEventDay=state.day;
+    state.eventLastDay[def.id]=state.day;
+    state.pendingEvents.remove(def.id);
+
+    for(final effect in choice.effects)_applyEventEffect(effect,def.id);
+    state.chronicle.add('${state.day}. gün — ${def.title}: ${choice.title}.');
+    _sync();
+    return choice.resultText;
+  }
+
+  void _applyEventEffect(Map<String,dynamic> effect,String sourceEventId){
+    final type=effect['type'] as String? ?? '';
+    final amount=(effect['amount'] as num?)?.toInt()??0;
+    switch(type){
+      case 'money':
+        state.money=math.max(0,state.money+amount);
+      case 'tension':
+        state.tension=clamp100(state.tension+amount);
+      case 'inventory':
+        final item=effect['item'] as String;
+        state.inventory[item]=math.max(0,(state.inventory[item]??0)+amount);
+      case 'city_stat':
+        _changeCityStat(effect['stat'] as String,amount);
+      case 'faction_reputation':
+        final faction=state.factions[effect['faction']];
+        if(faction!=null)faction.reputation=clamp100(faction.reputation+amount);
+      case 'skill':
+        final skill=effect['skill'] as String;
+        state.skills[skill]=clamp100((state.skills[skill]??0)+amount);
+      case 'attribute':
+        final attribute=effect['attribute'] as String;
+        state.attributes[attribute]=clamp100((state.attributes[attribute]??0)+amount);
+      case 'health':
+        state.health=clamp100(state.health+amount);
+        if(state.health<=0)_die('Olay sonucu ağır yaralanma');
+      case 'set_flag':
+        state.eventFlags[effect['key'] as String]=effect['value'];
+      case 'knowledge':
+        state.knowledge.add(KnowledgeEntry(
+          id:'${effect['id']}_${state.day}_${state.knowledge.length}',
+          text:effect['text'] as String,
+          source:effect['source'] as String,
+          reliability:(effect['reliability'] as num).toInt(),
+          day:state.day,
+        ));
+      case 'knowledge_random':
+        final min=(effect['minReliability'] as num).toInt();
+        final max=(effect['maxReliability'] as num).toInt();
+        final reliability=min+_rng.nextInt(math.max(1,max-min+1));
+        state.knowledge.add(KnowledgeEntry(
+          id:'${effect['id']}_${state.day}_${state.knowledge.length}',
+          text:effect['text'] as String,
+          source:effect['source'] as String,
+          reliability:reliability,
+          day:state.day,
+        ));
+      case 'npc_relation':
+        final npc=state.npcs[effect['npc']];
+        if(npc!=null){
+          final memory=(effect['memory'] as String?)??'Bu olayda oyuncunun tavrını hatırlıyor';
+          npc.remember(MemoryEntry(
+            text:memory,day:state.day,importance:(effect['importance'] as num?)?.toInt()??30,
+            trust:(effect['trust'] as num?)?.toInt()??0,
+            respect:(effect['respect'] as num?)?.toInt()??0,
+            fear:(effect['fear'] as num?)?.toInt()??0,
+            affection:(effect['affection'] as num?)?.toInt()??0,
+            suspicion:(effect['suspicion'] as num?)?.toInt()??0,
+          ));
+          npc.relation.change(debt:(effect['debt'] as num?)?.toInt()??0);
+        }
+      case 'schedule_event':
+        final min=(effect['minDays'] as num?)?.toInt()??1;
+        final max=(effect['maxDays'] as num?)?.toInt()??min;
+        final due=state.day+min+_rng.nextInt(math.max(1,max-min+1));
+        final eventId=effect['eventId'] as String;
+        state.delayedEffects.add(DelayedEffect(
+          id:'followup_${eventId}_${state.day}_${state.delayedEffects.length}',
+          dueDay:due,type:'event_followup',source:sourceEventId,payload:{'eventId':eventId},
+        ));
+      case 'advance_days':
+        if(amount>0)advance(amount);
+      case 'chronicle':
+        final text=effect['text'] as String?;
+        if(text!=null)state.chronicle.add('${state.day}. gün — $text');
+    }
+  }
+
 }
