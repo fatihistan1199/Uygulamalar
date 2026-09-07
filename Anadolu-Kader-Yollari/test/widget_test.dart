@@ -4,7 +4,7 @@ import 'package:anadolu_kader_yollari/main.dart';
 void main() {
   testWidgets('ana menü açılır', (tester) async {
     await tester.pumpWidget(const KaderApp());
-    await tester.pumpAndSettle();
+    await tester.pump();
     expect(find.text('ANADOLU'), findsOneWidget);
     expect(find.text('Yeni Oyun'), findsOneWidget);
   });
