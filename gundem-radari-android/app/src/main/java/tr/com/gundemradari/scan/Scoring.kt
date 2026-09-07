@@ -144,7 +144,7 @@ fun scores(
     }
 
     if(majorStateActions.any{t.contains(it)}){
-        importance+=26.0
+        importance+=30.0
         if(
             t.contains("türkiye")||
             t.contains("tbmm")||
@@ -162,7 +162,7 @@ fun scores(
         importance+=24.0
 
         if(severeDamageWords.any{t.contains(it)}){
-            importance+=24.0
+            importance+=26.0
         }
 
         val deaths=extractDeathCount(t)

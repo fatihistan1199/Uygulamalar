@@ -72,7 +72,7 @@ object EventClassifier {
     private val topics=linkedMapOf(
         "disaster" to listOf("deprem","sel","yangın","orman yangını","yanardağ","volkan","tsunami","heyelan","çığ","kasırga","afet"),
         "security" to listOf("savaş","çatışma","saldırı","füze","operasyon","terör","askeri","askerî","işgal"),
-        "politics" to listOf("seçim","referandum","meclis","tbmm","cumhurbaşkanı","hükümet","bakan","parti","anayasa"),
+        "politics" to listOf("seçim","referandum","meclis","tbmm","cumhurbaşkanı","cumhurbaşkanlığı","kabine","hükümet","bakan","parti","anayasa"),
         "economy" to listOf("faiz","enflasyon","tcmb","döviz","borsa","vergi","bütçe","asgari ücret","işsizlik","ekonomi"),
         "health" to listOf("salgın","virüs","sağlık","hastane","ilaç","aşı","hastalık"),
         "education" to listOf("meb","okul","üniversite","öğretmen","öğrenci","eğitim","sınav"),
