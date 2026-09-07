@@ -39,10 +39,10 @@ class NpcState {
 }
 
 class CityState {
-  CityState({required this.id,required this.name,required this.food,required this.trade,required this.order,required this.security,required this.prosperity,required this.banditry});
-  final String id,name; int food,trade,order,security,prosperity,banditry;
-  Map<String,dynamic> toJson()=>{'id':id,'name':name,'food':food,'trade':trade,'order':order,'security':security,'prosperity':prosperity,'banditry':banditry};
-  factory CityState.fromJson(Map<String,dynamic> j)=>CityState(id:j['id'],name:j['name'],food:j['food'],trade:j['trade'],order:j['order'],security:j['security'],prosperity:j['prosperity'],banditry:j['banditry']);
+  CityState({required this.id,required this.name,required this.food,required this.trade,required this.order,required this.security,required this.prosperity,required this.banditry,Map<String,int>? stock}):stock=stock??{'grain':60,'cloth':60,'salt':60,'leather':60};
+  final String id,name; int food,trade,order,security,prosperity,banditry; final Map<String,int> stock;
+  Map<String,dynamic> toJson()=>{'id':id,'name':name,'food':food,'trade':trade,'order':order,'security':security,'prosperity':prosperity,'banditry':banditry,'stock':stock};
+  factory CityState.fromJson(Map<String,dynamic> j)=>CityState(id:j['id'],name:j['name'],food:j['food'],trade:j['trade'],order:j['order'],security:j['security'],prosperity:j['prosperity'],banditry:j['banditry'],stock:Map<String,int>.from((j['stock'] as Map?)??{'grain':60,'cloth':60,'salt':60,'leather':60}));
 }
 
 class FactionState {
@@ -68,12 +68,12 @@ class DelayedEffect {
 }
 
 class GameState {
-  GameState({required this.version,required this.seed,required this.rngState,required this.playerName,required this.background,required this.day,required this.money,required this.tension,required this.currentCityId,required this.cities,required this.npcs,required this.factions,required this.knowledge,required this.delayedEffects,required this.chronicle});
-  final int version,seed; int rngState,day,money,tension; final String playerName,background; String currentCityId;
-  final Map<String,CityState> cities; final Map<String,NpcState> npcs; final Map<String,FactionState> factions; final List<KnowledgeEntry> knowledge; final List<DelayedEffect> delayedEffects; final List<String> chronicle;
+  GameState({required this.version,required this.seed,required this.rngState,required this.playerName,required this.background,required this.day,required this.money,required this.tension,required this.currentCityId,required this.cities,required this.npcs,required this.factions,required this.knowledge,required this.delayedEffects,required this.chronicle,Map<String,int>? inventory,int? lastMajorEventDay}):inventory=inventory??{},lastMajorEventDay=lastMajorEventDay??-999;
+  final int version,seed; int rngState,day,money,tension,lastMajorEventDay; final String playerName,background; String currentCityId;
+  final Map<String,CityState> cities; final Map<String,NpcState> npcs; final Map<String,FactionState> factions; final List<KnowledgeEntry> knowledge; final List<DelayedEffect> delayedEffects; final List<String> chronicle; final Map<String,int> inventory;
   CityState get city=>cities[currentCityId]!;
-  Map<String,dynamic> toJson()=>{'version':version,'seed':seed,'rngState':rngState,'playerName':playerName,'background':background,'day':day,'money':money,'tension':tension,'currentCityId':currentCityId,'cities':cities.map((k,v)=>MapEntry(k,v.toJson())),'npcs':npcs.map((k,v)=>MapEntry(k,v.toJson())),'factions':factions.map((k,v)=>MapEntry(k,v.toJson())),'knowledge':knowledge.map((k)=>k.toJson()).toList(),'delayedEffects':delayedEffects.map((e)=>e.toJson()).toList(),'chronicle':chronicle};
-  factory GameState.fromJson(Map<String,dynamic> j)=>GameState(version:j['version']??2,seed:j['seed'],rngState:j['rngState'],playerName:j['playerName'],background:j['background'],day:j['day'],money:j['money'],tension:j['tension'],currentCityId:j['currentCityId'],cities:(j['cities'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,CityState.fromJson(Map<String,dynamic>.from(v)))),npcs:(j['npcs'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,NpcState.fromJson(Map<String,dynamic>.from(v)))),factions:(j['factions'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,FactionState.fromJson(Map<String,dynamic>.from(v)))),knowledge:(j['knowledge'] as List).map((e)=>KnowledgeEntry.fromJson(Map<String,dynamic>.from(e))).toList(),delayedEffects:(j['delayedEffects'] as List).map((e)=>DelayedEffect.fromJson(Map<String,dynamic>.from(e))).toList(),chronicle:(j['chronicle'] as List).cast<String>());
+  Map<String,dynamic> toJson()=>{'version':version,'seed':seed,'rngState':rngState,'playerName':playerName,'background':background,'day':day,'money':money,'tension':tension,'currentCityId':currentCityId,'cities':cities.map((k,v)=>MapEntry(k,v.toJson())),'npcs':npcs.map((k,v)=>MapEntry(k,v.toJson())),'factions':factions.map((k,v)=>MapEntry(k,v.toJson())),'knowledge':knowledge.map((k)=>k.toJson()).toList(),'delayedEffects':delayedEffects.map((e)=>e.toJson()).toList(),'chronicle':chronicle,'inventory':inventory,'lastMajorEventDay':lastMajorEventDay};
+  factory GameState.fromJson(Map<String,dynamic> j)=>GameState(version:j['version']??2,seed:j['seed'],rngState:j['rngState'],playerName:j['playerName'],background:j['background'],day:j['day'],money:j['money'],tension:j['tension'],currentCityId:j['currentCityId'],cities:(j['cities'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,CityState.fromJson(Map<String,dynamic>.from(v)))),npcs:(j['npcs'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,NpcState.fromJson(Map<String,dynamic>.from(v)))),factions:(j['factions'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,FactionState.fromJson(Map<String,dynamic>.from(v)))),knowledge:(j['knowledge'] as List).map((e)=>KnowledgeEntry.fromJson(Map<String,dynamic>.from(e))).toList(),delayedEffects:(j['delayedEffects'] as List).map((e)=>DelayedEffect.fromJson(Map<String,dynamic>.from(e))).toList(),chronicle:(j['chronicle'] as List).cast<String>(),inventory:Map<String,int>.from((j['inventory'] as Map?)??{}),lastMajorEventDay:j['lastMajorEventDay']??-999);
 }
 
 class EventOption {const EventOption(this.id,this.title,this.hint);final String id,title,hint;}
@@ -85,11 +85,11 @@ class GameEngine {
 
   static GameState newGame({required int seed,required String name,required String background}){
     final cities=<String,CityState>{
-      'konya':CityState(id:'konya',name:'Konya',food:66,trade:78,order:61,security:68,prosperity:72,banditry:21),
-      'kayseri':CityState(id:'kayseri',name:'Kayseri',food:52,trade:88,order:54,security:61,prosperity:74,banditry:24),
-      'sivas':CityState(id:'sivas',name:'Sivas',food:69,trade:70,order:62,security:64,prosperity:63,banditry:27),
-      'ankara':CityState(id:'ankara',name:'Ankara',food:71,trade:64,order:59,security:66,prosperity:61,banditry:23),
-      'antalya':CityState(id:'antalya',name:'Antalya',food:76,trade:91,order:65,security:70,prosperity:81,banditry:18)};
+      'konya':CityState(id:'konya',name:'Konya',food:66,trade:78,order:61,security:68,prosperity:72,banditry:21,stock:{'grain':70,'cloth':55,'salt':50,'leather':60}),
+      'kayseri':CityState(id:'kayseri',name:'Kayseri',food:52,trade:88,order:54,security:61,prosperity:74,banditry:24,stock:{'grain':35,'cloth':65,'salt':55,'leather':75}),
+      'sivas':CityState(id:'sivas',name:'Sivas',food:69,trade:70,order:62,security:64,prosperity:63,banditry:27,stock:{'grain':62,'cloth':48,'salt':60,'leather':68}),
+      'ankara':CityState(id:'ankara',name:'Ankara',food:71,trade:64,order:59,security:66,prosperity:61,banditry:23,stock:{'grain':72,'cloth':70,'salt':45,'leather':50}),
+      'antalya':CityState(id:'antalya',name:'Antalya',food:76,trade:91,order:65,security:70,prosperity:81,banditry:18,stock:{'grain':80,'cloth':60,'salt':90,'leather':42})};
     final factions=<String,FactionState>{
       'yonetim':FactionState(id:'yonetim',name:'Yerel yönetim',reputation:50,power:68),
       'ahi':FactionState(id:'ahi',name:'Ahi ve zanaatkârlar',reputation:50,power:58),
@@ -118,14 +118,14 @@ class GameEngine {
       ['leyla','Leyla Hanım','antalya','Tercüman','tuccar','Yabancı tüccarlarla aracılık ağını büyütmek']];
     final npcs=<String,NpcState>{};
     for(final p in people){npcs[p[0]]=NpcState(id:p[0],name:p[1],cityId:p[2],profession:p[3],factionId:p[4],goal:p[5],relation:RelationState());}
-    return GameState(version:2,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.']);
+    return GameState(version:3,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999);
   }
 
   void _sync()=>state.rngState=_rng.state;
 
   void advance(int days){
     for(var i=0;i<days;i++){state.day++;
-      for(final c in state.cities.values){if(_rng.nextDouble()<.11)c.food=clamp100(c.food-1);c.trade=clamp100(c.trade+_rng.nextInt(3)-1);if(c.food<35)c.order=clamp100(c.order-1);if(c.order<35)c.banditry=clamp100(c.banditry+1);}
+      for(final c in state.cities.values){if(_rng.nextDouble()<.11)c.food=clamp100(c.food-1);c.trade=clamp100(c.trade+_rng.nextInt(3)-1);if(c.food<35)c.order=clamp100(c.order-1);if(c.order<35)c.banditry=clamp100(c.banditry+1);for(final g in c.stock.keys.toList()){var change=_rng.nextInt(3)-1;if(g=='grain'&&c.food<55)change--;c.stock[g]=math.max(5,math.min(100,c.stock[g]!+change));}}
       _runNpcGoals();_runDueEffects();}
     _sync();
   }
@@ -159,16 +159,47 @@ class GameEngine {
     state.currentCityId=cityId;advance(days);state.chronicle.add('${state.day}. gün — $from’dan ${destination.name} şehrine ulaştı.');_sync();return days;
   }
 
+
+  static const goods=<String,String>{'grain':'Tahıl','cloth':'Kumaş','salt':'Tuz','leather':'Deri'};
+  static const basePrices=<String,int>{'grain':7,'cloth':12,'salt':9,'leather':11};
+
+  int marketPrice(String good,{bool buying=true}){
+    final c=state.city;final stock=c.stock[good]??60;final base=basePrices[good]??10;
+    final scarcity=(120-stock)/100.0;final tradeAdjustment=(70-c.trade)/220.0;
+    final raw=base*(0.62+scarcity+tradeAdjustment)*(buying?1.08:.82);
+    return math.max(1,raw.round());
+  }
+
+  String buyGood(String good,[int quantity=1]){
+    if(!goods.containsKey(good)||quantity<1)return 'Geçersiz ticaret.';
+    final unit=marketPrice(good,buying:true);final total=unit*quantity;
+    if(state.money<total)return 'Yeterli akçen yok.';
+    if((state.city.stock[good]??0)<quantity*2)return 'Pazarda yeterli mal yok.';
+    state.money-=total;state.inventory[good]=(state.inventory[good]??0)+quantity;
+    state.city.stock[good]=math.max(0,state.city.stock[good]!-quantity*2);
+    state.factions['tuccar']!.reputation=clamp100(state.factions['tuccar']!.reputation+1);
+    state.chronicle.add('${state.day}. gün — ${state.city.name} pazarında $quantity ${goods[good]!.toLowerCase()} satın aldı.');
+    return '$quantity ${goods[good]!.toLowerCase()} için $total akçe ödedin.';
+  }
+
+  String sellGood(String good,[int quantity=1]){
+    if((state.inventory[good]??0)<quantity||quantity<1)return 'Satacak kadar malın yok.';
+    final unit=marketPrice(good,buying:false);final total=unit*quantity;
+    state.inventory[good]=state.inventory[good]!-quantity;state.money+=total;
+    state.city.stock[good]=math.min(100,(state.city.stock[good]??60)+quantity*2);
+    state.chronicle.add('${state.day}. gün — ${state.city.name} pazarında $quantity ${goods[good]!.toLowerCase()} sattı.');
+    return '$quantity ${goods[good]!.toLowerCase()} satarak $total akçe kazandın.';
+  }
+
   EventView pickEvent(){
-    final c=state.city;
-    if(c.id=='kayseri'&&c.food<60)return const EventView(id:'grain',title:'Kayseri’de Tahıl Meselesi',body:'Tahıl fiyatları yükseliyor. Esnaf, Tüccar Mahmud’un zahire depoladığını söylüyor; fakat söylentinin önemli kısmı rakiplerinden geliyor.',options:[EventOption('talk','Mahmud’u dinle','Bilgi kazanırsın; onun anlatısına da maruz kalırsın.'),EventOption('judge','Kadıyı haberdar et','Meşru yol; gecikmiş siyasi sonucu olabilir.'),EventOption('buy','15 akçelik tahıl al','Ekonomik fırsat; ahlaki ve sosyal bedeli belirsiz.'),EventOption('ignore','Karışma','Tarafsızlık da dünyanın gidişini değiştirebilir.')]);
-    if(state.tension>55)return const EventView(id:'faction_dispute',title:'Han Avlusunda Tartışma',body:'Bir Ahi ustasıyla vergi memuru sert biçimde tartışıyor. İki taraf da seni tanıyor; sessiz kalman bile yorumlanabilir.',options:[EventOption('ahi','Ahi ustasını destekle','Esnaf seni hatırlayacak.'),EventOption('official','Memuru destekle','Yönetim desteğini not edecek.'),EventOption('mediate','Arabuluculuk et','Başarısı ilişkilerine bağlı.'),EventOption('leave','Uzaklaş','Taraflar bunu çekingenlik sayabilir.')]);
+    final c=state.city;final sinceMajor=state.day-state.lastMajorEventDay;
+    if(c.id=='kayseri'&&c.food<40)return const EventView(id:'grain',title:'Kayseri’de Tahıl Meselesi',body:'Tahıl fiyatları yükseliyor. Esnaf, Tüccar Mahmud’un zahire depoladığını söylüyor; fakat söylentinin önemli kısmı rakiplerinden geliyor.',options:[EventOption('talk','Mahmud’u dinle','Bilgi kazanırsın; onun anlatısına da maruz kalırsın.'),EventOption('judge','Kadıyı haberdar et','Meşru yol; gecikmiş siyasi sonucu olabilir.'),EventOption('buy','15 akçelik tahıl al','Ekonomik fırsat; ahlaki ve sosyal bedeli belirsiz.'),EventOption('ignore','Karışma','Tarafsızlık da dünyanın gidişini değiştirebilir.')]);
+    if(sinceMajor>=10&&c.id=='kayseri'&&c.food<60)return const EventView(id:'grain',title:'Kayseri’de Tahıl Meselesi',body:'Tahıl fiyatları yükseliyor. Esnaf, Tüccar Mahmud’un zahire depoladığını söylüyor; fakat söylentinin önemli kısmı rakiplerinden geliyor.',options:[EventOption('talk','Mahmud’u dinle','Bilgi kazanırsın; onun anlatısına da maruz kalırsın.'),EventOption('judge','Kadıyı haberdar et','Meşru yol; gecikmiş siyasi sonucu olabilir.'),EventOption('buy','15 akçelik tahıl al','Ekonomik fırsat; ahlaki ve sosyal bedeli belirsiz.'),EventOption('ignore','Karışma','Tarafsızlık da dünyanın gidişini değiştirebilir.')]);
+    if(sinceMajor>=8&&state.tension>55)return const EventView(id:'faction_dispute',title:'Han Avlusunda Tartışma',body:'Bir Ahi ustasıyla vergi memuru sert biçimde tartışıyor. İki taraf da seni tanıyor; sessiz kalman bile yorumlanabilir.',options:[EventOption('ahi','Ahi ustasını destekle','Esnaf seni hatırlayacak.'),EventOption('official','Memuru destekle','Yönetim desteğini not edecek.'),EventOption('mediate','Arabuluculuk et','Başarısı ilişkilerine bağlı.'),EventOption('leave','Uzaklaş','Taraflar bunu çekingenlik sayabilir.')]);
     return const EventView(id:'rumor',title:'Handaki Fısıltılar',body:'Yan masadaki iki yolcu yaklaşan yeni vergilerden söz ediyor. Birinin sarhoş olduğu açık; diğerinin kaynağını bilmiyorsun.',options:[EventOption('listen','Dinlemeye devam et','Kaynağı belirsiz bir bilgi edinebilirsin.'),EventOption('verify','Başka bir kaynak ara','Daha fazla zaman karşılığında güveni yükseltebilirsin.'),EventOption('ignore','Önemseme','Yanlış bilgiden korunursun; gerçek uyarıyı kaçırabilirsin.')]);
   }
 
-  String resolve(EventView e,String choice){
-    if(e.id=='grain')return _grain(choice);if(e.id=='rumor')return _rumor(choice);if(e.id=='faction_dispute')return _dispute(choice);return 'Sonuç oluşmadı.';
-  }
+  String resolve(EventView e,String choice){if(e.id!='rumor')state.lastMajorEventDay=state.day;if(e.id=='grain')return _grain(choice);if(e.id=='rumor')return _rumor(choice);if(e.id=='faction_dispute')return _dispute(choice);return 'Sonuç oluşmadı.';}
 
   String _grain(String c){
     final mahmud=state.npcs['mahmud']!;
