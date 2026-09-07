@@ -81,7 +81,9 @@ class GundemViewModel(context:Context):ViewModel(){
         scanning.value=true
         scanMessage.value="Kaynaklar hazırlanıyor"
         try{
-            val result=scanner.scan{scanMessage.value=it}
+            val result=scanner.scan(
+                onProgress={scanMessage.value=it}
+            )
             if(result.failed.isNotEmpty()){
                 scanMessage.value+=" · Hata: ${result.failed.joinToString()}"
             }
