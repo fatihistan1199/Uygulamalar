@@ -42,7 +42,9 @@ void main(){
     final s=GameEngine.newGame(seed:99,name:'Hasan',background:'Tüccar ailesi');
     final e=GameEngine(s,catalog);
     s.currentCityId='kayseri';
+    s.pendingEvents.add('grain');
     final event=e.pickEvent();
+    expect(event.id,'grain');
     e.resolve(event,'judge');
     expect(s.delayedEffects,isNotEmpty);
     final due=s.delayedEffects.first.dueDay;
