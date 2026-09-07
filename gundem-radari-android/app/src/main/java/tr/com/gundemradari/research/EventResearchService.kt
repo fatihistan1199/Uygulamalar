@@ -9,6 +9,7 @@ import tr.com.gundemradari.web.ArticleReader
 import tr.com.gundemradari.web.NewsWebSearch
 import tr.com.gundemradari.web.ResearchedArticle
 import tr.com.gundemradari.web.summarizeResearch
+import tr.com.gundemradari.web.webSourceQuality
 
 data class EventResearchReport(
     val event:EventEntity,
@@ -70,12 +71,16 @@ class EventResearchService(
                             paragraphs=d.paragraphs,
                             publishedAt=wr.publishedAt,
                             isPrimary=false,
-                            quality=0.55
+                            quality=webSourceQuality(
+                                wr.source.ifBlank{d.host},
+                                d.finalUrl.ifBlank{wr.url}
+                            )
                         )
                     } ?: ResearchedArticle(
                         sourceName=wr.source.ifBlank{"Web kaynağı"},title=wr.title,url=wr.url,
                         description=wr.snippet,paragraphs=emptyList(),publishedAt=wr.publishedAt,
-                        isPrimary=false,quality=0.50
+                        isPrimary=false,
+                        quality=webSourceQuality(wr.source,wr.url)
                     )
                 }
             }.awaitAll()

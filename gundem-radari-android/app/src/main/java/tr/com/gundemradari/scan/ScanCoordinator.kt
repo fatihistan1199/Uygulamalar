@@ -159,7 +159,18 @@ class ScanCoordinator(private val db:AppDatabase){
         )
         if(dao.addRaw(raw)==-1L)return@withTransaction null
 
-        val candidate=dao.recentEvents(now-14L*24*3600*1000).firstOrNull{isSameEvent(item,it)}
+        val incomingText=item.title+" "+item.summary.take(320)
+        val candidate=dao.recentEvents(now-14L*24*3600*1000)
+            .asSequence()
+            .filter{isSameEvent(item,it)}
+            .map{event->
+                event to similarity(
+                    incomingText,
+                    event.title+" "+event.summary.take(320)
+                )
+            }
+            .maxByOrNull{it.second}
+            ?.first
 
         if(candidate==null){
             val (importance,noise)=scores(item.title,item.source,summary=item.summary)
@@ -189,7 +200,10 @@ class ScanCoordinator(private val db:AppDatabase){
             id
         }else{
             val alreadyHasSource=dao.eventHasSource(candidate.id,item.source.id)
-            val nextSourceCount=candidate.sourceCount+if(alreadyHasSource)0 else 1
+            val existingFamilies=dao.eventSourceIds(candidate.id)
+                .map(::sourceFamily)
+                .toSet()
+            val nextSourceCount=(existingFamilies+sourceFamily(item.source.id)).size
             val (importance,noise)=scores(item.title,item.source,nextSourceCount,item.summary)
             val eventPublished=listOfNotNull(candidate.publishedAt,item.publishedAt).maxOrNull()
 

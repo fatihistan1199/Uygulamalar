@@ -127,6 +127,14 @@ data class SearchEventRow(
     """)
     suspend fun eventHasSource(eventId:String,sourceId:String):Boolean
 
+    @Query("""
+        SELECT DISTINCT r.sourceId
+        FROM event_items ei
+        JOIN raw_items r ON r.url=ei.rawUrl
+        WHERE ei.eventId=:eventId
+    """)
+    suspend fun eventSourceIds(eventId:String):List<String>
+
     @Query("SELECT max(version) FROM event_versions WHERE eventId=:eventId")
     suspend fun maxEventVersion(eventId:String):Int?
 
@@ -207,7 +215,7 @@ data class SearchEventRow(
         SourceEntity::class,SourceHealthEntity::class,RawItemEntity::class,EventEntity::class,
         EventItemEntity::class,EventVersionEntity::class,ScanHistoryEntity::class
     ],
-    version=11, exportSchema=false
+    version=12, exportSchema=false
 )
 abstract class AppDatabase:RoomDatabase(){
     abstract fun dao():GundemDao
@@ -258,9 +266,17 @@ abstract class AppDatabase:RoomDatabase(){
                 db.execSQL("DELETE FROM raw_items")
             }
         }
+        private val MIGRATION_11_12=object:Migration(11,12){
+            override fun migrate(db:SupportSQLiteDatabase){
+                db.execSQL("DELETE FROM event_items")
+                db.execSQL("DELETE FROM event_versions")
+                db.execSQL("DELETE FROM events")
+                db.execSQL("DELETE FROM raw_items")
+            }
+        }
         fun get(context:Context)=INSTANCE?:synchronized(this){
             INSTANCE?:Room.databaseBuilder(context.applicationContext,AppDatabase::class.java,"gundem-radari.db")
-                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8,MIGRATION_8_9,MIGRATION_9_10,MIGRATION_10_11)
+                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8,MIGRATION_8_9,MIGRATION_9_10,MIGRATION_10_11,MIGRATION_11_12)
                 .build().also{INSTANCE=it}
         }
     }

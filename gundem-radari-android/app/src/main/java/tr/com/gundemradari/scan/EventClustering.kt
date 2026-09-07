@@ -135,3 +135,68 @@ fun isSameEvent(item:FetchedItem,event:EventEntity):Boolean{
         score>=0.35
     )
 }
+
+
+fun likelySameSearchEvent(a:EventEntity,b:EventEntity):Boolean{
+    val aText=a.title+" "+a.summary.take(320)
+    val bText=b.title+" "+b.summary.take(320)
+
+    val kindA=eventKind(aText)
+    val kindB=eventKind(bText)
+
+    if(kindA!="general"&&kindB!="general"&&kindA!=kindB){
+        return false
+    }
+
+    val aTime=a.publishedAt?:a.updatedAt
+    val bTime=b.publishedAt?:b.updatedAt
+    val gap=abs(aTime-bTime)
+
+    val maxGap=if(
+        kindA=="general"&&kindB=="general"
+    ){
+        3L*24*3600*1000
+    }else{
+        7L*24*3600*1000
+    }
+
+    if(gap>maxGap)return false
+
+    if(kindA=="earthquake"&&kindB=="earthquake"){
+        val ma=earthquakeMagnitude(aText)
+        val mb=earthquakeMagnitude(bText)
+
+        if(ma!=null&&mb!=null&&abs(ma-mb)>0.35){
+            return false
+        }
+    }
+
+    val aTitle=titleTokens(a.title)
+    val bTitle=titleTokens(b.title)
+    val titleCommon=aTitle.intersect(bTitle).size
+    val titleOverlap=overlap(aTitle,bTitle)
+    val overall=similarity(aText,bText)
+
+    return if(kindA!="general"&&kindA==kindB){
+        (
+            titleCommon>=2 &&
+            (
+                titleOverlap>=0.42 ||
+                overall>=0.39
+            )
+        ) || (
+            titleCommon>=1 &&
+            overall>=0.52
+        )
+    }else{
+        (
+            titleCommon>=3 &&
+            titleOverlap>=0.48
+        ) || (
+            titleCommon>=2 &&
+            overall>=0.48
+        ) || (
+            overall>=0.60
+        )
+    }
+}

@@ -44,8 +44,9 @@ import tr.com.gundemradari.data.*
 import tr.com.gundemradari.research.EventResearchReport
 import tr.com.gundemradari.research.EventResearchService
 import tr.com.gundemradari.scan.ScanCoordinator
-import tr.com.gundemradari.scan.similarity
+import tr.com.gundemradari.scan.likelySameSearchEvent
 import tr.com.gundemradari.web.NewsWebSearch
+import tr.com.gundemradari.web.webSourceQuality
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -197,6 +198,8 @@ class GundemViewModel(context:Context):ViewModel(){
                             importance=externalSearchImportance(
                                 row.title,
                                 row.snippet,
+                                row.source,
+                                row.url,
                                 row.publishedAt,
                                 now
                             ),
@@ -210,7 +213,10 @@ class GundemViewModel(context:Context):ViewModel(){
                             publishedAt=row.publishedAt,
                             religionPriority=0,
                             topic="search",
-                            bestContentQuality=50.0
+                            bestContentQuality=webSourceQuality(
+                                row.source,
+                                row.url
+                            )*100.0
                         )
                     }
 
@@ -231,12 +237,8 @@ class GundemViewModel(context:Context):ViewModel(){
         val merged=current.toMutableList()
 
         incoming.forEach{candidate->
-            val candidateText=candidate.title+" "+candidate.summary
             val matchIndex=merged.indexOfFirst{existing->
-                similarity(
-                    existing.title+" "+existing.summary,
-                    candidateText
-                )>=0.47
+                likelySameSearchEvent(existing,candidate)
             }
 
             if(matchIndex<0){
@@ -278,17 +280,22 @@ class GundemViewModel(context:Context):ViewModel(){
                 ((now-event.updatedAt)/3600000.0)*0.55
             )
         )
-        return event.importance-agePenalty
+        val qualityBonus=((event.bestContentQuality-50.0)*0.08)
+            .coerceIn(-4.0,4.0)
+        return event.importance-agePenalty+qualityBonus
     }
 
     private fun externalSearchImportance(
         title:String,
         summary:String,
+        sourceName:String,
+        url:String,
         publishedAt:Long?,
         now:Long
     ):Double{
         val text=normalizeSearch("$title $summary")
-        var score=48.0
+        val quality=webSourceQuality(sourceName,url)
+        var score=44.0 + (quality-0.50)*20.0
 
         val high=listOf(
             "deprem","yangın","savaş","saldırı","seçim","referandum",
@@ -302,7 +309,7 @@ class GundemViewModel(context:Context):ViewModel(){
             else if(ageHours<=24)score+=4.0
         }
 
-        return score.coerceIn(35.0,82.0)
+        return score.coerceIn(32.0,86.0)
     }
 
     fun resetSearch(){
