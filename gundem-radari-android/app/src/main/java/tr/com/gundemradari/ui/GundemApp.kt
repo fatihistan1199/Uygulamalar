@@ -63,15 +63,29 @@ class GundemViewModel(context:Context):ViewModel(){
         }
     }.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
 
-    init{viewModelScope.launch{repo.seed()}}
+    init{
+        viewModelScope.launch{
+            repo.seed()
+            runScan()
+        }
+    }
 
-    fun scan()=viewModelScope.launch{
-        if(scanning.value)return@launch
+    private suspend fun runScan(){
+        if(scanning.value)return
         scanning.value=true
         scanMessage.value="Kaynaklar hazırlanıyor"
-        val result=scanner.scan{scanMessage.value=it}
-        if(result.failed.isNotEmpty())scanMessage.value+=" · Hata: ${result.failed.joinToString()}"
-        scanning.value=false
+        try{
+            val result=scanner.scan{scanMessage.value=it}
+            if(result.failed.isNotEmpty()){
+                scanMessage.value+=" · Hata: ${result.failed.joinToString()}"
+            }
+        }finally{
+            scanning.value=false
+        }
+    }
+
+    fun scan()=viewModelScope.launch{
+        runScan()
     }
 
     fun setSource(id:String,enabled:Boolean)=viewModelScope.launch{dao.setSource(id,enabled)}
@@ -293,12 +307,6 @@ private fun eventDate(millis:Long):String=
     Card{
         SelectionContainer{
             Column(Modifier.padding(14.dp)){
-                Text(
-                    "Önem ${e.importance.toInt()} · Doğrulama ${e.verification}/4",
-                    style=MaterialTheme.typography.labelMedium,
-                    color=MaterialTheme.colorScheme.primary
-                )
-
                 Text(
                     e.title,
                     style=MaterialTheme.typography.titleMedium

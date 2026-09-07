@@ -32,7 +32,9 @@ class ScanCoordinator(private val db:AppDatabase){
                     val localized=translator.translateIfNeeded(item)
                     if(persist(localized))count++
                 }
-            }.onFailure{failures+=source.name}
+            }.onFailure{
+                failures+=source.name
+            }
         }
 
         dao.scan(
@@ -43,6 +45,7 @@ class ScanCoordinator(private val db:AppDatabase){
                 failedSources=failures.size
             )
         )
+
         onProgress("$count yeni kayıt, ${failures.size} kaynak hatası")
         ScanOutcome(count,failures)
     }
@@ -52,13 +55,15 @@ class ScanCoordinator(private val db:AppDatabase){
         val keys=listOf(
             " türkiye "," türk "," ankara "," istanbul "," erdoğan "," tbmm "," ak parti ",
             " chp "," mhp "," dem parti "," bakanlık "," tcmb "," afad "," diyanet ",
-            " cumhurbaşkanı "," meclis "," yargıtay "," anayasa mahkemesi "
+            " cumhurbaşkanı "," meclis "," yargıtay "," anayasa mahkemesi ",
+            " ülke genelinde "," türkiye genelinde "," 81 il "
         )
         return keys.any{text.contains(it)}
     }
 
     private suspend fun persist(item:FetchedItem):Boolean=db.withTransaction{
         val now=System.currentTimeMillis()
+
         val raw=RawItemEntity(
             url=item.url,
             sourceId=item.source.id,
@@ -70,27 +75,47 @@ class ScanCoordinator(private val db:AppDatabase){
             originalTitle=item.originalTitle,
             originalSummary=item.originalSummary
         )
+
         if(dao.addRaw(raw)==-1L)return@withTransaction false
 
-        val religionPriority=ReligionTracker.priority(item.source,item.title,item.summary)
-        val candidate=dao.recentEvents(now-14L*24*3600*1000).firstOrNull{isSameEvent(item,it)}
+        val religionPriority=ReligionTracker.priority(
+            item.source,
+            item.title,
+            item.summary
+        )
+
+        val candidate=dao.recentEvents(
+            now-14L*24*3600*1000
+        ).firstOrNull{
+            isSameEvent(item,it)
+        }
 
         if(candidate==null){
-            val (importance,noise)=scores(item.title,item.source)
+            val (importance,noise)=scores(
+                title=item.title,
+                source=item.source,
+                summary=item.summary
+            )
+
             val id=UUID.randomUUID().toString()
+
             val scope=when{
-                item.source.groupName=="religion_search"||item.source.groupName=="religion_direct"->"religion"
+                item.source.groupName=="religion_search"||
+                item.source.groupName=="religion_direct"->"religion"
+
                 turkeyFocused(item.title,item.summary)->"turkey"
+
                 item.source.groupName=="turkey"->"turkey"
+
                 item.source.groupName=="world_tr"->"world"
-                item.source.groupName=="social"->if(turkeyFocused(item.title,item.summary))"turkey" else "world"
+
+                item.source.groupName=="social"->
+                    if(turkeyFocused(item.title,item.summary))"turkey"
+                    else "world"
+
                 else->"world"
             }
-            val verify=when(item.source.groupName){
-                "official","religion_direct"->4
-                "social"->1
-                else->2
-            }
+
             dao.putEvent(
                 EventEntity(
                     id=id,
@@ -99,7 +124,7 @@ class ScanCoordinator(private val db:AppDatabase){
                     scope=scope,
                     importance=importance,
                     noise=noise,
-                    verification=verify,
+                    verification=0,
                     velocity=0.0,
                     sourceCount=1,
                     firstSeenAt=now,
@@ -109,7 +134,14 @@ class ScanCoordinator(private val db:AppDatabase){
                     religionPriority=religionPriority
                 )
             )
-            dao.link(EventItemEntity(id,item.url))
+
+            dao.link(
+                EventItemEntity(
+                    eventId=id,
+                    rawUrl=item.url
+                )
+            )
+
             dao.addVersion(
                 EventVersionEntity(
                     eventId=id,
@@ -122,31 +154,44 @@ class ScanCoordinator(private val db:AppDatabase){
             )
         }else{
             val next=candidate.sourceCount+1
-            val (i,n)=scores(item.title,item.source,next)
-            val verification=maxOf(
-                candidate.verification,
-                when(item.source.groupName){
-                    "official","religion_direct"->4
-                    "social"->candidate.verification
-                    else->if(next>=2)3 else 2
-                }
+
+            val (importance,noise)=scores(
+                title=item.title,
+                source=item.source,
+                sourceCount=next,
+                summary=item.summary
             )
-            val eventPublished=listOfNotNull(candidate.publishedAt,item.publishedAt).maxOrNull()
+
+            val eventPublished=listOfNotNull(
+                candidate.publishedAt,
+                item.publishedAt
+            ).maxOrNull()
+
             dao.putEvent(
                 candidate.copy(
                     title=item.title,
                     summary=item.summary,
-                    importance=maxOf(candidate.importance,i),
-                    noise=minOf(candidate.noise,n),
-                    verification=verification,
+                    importance=maxOf(candidate.importance,importance),
+                    noise=minOf(candidate.noise,noise),
+                    verification=0,
                     sourceCount=next,
                     updatedAt=now,
                     changeNote="Yeni kaynak eklendi",
                     publishedAt=eventPublished,
-                    religionPriority=maxOf(candidate.religionPriority,religionPriority)
+                    religionPriority=maxOf(
+                        candidate.religionPriority,
+                        religionPriority
+                    )
                 )
             )
-            dao.link(EventItemEntity(candidate.id,item.url))
+
+            dao.link(
+                EventItemEntity(
+                    eventId=candidate.id,
+                    rawUrl=item.url
+                )
+            )
+
             dao.addVersion(
                 EventVersionEntity(
                     eventId=candidate.id,
@@ -158,6 +203,7 @@ class ScanCoordinator(private val db:AppDatabase){
                 )
             )
         }
+
         true
     }
 }
