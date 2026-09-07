@@ -1,6 +1,5 @@
 package tr.com.gundemradari.scan
 
-import tr.com.gundemradari.data.EventEntity
 import tr.com.gundemradari.data.SourceEntity
 import java.util.Locale
 import kotlin.math.max
@@ -174,20 +173,3 @@ fun scores(
 
     return min(100.0,max(0.0,importance)) to min(100.0,max(0.0,noise))
 }
-
-fun similarity(a:String,b:String):Double{
-    val x=a.lowercase(locale)
-        .split(Regex("[^\\p{L}\\p{N}]+"))
-        .filter{it.length>2}
-        .toSet()
-    val y=b.lowercase(locale)
-        .split(Regex("[^\\p{L}\\p{N}]+"))
-        .filter{it.length>2}
-        .toSet()
-
-    return if(x.isEmpty()||y.isEmpty())0.0
-    else x.intersect(y).size.toDouble()/x.union(y).size
-}
-
-fun isSameEvent(item:FetchedItem,event:EventEntity):Boolean =
-    similarity(item.title,event.title)>=.58

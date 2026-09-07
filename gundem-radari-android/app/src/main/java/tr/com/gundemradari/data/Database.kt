@@ -47,6 +47,13 @@ data class ResearchItemRow(
     val trust:Double
 )
 
+data class ClassificationItemRow(
+    val sourceId:String,
+    val groupName:String,
+    val title:String,
+    val summary:String
+)
+
 @Dao interface GundemDao {
     @Query("SELECT * FROM sources ORDER BY groupName,name")
     fun sources():Flow<List<SourceEntity>>
@@ -80,6 +87,32 @@ data class ResearchItemRow(
 
     @Query("SELECT * FROM events WHERE id=:id")
     suspend fun event(id:String):EventEntity?
+
+    @Query("UPDATE events SET scope=:scope WHERE id=:id")
+    suspend fun updateEventScope(id:String,scope:String)
+
+    @Query("""
+        SELECT r.sourceId AS sourceId, s.groupName AS groupName,
+               r.title AS title, r.summary AS summary
+        FROM event_items ei
+        JOIN raw_items r ON r.url=ei.rawUrl
+        JOIN sources s ON s.id=r.sourceId
+        WHERE ei.eventId=:eventId
+    """)
+    suspend fun classificationItems(eventId:String):List<ClassificationItemRow>
+
+    @Query("""
+        SELECT EXISTS(
+            SELECT 1
+            FROM event_items ei
+            JOIN raw_items r ON r.url=ei.rawUrl
+            WHERE ei.eventId=:eventId AND r.sourceId=:sourceId
+        )
+    """)
+    suspend fun eventHasSource(eventId:String,sourceId:String):Boolean
+
+    @Query("SELECT max(version) FROM event_versions WHERE eventId=:eventId")
+    suspend fun maxEventVersion(eventId:String):Int?
 
     @Insert(onConflict=OnConflictStrategy.REPLACE)
     suspend fun putEvent(row:EventEntity)
@@ -124,7 +157,7 @@ data class ResearchItemRow(
         SourceEntity::class,RawItemEntity::class,EventEntity::class,
         EventItemEntity::class,EventVersionEntity::class,ScanHistoryEntity::class
     ],
-    version=7,
+    version=8,
     exportSchema=false
 )
 abstract class AppDatabase:RoomDatabase(){
@@ -187,6 +220,15 @@ abstract class AppDatabase:RoomDatabase(){
             }
         }
 
+        private val MIGRATION_7_8=object:Migration(7,8){
+            override fun migrate(db:SupportSQLiteDatabase){
+                db.execSQL("DELETE FROM event_items")
+                db.execSQL("DELETE FROM event_versions")
+                db.execSQL("DELETE FROM events")
+                db.execSQL("DELETE FROM raw_items")
+            }
+        }
+
         fun get(context:Context)=INSTANCE?:synchronized(this){
             INSTANCE?:Room.databaseBuilder(
                 context.applicationContext,
@@ -195,7 +237,7 @@ abstract class AppDatabase:RoomDatabase(){
             )
                 .addMigrations(
                     MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,
-                    MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7
+                    MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8
                 )
                 .build()
                 .also{INSTANCE=it}

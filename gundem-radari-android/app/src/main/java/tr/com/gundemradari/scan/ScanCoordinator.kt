@@ -6,7 +6,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import tr.com.gundemradari.data.*
 import tr.com.gundemradari.religion.ReligionTracker
-import java.util.Locale
 import java.util.UUID
 
 data class ScanOutcome(val newItems:Int,val failed:List<String>)
@@ -19,6 +18,8 @@ class ScanCoordinator(private val db:AppDatabase){
     suspend fun scan(onProgress:(String)->Unit):ScanOutcome=coroutineScope{
         val started=System.currentTimeMillis()
         val sources=dao.enabledSources()
+        val touchedEvents=linkedSetOf<String>()
+
         onProgress("${sources.size} kaynak taranıyor")
         val outcomes=sources.map{s->async{runCatching{client.fetch(s)}}}.awaitAll()
         val failures=mutableListOf<String>()
@@ -29,12 +30,28 @@ class ScanCoordinator(private val db:AppDatabase){
             result.onSuccess{items->
                 for(item in items){
                     if(dao.rawExists(item.url))continue
+
                     val localized=translator.translateIfNeeded(item)
-                    if(persist(localized))count++
+                    val cleaned=localized.copy(
+                        title=sanitizeNewsText(localized.title),
+                        summary=sanitizeNewsText(localized.summary),
+                        originalTitle=sanitizeNewsText(localized.originalTitle),
+                        originalSummary=sanitizeNewsText(localized.originalSummary)
+                    )
+
+                    persist(cleaned)?.let{eventId->
+                        count++
+                        touchedEvents+=eventId
+                    }
                 }
             }.onFailure{
                 failures+=source.name
             }
+        }
+
+        if(touchedEvents.isNotEmpty()){
+            onProgress("Haberler yeniden sınıflandırılıyor")
+            reviewCategorization(touchedEvents)
         }
 
         dao.scan(
@@ -50,18 +67,19 @@ class ScanCoordinator(private val db:AppDatabase){
         ScanOutcome(count,failures)
     }
 
-    private fun turkeyFocused(title:String,summary:String):Boolean{
-        val text=(" $title $summary ").lowercase(Locale("tr","TR"))
-        val keys=listOf(
-            " türkiye "," türk "," ankara "," istanbul "," erdoğan "," tbmm "," ak parti ",
-            " chp "," mhp "," dem parti "," bakanlık "," tcmb "," afad "," diyanet ",
-            " cumhurbaşkanı "," meclis "," yargıtay "," anayasa mahkemesi ",
-            " ülke genelinde "," türkiye genelinde "," 81 il "
-        )
-        return keys.any{text.contains(it)}
+    private suspend fun reviewCategorization(eventIds:Set<String>){
+        eventIds.forEach{eventId->
+            val event=dao.event(eventId) ?: return@forEach
+            val items=dao.classificationItems(eventId)
+            val decision=EventClassifier.classify(event,items)
+
+            if(decision.scope!=event.scope){
+                dao.updateEventScope(eventId,decision.scope)
+            }
+        }
     }
 
-    private suspend fun persist(item:FetchedItem):Boolean=db.withTransaction{
+    private suspend fun persist(item:FetchedItem):String?=db.withTransaction{
         val now=System.currentTimeMillis()
 
         val raw=RawItemEntity(
@@ -76,7 +94,7 @@ class ScanCoordinator(private val db:AppDatabase){
             originalSummary=item.originalSummary
         )
 
-        if(dao.addRaw(raw)==-1L)return@withTransaction false
+        if(dao.addRaw(raw)==-1L)return@withTransaction null
 
         val religionPriority=ReligionTracker.priority(
             item.source,
@@ -99,40 +117,37 @@ class ScanCoordinator(private val db:AppDatabase){
 
             val id=UUID.randomUUID().toString()
 
-            val scope=when{
-                item.source.groupName=="religion_search"||
-                item.source.groupName=="religion_direct"->"religion"
+            val provisional=EventEntity(
+                id=id,
+                title=item.title,
+                summary=item.summary,
+                scope="world",
+                importance=importance,
+                noise=noise,
+                verification=0,
+                velocity=0.0,
+                sourceCount=1,
+                firstSeenAt=now,
+                updatedAt=now,
+                changeNote="İlk kayıt",
+                publishedAt=item.publishedAt,
+                religionPriority=religionPriority
+            )
 
-                turkeyFocused(item.title,item.summary)->"turkey"
-
-                item.source.groupName=="turkey"->"turkey"
-
-                item.source.groupName=="world_tr"->"world"
-
-                item.source.groupName=="social"->
-                    if(turkeyFocused(item.title,item.summary))"turkey"
-                    else "world"
-
-                else->"world"
-            }
+            val decision=EventClassifier.classify(
+                provisional,
+                listOf(
+                    ClassificationItemRow(
+                        sourceId=item.source.id,
+                        groupName=item.source.groupName,
+                        title=item.title,
+                        summary=item.summary
+                    )
+                )
+            )
 
             dao.putEvent(
-                EventEntity(
-                    id=id,
-                    title=item.title,
-                    summary=item.summary,
-                    scope=scope,
-                    importance=importance,
-                    noise=noise,
-                    verification=0,
-                    velocity=0.0,
-                    sourceCount=1,
-                    firstSeenAt=now,
-                    updatedAt=now,
-                    changeNote="İlk kayıt",
-                    publishedAt=item.publishedAt,
-                    religionPriority=religionPriority
-                )
+                provisional.copy(scope=decision.scope)
             )
 
             dao.link(
@@ -152,13 +167,21 @@ class ScanCoordinator(private val db:AppDatabase){
                     createdAt=now
                 )
             )
+
+            id
         }else{
-            val next=candidate.sourceCount+1
+            val alreadyHasSource=dao.eventHasSource(
+                candidate.id,
+                item.source.id
+            )
+
+            val nextSourceCount=
+                candidate.sourceCount + if(alreadyHasSource)0 else 1
 
             val (importance,noise)=scores(
                 title=item.title,
                 source=item.source,
-                sourceCount=next,
+                sourceCount=nextSourceCount,
                 summary=item.summary
             )
 
@@ -167,16 +190,21 @@ class ScanCoordinator(private val db:AppDatabase){
                 item.publishedAt
             ).maxOrNull()
 
+            val incomingBetterHeadline=
+                importance>candidate.importance+4 ||
+                candidate.title.length<35 ||
+                candidate.title.contains("[OBJ]",true)
+
             dao.putEvent(
                 candidate.copy(
-                    title=item.title,
-                    summary=item.summary,
+                    title=if(incomingBetterHeadline)item.title else candidate.title,
+                    summary=if(incomingBetterHeadline&&item.summary.isNotBlank())item.summary else candidate.summary,
                     importance=maxOf(candidate.importance,importance),
                     noise=minOf(candidate.noise,noise),
                     verification=0,
-                    sourceCount=next,
+                    sourceCount=nextSourceCount,
                     updatedAt=now,
-                    changeNote="Yeni kaynak eklendi",
+                    changeNote=if(alreadyHasSource)"Yeni gelişme" else "Yeni kaynak eklendi",
                     publishedAt=eventPublished,
                     religionPriority=maxOf(
                         candidate.religionPriority,
@@ -192,18 +220,20 @@ class ScanCoordinator(private val db:AppDatabase){
                 )
             )
 
+            val nextVersion=(dao.maxEventVersion(candidate.id)?:1)+1
+
             dao.addVersion(
                 EventVersionEntity(
                     eventId=candidate.id,
-                    version=next,
+                    version=nextVersion,
                     title=item.title,
                     summary=item.summary,
-                    changeNote="Yeni kaynak eklendi",
+                    changeNote=if(alreadyHasSource)"Yeni gelişme" else "Yeni kaynak eklendi",
                     createdAt=now
                 )
             )
-        }
 
-        true
+            candidate.id
+        }
     }
 }
