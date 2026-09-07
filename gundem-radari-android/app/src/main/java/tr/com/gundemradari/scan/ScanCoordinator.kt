@@ -1,9 +1,8 @@
 package tr.com.gundemradari.scan
 
 import androidx.room.withTransaction
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
 import tr.com.gundemradari.data.*
 import tr.com.gundemradari.religion.ReligionTracker
 import java.util.UUID
@@ -15,67 +14,109 @@ class ScanCoordinator(private val db:AppDatabase){
     private val client=FeedClient()
     private val translator=NewsTranslator()
 
-    suspend fun scan(onProgress:(String)->Unit):ScanOutcome=coroutineScope{
-        val started=System.currentTimeMillis()
-        val sources=dao.enabledSources()
-        val touchedEvents=linkedSetOf<String>()
+    private val maintenanceScope=CoroutineScope(
+        SupervisorJob()+Dispatchers.IO
+    )
 
-        onProgress("${sources.size} kaynak taranıyor")
-        val outcomes=sources.map{s->async{runCatching{client.fetch(s)}}}.awaitAll()
-        val failures=mutableListOf<String>()
-        var count=0
+    suspend fun scan(
+        onProgress:(String)->Unit,
+        waitForReview:Boolean=false
+    ):ScanOutcome{
+        if(!scanMutex.tryLock()){
+            return ScanOutcome(0,emptyList())
+        }
 
-        outcomes.forEachIndexed{index,result->
-            val source=sources[index]
-            result.onSuccess{items->
-                for(item in items){
-                    if(dao.rawExists(item.url))continue
+        try{
+            return coroutineScope{
+                val started=System.currentTimeMillis()
+                val sources=dao.enabledSources()
+                val touchedEvents=linkedSetOf<String>()
 
-                    val localized=translator.translateIfNeeded(item)
-                    val cleaned=localized.copy(
-                        title=sanitizeNewsText(localized.title),
-                        summary=sanitizeNewsText(localized.summary),
-                        originalTitle=sanitizeNewsText(localized.originalTitle),
-                        originalSummary=sanitizeNewsText(localized.originalSummary)
-                    )
+                onProgress("${sources.size} kaynak taranıyor")
 
-                    persist(cleaned)?.let{eventId->
-                        count++
-                        touchedEvents+=eventId
+                val outcomes=sources.map{s->
+                    async{
+                        runCatching{client.fetch(s)}
+                    }
+                }.awaitAll()
+
+                val failures=mutableListOf<String>()
+                var count=0
+
+                outcomes.forEachIndexed{index,result->
+                    val source=sources[index]
+
+                    result.onSuccess{items->
+                        for(item in items){
+                            if(dao.rawExists(item.url))continue
+
+                            val localized=translator.translateIfNeeded(item)
+                            val cleaned=localized.copy(
+                                title=sanitizeNewsText(localized.title),
+                                summary=sanitizeNewsText(localized.summary),
+                                originalTitle=sanitizeNewsText(localized.originalTitle),
+                                originalSummary=sanitizeNewsText(localized.originalSummary)
+                            )
+
+                            persist(cleaned)?.let{eventId->
+                                count++
+                                touchedEvents+=eventId
+                            }
+                        }
+                    }.onFailure{
+                        failures+=source.name
                     }
                 }
-            }.onFailure{
-                failures+=source.name
+
+                dao.scan(
+                    ScanHistoryEntity(
+                        startedAt=started,
+                        finishedAt=System.currentTimeMillis(),
+                        newItems=count,
+                        failedSources=failures.size
+                    )
+                )
+
+                if(touchedEvents.isNotEmpty()){
+                    if(waitForReview){
+                        reviewCategorizationSlowly(touchedEvents)
+                    }else{
+                        scheduleBackgroundReview(touchedEvents)
+                    }
+                }
+
+                onProgress("$count yeni kayıt, ${failures.size} kaynak hatası")
+                ScanOutcome(count,failures)
             }
+        }finally{
+            scanMutex.unlock()
         }
-
-        if(touchedEvents.isNotEmpty()){
-            onProgress("Haberler yeniden sınıflandırılıyor")
-            reviewCategorization(touchedEvents)
-        }
-
-        dao.scan(
-            ScanHistoryEntity(
-                startedAt=started,
-                finishedAt=System.currentTimeMillis(),
-                newItems=count,
-                failedSources=failures.size
-            )
-        )
-
-        onProgress("$count yeni kayıt, ${failures.size} kaynak hatası")
-        ScanOutcome(count,failures)
     }
 
-    private suspend fun reviewCategorization(eventIds:Set<String>){
-        eventIds.forEach{eventId->
-            val event=dao.event(eventId) ?: return@forEach
-            val items=dao.classificationItems(eventId)
-            val decision=EventClassifier.classify(event,items)
+    private fun scheduleBackgroundReview(eventIds:Set<String>){
+        maintenanceScope.launch{
+            delay(1200)
+            reviewCategorizationSlowly(eventIds)
+        }
+    }
 
-            if(decision.scope!=event.scope){
-                dao.updateEventScope(eventId,decision.scope)
+    private suspend fun reviewCategorizationSlowly(eventIds:Set<String>){
+        eventIds.toList().chunked(4).forEach{batch->
+            batch.forEach{eventId->
+                reviewCategorization(eventId)
+                yield()
             }
+            delay(180)
+        }
+    }
+
+    private suspend fun reviewCategorization(eventId:String){
+        val event=dao.event(eventId) ?: return
+        val items=dao.classificationItems(eventId)
+        val decision=EventClassifier.classify(event,items)
+
+        if(decision.scope!=event.scope){
+            dao.updateEventScope(eventId,decision.scope)
         }
     }
 
@@ -94,7 +135,9 @@ class ScanCoordinator(private val db:AppDatabase){
             originalSummary=item.originalSummary
         )
 
-        if(dao.addRaw(raw)==-1L)return@withTransaction null
+        if(dao.addRaw(raw)==-1L){
+            return@withTransaction null
+        }
 
         val religionPriority=ReligionTracker.priority(
             item.source,
@@ -198,13 +241,25 @@ class ScanCoordinator(private val db:AppDatabase){
             dao.putEvent(
                 candidate.copy(
                     title=if(incomingBetterHeadline)item.title else candidate.title,
-                    summary=if(incomingBetterHeadline&&item.summary.isNotBlank())item.summary else candidate.summary,
-                    importance=maxOf(candidate.importance,importance),
-                    noise=minOf(candidate.noise,noise),
+                    summary=if(
+                        incomingBetterHeadline&&
+                        item.summary.isNotBlank()
+                    )item.summary else candidate.summary,
+                    importance=maxOf(
+                        candidate.importance,
+                        importance
+                    ),
+                    noise=minOf(
+                        candidate.noise,
+                        noise
+                    ),
                     verification=0,
                     sourceCount=nextSourceCount,
                     updatedAt=now,
-                    changeNote=if(alreadyHasSource)"Yeni gelişme" else "Yeni kaynak eklendi",
+                    changeNote=if(alreadyHasSource)
+                        "Yeni gelişme"
+                    else
+                        "Yeni kaynak eklendi",
                     publishedAt=eventPublished,
                     religionPriority=maxOf(
                         candidate.religionPriority,
@@ -220,7 +275,8 @@ class ScanCoordinator(private val db:AppDatabase){
                 )
             )
 
-            val nextVersion=(dao.maxEventVersion(candidate.id)?:1)+1
+            val nextVersion=
+                (dao.maxEventVersion(candidate.id)?:1)+1
 
             dao.addVersion(
                 EventVersionEntity(
@@ -228,12 +284,19 @@ class ScanCoordinator(private val db:AppDatabase){
                     version=nextVersion,
                     title=item.title,
                     summary=item.summary,
-                    changeNote=if(alreadyHasSource)"Yeni gelişme" else "Yeni kaynak eklendi",
+                    changeNote=if(alreadyHasSource)
+                        "Yeni gelişme"
+                    else
+                        "Yeni kaynak eklendi",
                     createdAt=now
                 )
             )
 
             candidate.id
         }
+    }
+
+    companion object{
+        private val scanMutex=Mutex()
     }
 }

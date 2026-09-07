@@ -3,6 +3,7 @@ package tr.com.gundemradari.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,12 +11,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -33,10 +39,10 @@ import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
-enum class FeedTab(val label:String){
-    TURKEY("Türkiye"),
-    WORLD("Dünya"),
-    RELIGION("Din")
+enum class FeedTab(val label:String,val icon:ImageVector){
+    TURKEY("Türkiye",Icons.Default.Flag),
+    WORLD("Dünya",Icons.Default.Public),
+    RELIGION("Din",Icons.Default.MenuBook)
 }
 
 class GundemViewModel(context:Context):ViewModel(){
@@ -166,7 +172,13 @@ class GundemViewModel(context:Context):ViewModel(){
                 )
             }
 
-            Button(onClick=vm::scan,enabled=!scanning){
+            FilledTonalButton(onClick=vm::scan,enabled=!scanning){
+                Icon(
+                    Icons.Default.Refresh,
+                    contentDescription=null,
+                    modifier=Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
                 Text(if(scanning)"Taranıyor…" else "Şimdi tara")
             }
         }
@@ -183,7 +195,9 @@ class GundemViewModel(context:Context):ViewModel(){
         ){
             TabRow(
                 selectedTabIndex=pagerState.currentPage,
-                modifier=Modifier.weight(1f)
+                modifier=Modifier.weight(1f),
+                containerColor=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.45f),
+                divider={}
             ){
                 FeedTab.entries.forEachIndexed{index,t->
                     Tab(
@@ -193,7 +207,17 @@ class GundemViewModel(context:Context):ViewModel(){
                                 pagerState.animateScrollToPage(index)
                             }
                         },
-                        text={Text(t.label)}
+                        selectedContentColor=tabAccent(t),
+                        unselectedContentColor=MaterialTheme.colorScheme.onSurfaceVariant,
+                        text={
+                            Row(
+                                verticalAlignment=Alignment.CenterVertically,
+                                horizontalArrangement=Arrangement.spacedBy(5.dp)
+                            ){
+                                Icon(t.icon,contentDescription=null,modifier=Modifier.size(17.dp))
+                                Text(t.label)
+                            }
+                        }
                     )
                 }
             }
@@ -202,7 +226,11 @@ class GundemViewModel(context:Context):ViewModel(){
                 onClick=onSettings,
                 modifier=Modifier.padding(start=4.dp)
             ){
-                Text("⚙",style=MaterialTheme.typography.titleLarge)
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription="Ayarlar",
+                    tint=MaterialTheme.colorScheme.primary
+                )
             }
         }
 
@@ -231,7 +259,15 @@ class GundemViewModel(context:Context):ViewModel(){
     if(researchLoading){
         AlertDialog(
             onDismissRequest=vm::closeResearch,
-            title={Text("Geniş araştırma yapılıyor")},
+            title={
+                Row(
+                    verticalAlignment=Alignment.CenterVertically,
+                    horizontalArrangement=Arrangement.spacedBy(8.dp)
+                ){
+                    Icon(Icons.Default.Search,contentDescription=null)
+                    Text("Geniş araştırma")
+                }
+            },
             confirmButton={
                 TextButton(onClick=vm::closeResearch){
                     Text("İptal")
@@ -288,7 +324,7 @@ class GundemViewModel(context:Context):ViewModel(){
             verticalArrangement=Arrangement.spacedBy(10.dp)
         ){
             items(events,key={it.id}){e->
-                EventCard(e){onResearch(e)}
+                EventCard(tab,e){onResearch(e)}
             }
         }
     }
@@ -300,25 +336,82 @@ private fun eventDate(millis:Long):String=
         Locale("tr","TR")
     ).format(Date(millis))
 
+@Composable private fun tabAccent(tab:FeedTab):Color=
+    when(tab){
+        FeedTab.TURKEY->MaterialTheme.colorScheme.primary
+        FeedTab.WORLD->MaterialTheme.colorScheme.secondary
+        FeedTab.RELIGION->MaterialTheme.colorScheme.tertiary
+    }
+
+@Composable private fun eventCardColor(tab:FeedTab,importance:Double):Color{
+    if(importance>=85){
+        return MaterialTheme.colorScheme.errorContainer.copy(alpha=.58f)
+    }
+    if(importance>=70){
+        return MaterialTheme.colorScheme.tertiaryContainer.copy(alpha=.48f)
+    }
+    return when(tab){
+        FeedTab.TURKEY->MaterialTheme.colorScheme.primaryContainer.copy(alpha=.44f)
+        FeedTab.WORLD->MaterialTheme.colorScheme.secondaryContainer.copy(alpha=.44f)
+        FeedTab.RELIGION->MaterialTheme.colorScheme.tertiaryContainer.copy(alpha=.38f)
+    }
+}
+
 @Composable private fun EventCard(
+    tab:FeedTab,
     e:EventEntity,
     onResearch:()->Unit
 ){
-    Card{
+    val accent=if(e.importance>=85)MaterialTheme.colorScheme.error else tabAccent(tab)
+
+    Card(
+        colors=CardDefaults.cardColors(
+            containerColor=eventCardColor(tab,e.importance)
+        ),
+        elevation=CardDefaults.cardElevation(
+            defaultElevation=if(e.importance>=80)3.dp else 1.dp
+        )
+    ){
         SelectionContainer{
             Column(Modifier.padding(14.dp)){
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment=Alignment.CenterVertically
+                ){
+                    Icon(
+                        tab.icon,
+                        contentDescription=null,
+                        modifier=Modifier.size(17.dp),
+                        tint=accent
+                    )
+                    if(e.importance>=80){
+                        Spacer(Modifier.width(7.dp))
+                        Box(
+                            Modifier
+                                .size(7.dp)
+                                .background(accent,CircleShape)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(7.dp))
+
                 Text(
                     e.title,
                     style=MaterialTheme.typography.titleMedium
                 )
 
                 if(e.summary.isNotBlank()){
+                    Spacer(Modifier.height(5.dp))
                     Text(
                         e.summary,
                         style=MaterialTheme.typography.bodyMedium,
-                        maxLines=3
+                        maxLines=3,
+                        color=MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                Spacer(Modifier.height(9.dp))
 
                 Row(
                     Modifier.fillMaxWidth(),
@@ -327,14 +420,19 @@ private fun eventDate(millis:Long):String=
                 ){
                     Text(
                         "${e.sourceCount} kaynak · ${e.changeNote}",
-                        style=MaterialTheme.typography.labelSmall
+                        style=MaterialTheme.typography.labelSmall,
+                        color=MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    IconButton(
+                    FilledTonalIconButton(
                         onClick=onResearch,
-                        modifier=Modifier.size(30.dp)
+                        modifier=Modifier.size(32.dp)
                     ){
-                        Text("🔍")
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription="Araştır",
+                            modifier=Modifier.size(18.dp)
+                        )
                     }
                 }
             }
@@ -536,10 +634,20 @@ private fun openInOpera(
             Text("‹ Gündem")
         }
 
-        Text(
-            "Kaynaklar",
-            style=MaterialTheme.typography.headlineSmall
-        )
+        Row(
+            verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(8.dp)
+        ){
+            Icon(
+                Icons.Default.Settings,
+                contentDescription=null,
+                tint=MaterialTheme.colorScheme.primary
+            )
+            Text(
+                "Kaynaklar",
+                style=MaterialTheme.typography.headlineSmall
+            )
+        }
 
         ElevatedCard(
             Modifier
