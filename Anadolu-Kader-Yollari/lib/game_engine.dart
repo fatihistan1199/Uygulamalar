@@ -14,10 +14,10 @@ class KaderRng {
 int clamp100(int value) => math.max(0, math.min(100, value));
 
 class MemoryEntry {
-  MemoryEntry({required this.text,required this.day,required this.importance,required this.trust,required this.respect,required this.fear,required this.affection,required this.suspicion});
-  final String text; final int day,importance,trust,respect,fear,affection,suspicion;
-  Map<String,dynamic> toJson()=>{'text':text,'day':day,'importance':importance,'trust':trust,'respect':respect,'fear':fear,'affection':affection,'suspicion':suspicion};
-  factory MemoryEntry.fromJson(Map<String,dynamic> j)=>MemoryEntry(text:j['text'],day:j['day'],importance:j['importance'],trust:j['trust'],respect:j['respect'],fear:j['fear'],affection:j['affection'],suspicion:j['suspicion']);
+  MemoryEntry({required this.text,required this.day,required this.importance,required this.trust,required this.respect,required this.fear,required this.affection,required this.suspicion,this.source='doğrudan',this.kind='event'});
+  final String text,source,kind; final int day,importance,trust,respect,fear,affection,suspicion;
+  Map<String,dynamic> toJson()=>{'text':text,'day':day,'importance':importance,'trust':trust,'respect':respect,'fear':fear,'affection':affection,'suspicion':suspicion,'source':source,'kind':kind};
+  factory MemoryEntry.fromJson(Map<String,dynamic> j)=>MemoryEntry(text:j['text'],day:j['day'],importance:j['importance'],trust:j['trust'],respect:j['respect'],fear:j['fear'],affection:j['affection'],suspicion:j['suspicion'],source:j['source']??'doğrudan',kind:j['kind']??'event');
 }
 
 class RelationState {
@@ -63,11 +63,11 @@ class FactionState {
 }
 
 class KnowledgeEntry {
-  KnowledgeEntry({required this.id,required this.text,required this.source,required this.reliability,required this.day,this.confirmed=false});
-  final String id,text,source; final int reliability,day; bool confirmed;
-  String get label {if(confirmed)return 'Kesin bilgi';if(reliability>=80)return 'Güçlü söylenti';if(reliability>=55)return 'Söylenti';if(reliability>=30)return 'Şüpheli bilgi';return 'Propaganda / çok zayıf';}
-  Map<String,dynamic> toJson()=>{'id':id,'text':text,'source':source,'reliability':reliability,'day':day,'confirmed':confirmed};
-  factory KnowledgeEntry.fromJson(Map<String,dynamic> j)=>KnowledgeEntry(id:j['id'],text:j['text'],source:j['source'],reliability:j['reliability'],day:j['day'],confirmed:j['confirmed']);
+  KnowledgeEntry({required this.id,required this.text,required this.source,required this.reliability,required this.day,this.confirmed=false,this.refuted=false,this.factId});
+  final String id,text,source; final String? factId; int reliability; final int day; bool confirmed,refuted;
+  String get label {if(refuted)return 'Yanlışlandı';if(confirmed)return 'Doğrulandı';if(reliability>=80)return 'Güçlü söylenti';if(reliability>=55)return 'Söylenti';if(reliability>=30)return 'Şüpheli bilgi';return 'Propaganda / çok zayıf';}
+  Map<String,dynamic> toJson()=>{'id':id,'text':text,'source':source,'reliability':reliability,'day':day,'confirmed':confirmed,'refuted':refuted,'factId':factId};
+  factory KnowledgeEntry.fromJson(Map<String,dynamic> j)=>KnowledgeEntry(id:j['id'],text:j['text'],source:j['source'],reliability:j['reliability'],day:j['day'],confirmed:j['confirmed']??false,refuted:j['refuted']??false,factId:j['factId']);
 }
 
 class DelayedEffect {
@@ -106,13 +106,15 @@ class GameState {
     Map<String,int>? inventory,int? lastMajorEventDay,Map<String,int>? attributes,Map<String,int>? skills,
     int? health,int? age,int? generation,bool? alive,List<Injury>? injuries,List<String>? lineage,String? deathCause,
     Map<String,dynamic>? eventFlags,List<String>? pendingEvents,Map<String,int>? eventLastDay,
-    Map<String,FamilyMember>? family,String? playerFamilyId,int? nextLifeId,String? playerGender
+    Map<String,FamilyMember>? family,String? playerFamilyId,int? nextLifeId,String? playerGender,
+    Map<String,bool>? worldFacts,List<String>? recentEventIds
   }):inventory=inventory??{},lastMajorEventDay=lastMajorEventDay??-999,
     attributes=attributes??{'strength':40,'agility':40,'intellect':40,'rhetoric':40,'intuition':40,'willpower':40},
     skills=skills??{'trade':25,'diplomacy':25,'law':20,'medicine':15,'religion':20,'military':20,'tracking':15,'espionage':10,'leadership':20,'localCulture':30},
     health=health??100,age=age??22,generation=generation??1,alive=alive??true,injuries=injuries??[],lineage=lineage??[],deathCause=deathCause??'',
     eventFlags=eventFlags??{},pendingEvents=pendingEvents??[],eventLastDay=eventLastDay??{},
-    family=family??{},playerFamilyId=playerFamilyId??'player',nextLifeId=nextLifeId??1,playerGender=playerGender??'unknown' {
+    family=family??{},playerFamilyId=playerFamilyId??'player',nextLifeId=nextLifeId??1,playerGender=playerGender??'unknown',
+    worldFacts=worldFacts??{},recentEventIds=recentEventIds??[] {
       // v0.5 kayıtlarında soy alanı yoktu; dünya verisine dokunmadan ince bir başlangıç ağacı üret.
       if(this.family.isEmpty){
         this.family['player']=FamilyMember(id:'player',name:playerName,age:this.age,cityId:currentCityId,gender:this.playerGender,isPlayerLine:true);
@@ -128,6 +130,7 @@ class GameState {
   final Map<String,int> inventory,attributes,skills; final List<Injury> injuries; final List<String> lineage;
   final Map<String,dynamic> eventFlags; final List<String> pendingEvents; final Map<String,int> eventLastDay;
   final Map<String,FamilyMember> family; String playerFamilyId; int nextLifeId;
+  final Map<String,bool> worldFacts; final List<String> recentEventIds;
 
   CityState get city=>cities[currentCityId]!;
 
@@ -139,7 +142,8 @@ class GameState {
     'chronicle':chronicle,'inventory':inventory,'lastMajorEventDay':lastMajorEventDay,'attributes':attributes,'skills':skills,
     'health':health,'age':age,'generation':generation,'alive':alive,'injuries':injuries.map((i)=>i.toJson()).toList(),
     'lineage':lineage,'deathCause':deathCause,'eventFlags':eventFlags,'pendingEvents':pendingEvents,'eventLastDay':eventLastDay,
-    'family':family.map((k,v)=>MapEntry(k,v.toJson())),'playerFamilyId':playerFamilyId,'nextLifeId':nextLifeId,'playerGender':playerGender
+    'family':family.map((k,v)=>MapEntry(k,v.toJson())),'playerFamilyId':playerFamilyId,'nextLifeId':nextLifeId,'playerGender':playerGender,
+    'worldFacts':worldFacts,'recentEventIds':recentEventIds
   };
 
   factory GameState.fromJson(Map<String,dynamic> j)=>GameState(
@@ -159,7 +163,9 @@ class GameState {
     pendingEvents:((j['pendingEvents'] as List?)??[]).cast<String>(),
     eventLastDay:Map<String,int>.from((j['eventLastDay'] as Map?)??{}),
     family:((j['family'] as Map?)??{}).map((k,v)=>MapEntry(k.toString(),FamilyMember.fromJson(Map<String,dynamic>.from(v)))),
-    playerFamilyId:j['playerFamilyId']??'player',nextLifeId:j['nextLifeId']??1,playerGender:j['playerGender']??'unknown'
+    playerFamilyId:j['playerFamilyId']??'player',nextLifeId:j['nextLifeId']??1,playerGender:j['playerGender']??'unknown',
+    worldFacts:Map<String,bool>.from((j['worldFacts'] as Map?)??{}),
+    recentEventIds:((j['recentEventIds'] as List?)??[]).cast<String>()
   );
 }
 
