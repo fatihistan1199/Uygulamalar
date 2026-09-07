@@ -162,9 +162,17 @@ class _GamePageState extends State<GamePage>{
           items:['Erkek','Kadın'].map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),
           onChanged:(v)=>setState(()=>gender=v!),
         ),
-        const SizedBox(height:12),
-        TextField(controller:seedCtrl,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Seed (boş bırakılabilir)',helperText:'Aynı seed aynı başlangıç dünyasını üretir.',border:OutlineInputBorder())),
-        const SizedBox(height:16),
+        const SizedBox(height:8),
+        ExpansionTile(
+          tilePadding:EdgeInsets.zero,
+          title:const Text('Gelişmiş'),
+          subtitle:const Text('İstersen dünya seed değerini belirleyebilirsin.'),
+          children:[Padding(
+            padding:const EdgeInsets.only(bottom:12),
+            child:TextField(controller:seedCtrl,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Dünya seed değeri',helperText:'Boş bırakırsan otomatik oluşturulur.',border:OutlineInputBorder())),
+          )],
+        ),
+        const SizedBox(height:8),
         if(contentLoading)const Padding(padding:EdgeInsets.symmetric(vertical:8),child:LinearProgressIndicator()),
         if(contentError!=null)Padding(padding:const EdgeInsets.only(bottom:8),child:Text(contentError!,textAlign:TextAlign.center)),
         FilledButton(onPressed:catalog!=null?_newGame:null,child:const Text('Yeni Oyun')),
@@ -239,9 +247,6 @@ class _GamePageState extends State<GamePage>{
     children:[Padding(padding:const EdgeInsets.fromLTRB(16,0,16,14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       const Text('Nitelikler',style:TextStyle(fontWeight:FontWeight.bold)),
       Wrap(spacing:6,runSpacing:4,children:state!.attributes.entries.map((e)=>Chip(label:Text('${GameEngine.attributeNames[e.key]} ${e.value}'))).toList()),
-      const SizedBox(height:8),
-      const Text('Beceriler',style:TextStyle(fontWeight:FontWeight.bold)),
-      Wrap(spacing:6,runSpacing:4,children:state!.skills.entries.map((e)=>Chip(label:Text('${GameEngine.skillNames[e.key]} ${e.value}'))).toList()),
       if(state!.injuries.isNotEmpty)...[
         const Divider(),const Text('Yaralanmalar',style:TextStyle(fontWeight:FontWeight.bold)),
         ...state!.injuries.reversed.map((i)=>ListTile(
@@ -284,18 +289,18 @@ class _GamePageState extends State<GamePage>{
         child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
           Text('Yol Çatışması',style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
           const SizedBox(height:4),
-          const Text('Kuvvet tek belirleyici değildir. Taktik; nitelik, beceri, şehir güvenliği ve eşkıyalıkla birlikte çözülür.'),
+          const Text('Her taktik zarla çözülür. Kişisel yeteneklerin ve koşullar şansı arka planda değiştirir.'),
           const SizedBox(height:12),
-          _conflictButton(sheetContext,'defend','Tedbirli savun','İrade + Askerlik'),
-          _conflictButton(sheetContext,'assault','Hızlı saldır','Kuvvet + Askerlik'),
-          _conflictButton(sheetContext,'flee','Geri çekil','Çeviklik + İz sürme'),
-          _conflictButton(sheetContext,'parley','Konuşarak çöz','Hitabet + Diplomasi'),
+          _conflictButton(sheetContext,'defend','Tedbirli savun'),
+          _conflictButton(sheetContext,'assault','Hızlı saldır'),
+          _conflictButton(sheetContext,'flee','Geri çekil'),
+          _conflictButton(sheetContext,'parley','Konuşarak çöz'),
         ]),
       )),
     );
   }
 
-  Widget _conflictButton(BuildContext sheetContext,String tactic,String title,String detail)=>Padding(
+  Widget _conflictButton(BuildContext sheetContext,String tactic,String title)=>Padding(
     padding:const EdgeInsets.only(bottom:7),
     child:OutlinedButton(
       onPressed:(){
@@ -307,7 +312,8 @@ class _GamePageState extends State<GamePage>{
       child:Align(alignment:Alignment.centerLeft,child:Padding(
         padding:const EdgeInsets.symmetric(vertical:5),
         child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-          Text(title,style:const TextStyle(fontWeight:FontWeight.bold)),Text(detail,style:Theme.of(context).textTheme.bodySmall),
+          Text(title,style:const TextStyle(fontWeight:FontWeight.bold)),
+          Text('Başarı şansı: ${engine!.conflictRiskLabel(tactic)}',style:Theme.of(context).textTheme.bodySmall),
         ]),
       )),
     ),
