@@ -409,10 +409,9 @@ class _GamePageState extends State<GamePage>{
     const SizedBox(height:8),
     if(state!.knowledge.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(18),child:Text('Henüz kayıtlı bilgi yok. Hanlarda dinle, insanlarla konuş veya bilgiyi doğrulat.'))),
     ...state!.knowledge.reversed.map((k)=>Card(child:ListTile(
-      leading:Icon(k.confirmed?Icons.verified:Icons.hearing),
+      leading:Icon(k.refuted?Icons.block:k.confirmed?Icons.verified:Icons.hearing),
       title:Text(k.text),
       subtitle:Text('${k.label} • Kaynak: ${k.source} • ${k.day}. gün'),
-      trailing:Text('%${k.reliability}',style:const TextStyle(fontWeight:FontWeight.bold)),
     ))),
   ]);
 
