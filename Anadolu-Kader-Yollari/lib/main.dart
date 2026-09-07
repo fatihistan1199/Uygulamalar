@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'game_engine.dart';
 import 'event_catalog.dart';
+import 'story_catalog.dart';
 
 void main(){WidgetsFlutterBinding.ensureInitialized();runApp(const KaderApp());}
 
@@ -35,6 +36,7 @@ class _GamePageState extends State<GamePage>{
   GameState? state;
   GameEngine? engine;
   EventCatalog? catalog;
+  StoryCatalog? storyCatalog;
   EventView? activeEvent;
   String? outcome;
   int tab=0;
@@ -48,6 +50,7 @@ class _GamePageState extends State<GamePage>{
   Future<void> _bootstrap()async{
     try{
       catalog=await EventCatalog.loadDefault();
+      storyCatalog=await StoryCatalog.loadDefault();
       final p=await SharedPreferences.getInstance();
       hasSave=p.containsKey(saveKey);
     }catch(e){
@@ -61,8 +64,8 @@ class _GamePageState extends State<GamePage>{
     final parsed=int.tryParse(seedCtrl.text.trim());
     final seed=parsed??(DateTime.now().millisecondsSinceEpoch&0x7fffffff);
     state=GameEngine.newGame(seed:seed,name:nameCtrl.text.trim().isEmpty?'Hasan':nameCtrl.text.trim(),background:background,gender:gender=='Kadın'?'female':'male');
-    if(catalog==null)return;
-    engine=GameEngine(state!,catalog!);activeEvent=null;outcome='Seed: $seed';tab=0;
+    if(catalog==null||storyCatalog==null)return;
+    engine=GameEngine(state!,catalog!);activeEvent=null;outcome=null;tab=0;
     setState((){});_save();
   }
 
@@ -78,7 +81,7 @@ class _GamePageState extends State<GamePage>{
     if(raw==null)return;
     try{
       state=GameState.fromJson(Map<String,dynamic>.from(jsonDecode(raw) as Map));
-      if(catalog==null)throw StateError('Olay kataloğu hazır değil');
+      if(catalog==null||storyCatalog==null)throw StateError('İçerik katalogları hazır değil');
       engine=GameEngine(state!,catalog!);nameCtrl.text=state!.playerName;background=state!.background;gender=state!.playerGender=='female'?'Kadın':'Erkek';
       activeEvent=null;outcome='Kayıt yüklendi. Dünya ${state!.day}. günden devam ediyor.';tab=0;
       if(mounted)setState((){});
@@ -93,6 +96,19 @@ class _GamePageState extends State<GamePage>{
   }
 
   void _seek(){activeEvent=engine!.pickEvent();outcome=null;setState((){});}
+
+  void _continueStory(){
+    engine!.completeStory();
+    outcome=null;
+    setState((){});
+    _save();
+  }
+
+  void _work(){
+    outcome=engine!.doLocalWork();
+    setState((){});
+    _save();
+  }
 
   void _choose(EventOption option){
     outcome=engine!.resolve(activeEvent!,option.id);
@@ -112,7 +128,7 @@ class _GamePageState extends State<GamePage>{
     ));
     if(id==null)return;
     final from=state!.city.name;final days=engine!.travel(id);
-    outcome='$from → ${state!.city.name}: $days gün. Yol riski güvenlik ve eşkıyalığa göre hesaplandı.';
+    outcome='$from → ${state!.city.name}: $days gün sürdü. Şehir kapısından içeri giriyorsun.';
     setState((){});_save();
   }
 
@@ -175,9 +191,9 @@ class _GamePageState extends State<GamePage>{
         const SizedBox(height:8),
         if(contentLoading)const Padding(padding:EdgeInsets.symmetric(vertical:8),child:LinearProgressIndicator()),
         if(contentError!=null)Padding(padding:const EdgeInsets.only(bottom:8),child:Text(contentError!,textAlign:TextAlign.center)),
-        FilledButton(onPressed:catalog!=null?_newGame:null,child:const Text('Yeni Oyun')),
-        OutlinedButton(onPressed:catalog!=null&&hasSave?_load:null,child:const Text('Devam Et')),
-        if(catalog!=null)Padding(padding:const EdgeInsets.only(top:6),child:Text('${catalog!.events.length} olay modülü yüklendi.',textAlign:TextAlign.center,style:Theme.of(context).textTheme.bodySmall)),
+        FilledButton(onPressed:catalog!=null&&storyCatalog!=null?_newGame:null,child:const Text('Yeni Oyun')),
+        OutlinedButton(onPressed:catalog!=null&&storyCatalog!=null&&hasSave?_load:null,child:const Text('Devam Et')),
+        if(catalog!=null&&storyCatalog!=null)Padding(padding:const EdgeInsets.only(top:6),child:Text('${catalog!.events.length} olay • ${storyCatalog!.scenes.length} hikâye sahnesi',textAlign:TextAlign.center,style:Theme.of(context).textTheme.bodySmall)),
         if(outcome!=null)Padding(padding:const EdgeInsets.only(top:10),child:Text(outcome!,textAlign:TextAlign.center)),
       ]),
     ))),
@@ -206,11 +222,15 @@ class _GamePageState extends State<GamePage>{
         Text('Gerilim ${state!.tension}'),
       ]),
     ]))),
-    _characterCard(context),
-    if(!state!.alive)_successorPanel(context)else if(activeEvent!=null)_eventCard(context)else...[
-      if(outcome!=null)Card(child:Padding(padding:const EdgeInsets.all(14),child:Text(outcome!))),
+    if(!state!.alive)_successorPanel(context)
+    else if(state!.narrativeQueue.isNotEmpty&&storyCatalog!=null)_storyCard(context)
+    else if(activeEvent!=null)_eventCard(context)
+    else...[
+      _lifePathCard(context),
+      if(outcome!=null)Card(child:Padding(padding:const EdgeInsets.all(14),child:Text(outcome!,style:const TextStyle(height:1.45)))),
       _cityCard(context),
-      FilledButton.icon(onPressed:_seek,icon:const Icon(Icons.forum_outlined),label:const Text('Şehirde dolaş / bilgi ara')),
+      FilledButton.icon(onPressed:_seek,icon:const Icon(Icons.auto_stories_outlined),label:const Text('Şehirde bir hikâyenin peşine düş')),
+      OutlinedButton.icon(onPressed:_work,icon:const Icon(Icons.work_outline),label:const Text('Şehirde iş ara')),
       OutlinedButton.icon(onPressed:_marketSheet,icon:const Icon(Icons.storefront_outlined),label:const Text('Pazara git')),
       OutlinedButton.icon(onPressed:_conflictSheet,icon:const Icon(Icons.shield_outlined),label:const Text('Riskli yol görevine katıl')),
       OutlinedButton.icon(onPressed:_travel,icon:const Icon(Icons.map_outlined),label:const Text('Seyahat et')),
@@ -222,10 +242,52 @@ class _GamePageState extends State<GamePage>{
     ],
   ]);
 
+  Widget _storyCard(BuildContext context){
+    final story=engine!.currentStory(storyCatalog!);
+    if(story==null)return const SizedBox.shrink();
+    return Card(child:Padding(
+      padding:const EdgeInsets.all(18),
+      child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+        Container(
+          height:170,
+          decoration:BoxDecoration(borderRadius:BorderRadius.circular(18),gradient:const LinearGradient(begin:Alignment.topLeft,end:Alignment.bottomRight,colors:[Color(0xff0b7285),Color(0xff6d3b8c),Color(0xffa45a23)])),
+          child:Stack(children:[
+            const Positioned(right:22,bottom:16,child:Icon(Icons.auto_stories,size:72,color:Color(0x55ffffff))),
+            Positioned(left:18,top:18,right:18,child:Text(story.kicker.toUpperCase(),style:const TextStyle(color:Colors.white70,fontWeight:FontWeight.w700,letterSpacing:1.4))),
+            Positioned(left:18,bottom:22,right:90,child:Text(story.title,style:Theme.of(context).textTheme.headlineMedium?.copyWith(color:Colors.white,fontWeight:FontWeight.w900))),
+          ]),
+        ),
+        const SizedBox(height:18),
+        Text(story.body,style:Theme.of(context).textTheme.bodyLarge?.copyWith(height:1.6)),
+        const SizedBox(height:18),
+        FilledButton.icon(onPressed:_continueStory,icon:const Icon(Icons.arrow_forward),label:Text(story.continueLabel)),
+      ]),
+    ));
+  }
+
+  Widget _lifePathCard(BuildContext context){
+    final goals=engine!.lifeGoals();
+    final done=goals.where((g)=>g.complete).length;
+    return Card(child:ExpansionTile(
+      initiallyExpanded:done<2,
+      leading:CircleAvatar(child:Text('$done/${goals.length}')),
+      title:const Text('Yaşam Yolu',style:TextStyle(fontWeight:FontWeight.bold)),
+      subtitle:const Text('Bunlar zorunlu görevler değil; kurduğun hayatın kilometre taşları.'),
+      children:goals.map((g)=>ListTile(
+        dense:true,
+        leading:Icon(g.complete?Icons.check_circle:Icons.radio_button_unchecked),
+        title:Text(g.title),
+        subtitle:Text(g.description),
+      )).toList(),
+    ));
+  }
+
   Widget _cityCard(BuildContext context){
     final c=state!.city;
     return Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       Text(c.name,style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
+      const SizedBox(height:6),
+      Text(engine!.cityMoodText(),style:Theme.of(context).textTheme.bodyMedium?.copyWith(height:1.45)),
       const SizedBox(height:10),
       Wrap(spacing:7,runSpacing:7,children:[
         Chip(label:Text('Gıda ${c.food}')),Chip(label:Text('Ticaret ${c.trade}')),Chip(label:Text('Huzur ${c.order}')),
