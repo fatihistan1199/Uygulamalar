@@ -24,7 +24,7 @@ class ArticleReader {
     suspend fun read(url:String):ArticleDetails?=withContext(Dispatchers.IO){
         runCatching{
             val first=Jsoup.connect(url)
-                .userAgent("Mozilla/5.0 (Android) GundemRadari/13")
+                .userAgent("Mozilla/5.0 (Android) GundemRadari/14")
                 .timeout(14000)
                 .followRedirects(true)
                 .get()
@@ -41,7 +41,7 @@ class ArticleReader {
                 if(external!=null){
                     runCatching{
                         Jsoup.connect(external)
-                            .userAgent("Mozilla/5.0 (Android) GundemRadari/13")
+                            .userAgent("Mozilla/5.0 (Android) GundemRadari/14")
                             .timeout(14000)
                             .followRedirects(true)
                             .get()
@@ -160,7 +160,7 @@ fun summarizeResearch(eventTitle:String,articles:List<ResearchedArticle>):Resear
         val out=mutableListOf<String>()
         for(c in input){
             if(c.text in used)continue
-            if(out.none{sentenceSimilarity(it,c.text)>.62}){
+            if(out.none{sentenceSimilarity(it,c.text)>.50}){
                 out+=c.text
                 if(out.size>=count)break
             }

@@ -189,6 +189,10 @@ class GundemViewModel(context:Context):ViewModel(){
                         expandDescriptions=false
                     )
                 }.getOrElse{emptyList()}
+                    .filter{row->
+                        val hay=normalizeSearch(row.title+" "+row.snippet)
+                        terms.all{hay.contains(it)}
+                    }
                     .map{row->
                         EventEntity(
                             id="websearch:${row.url.hashCode()}",
@@ -730,6 +734,9 @@ private data class EventTone(
     val tone=eventTone(e.importance)
 
     Card(
+        modifier=Modifier
+            .fillMaxWidth()
+            .clickable(onClick=onResearch),
         colors=CardDefaults.cardColors(
             containerColor=tone.background,
             contentColor=tone.foreground
@@ -754,25 +761,6 @@ private data class EventTone(
                         maxLines=4,
                         color=tone.foreground.copy(alpha=.88f)
                     )
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement=Arrangement.End
-                ){
-                    IconButton(
-                        onClick=onResearch,
-                        modifier=Modifier.size(32.dp)
-                    ){
-                        Icon(
-                            Icons.Default.Search,
-                            contentDescription="Araştır",
-                            modifier=Modifier.size(19.dp),
-                            tint=tone.foreground
-                        )
-                    }
                 }
             }
         }

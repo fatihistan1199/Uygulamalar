@@ -70,7 +70,7 @@ class NewsWebSearch {
             connectTimeout=12000
             readTimeout=12000
             instanceFollowRedirects=true
-            setRequestProperty("User-Agent","Mozilla/5.0 (Android) GundemRadari/13")
+            setRequestProperty("User-Agent","Mozilla/5.0 (Android) GundemRadari/14")
             setRequestProperty("Accept","application/rss+xml,application/xml,text/xml,*/*")
         }
         return try{
@@ -155,7 +155,7 @@ class NewsWebSearch {
             connectTimeout=10000
             readTimeout=10000
             instanceFollowRedirects=true
-            setRequestProperty("User-Agent","Mozilla/5.0 (Android) GundemRadari/13")
+            setRequestProperty("User-Agent","Mozilla/5.0 (Android) GundemRadari/14")
             setRequestProperty("Accept","text/html,application/xhtml+xml")
         }
         return try{
