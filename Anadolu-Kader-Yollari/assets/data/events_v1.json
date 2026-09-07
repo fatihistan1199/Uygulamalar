@@ -1392,6 +1392,556 @@
           ]
         }
       ]
+    },
+    {
+      "id": "family_marriage_offer",
+      "category": "family",
+      "title": "Aileden Bir Evlilik Teklifi",
+      "body": "Ailen, {{city}} çevresinden uygun görülen bir evlilik teklifini önüne getiriyor. Bu yalnız iki kişinin değil, iki hanenin de birbirine bağlanması anlamına gelecek.",
+      "weight": 42,
+      "major": false,
+      "cooldownDays": 120,
+      "conditions": [
+        {
+          "type": "player_age_at_least",
+          "value": 18
+        },
+        {
+          "type": "player_age_at_most",
+          "value": 45
+        },
+        {
+          "type": "player_no_spouse"
+        }
+      ],
+      "tags": [
+        "family",
+        "marriage",
+        "legacy"
+      ],
+      "choices": [
+        {
+          "id": "accept",
+          "title": "Evliliği kabul et",
+          "hint": "Hane genişler; yeni sorumluluklar ve yeni bir halef hattı oluşabilir.",
+          "resultText": "Evliliği kabul ettin. Yeni eşin haneye katıldı; bundan sonra aile kararları yalnız seni ilgilendirmeyecek.",
+          "effects": [
+            {
+              "type": "family_add_spouse"
+            },
+            {
+              "type": "money",
+              "amount": -8
+            },
+            {
+              "type": "family_relation",
+              "role": "spouse",
+              "trust": 6,
+              "affection": 8,
+              "respect": 3
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "family_child_birth",
+              "minDays": 280,
+              "maxDays": 520
+            }
+          ]
+        },
+        {
+          "id": "negotiate",
+          "title": "Şartları konuş",
+          "hint": "Diplomasi 35 gerektirir; evlilik olur ama mali yükü azaltabilirsin.",
+          "resultText": "Şartları pazarlıkla yumuşattın ve evliliği kabul ettin.",
+          "requirements": [
+            {
+              "type": "skill_at_least",
+              "skill": "diplomacy",
+              "value": 35
+            }
+          ],
+          "effects": [
+            {
+              "type": "family_add_spouse"
+            },
+            {
+              "type": "money",
+              "amount": -4
+            },
+            {
+              "type": "skill",
+              "skill": "diplomacy",
+              "amount": 1
+            },
+            {
+              "type": "family_relation",
+              "role": "spouse",
+              "trust": 4,
+              "affection": 6,
+              "respect": 5
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "family_child_birth",
+              "minDays": 300,
+              "maxDays": 540
+            }
+          ]
+        },
+        {
+          "id": "decline",
+          "title": "Teklifi reddet",
+          "hint": "Bağımsızlığını korursun; aile çevresi kararı farklı yorumlayabilir.",
+          "resultText": "Teklifi reddettin. Karar şimdilik kapandı, fakat evlilik meselesi aile içinde unutulmadı.",
+          "effects": [
+            {
+              "type": "family_relation",
+              "role": "parent",
+              "trust": -2,
+              "respect": -1,
+              "suspicion": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "family_child_birth",
+      "category": "family",
+      "title": "Haneye Yeni Bir Çocuk",
+      "body": "Eşin {{spouse}} ile hanenize yeni bir çocuk katılmak üzere. Doğum hazırlığı için kimin yardımına güveneceğiniz konuşuluyor.",
+      "weight": 100,
+      "major": false,
+      "cooldownDays": 999,
+      "scheduledOnly": true,
+      "conditions": [
+        {
+          "type": "player_has_spouse"
+        }
+      ],
+      "tags": [
+        "family",
+        "child",
+        "legacy"
+      ],
+      "choices": [
+        {
+          "id": "midwife",
+          "title": "Tecrübeli bir ebe tut",
+          "hint": "8 akçe harcarsın; aile huzurunu artırır.",
+          "resultText": "Doğum için tecrübeli bir ebe tuttun. Çocuk sağ salim haneye katıldı.",
+          "requirements": [
+            {
+              "type": "money_at_least",
+              "value": 8
+            }
+          ],
+          "effects": [
+            {
+              "type": "money",
+              "amount": -8
+            },
+            {
+              "type": "family_add_child"
+            },
+            {
+              "type": "family_relation",
+              "role": "spouse",
+              "trust": 5,
+              "affection": 6
+            }
+          ]
+        },
+        {
+          "id": "family_help",
+          "title": "Ailenin yardımına güven",
+          "hint": "Maliyeti düşürür; sorumluluk akrabalar arasında paylaşılır.",
+          "resultText": "Yakınlarının yardımıyla doğum tamamlandı. Yeni çocuk aile ağacına katıldı.",
+          "effects": [
+            {
+              "type": "family_add_child"
+            },
+            {
+              "type": "family_relation",
+              "role": "parent",
+              "trust": 3,
+              "affection": 3
+            }
+          ]
+        },
+        {
+          "id": "physician",
+          "title": "Hekim çağır",
+          "hint": "Tıp çevresiyle bağ kurarsın; 12 akçe gerekir.",
+          "resultText": "Bir hekim gözetiminde doğum tamamlandı. Yeni çocuk haneye katıldı.",
+          "requirements": [
+            {
+              "type": "money_at_least",
+              "value": 12
+            }
+          ],
+          "effects": [
+            {
+              "type": "money",
+              "amount": -12
+            },
+            {
+              "type": "family_add_child"
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "medrese",
+              "amount": 2
+            },
+            {
+              "type": "family_relation",
+              "role": "spouse",
+              "trust": 6,
+              "affection": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "family_sibling_debt",
+      "category": "family",
+      "title": "{{sibling}}’in Borcu",
+      "body": "Kardeşin {{sibling}}, eski bir ticari borcun vadesinin geldiğini söylüyor. Borcu kapatamazsa aile adının da zarar görebileceğini düşünüyor.",
+      "weight": 40,
+      "major": false,
+      "cooldownDays": 80,
+      "conditions": [
+        {
+          "type": "family_role_exists",
+          "role": "sibling"
+        }
+      ],
+      "tags": [
+        "family",
+        "debt",
+        "reputation"
+      ],
+      "choices": [
+        {
+          "id": "pay",
+          "title": "12 akçeyi öde",
+          "hint": "Maddi kayıp; aile bağı güçlenir ve kardeşin sana borçlanır.",
+          "resultText": "Borcu kapattın. {{sibling}} bunu ciddi bir aile desteği olarak gördü.",
+          "requirements": [
+            {
+              "type": "money_at_least",
+              "value": 12
+            }
+          ],
+          "effects": [
+            {
+              "type": "money",
+              "amount": -12
+            },
+            {
+              "type": "family_relation",
+              "role": "sibling",
+              "trust": 10,
+              "affection": 7,
+              "debt": 10
+            }
+          ]
+        },
+        {
+          "id": "refuse",
+          "title": "Kendi borcunu kendisi ödesin",
+          "hint": "Paranı korursun; aile bağı zedelenebilir.",
+          "resultText": "Yardım etmeyi reddettin. {{sibling}} kararını unutmayacak.",
+          "effects": [
+            {
+              "type": "family_relation",
+              "role": "sibling",
+              "trust": -9,
+              "affection": -5,
+              "suspicion": 7
+            }
+          ]
+        },
+        {
+          "id": "mediate",
+          "title": "Alacaklıyla pazarlık et",
+          "hint": "Diplomasi 30 gerektirir; daha düşük ödeme ile sorunu çözebilirsin.",
+          "resultText": "Alacaklıyla konuşup borcu yeniden yapılandırdın. {{sibling}} sana minnettar.",
+          "requirements": [
+            {
+              "type": "skill_at_least",
+              "skill": "diplomacy",
+              "value": 30
+            },
+            {
+              "type": "money_at_least",
+              "value": 5
+            }
+          ],
+          "effects": [
+            {
+              "type": "money",
+              "amount": -5
+            },
+            {
+              "type": "skill",
+              "skill": "diplomacy",
+              "amount": 1
+            },
+            {
+              "type": "family_relation",
+              "role": "sibling",
+              "trust": 6,
+              "respect": 5,
+              "debt": 6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "family_parent_illness",
+      "category": "family",
+      "title": "{{parent}} Hastalandı",
+      "body": "Ailenden {{parent}} birkaç gündür yataktan kalkamıyor. İşlerini bırakıp yanında kalmak, hekim çağırmak veya sorumluluğu diğer akrabalara bırakmak arasında seçim yapmalısın.",
+      "weight": 34,
+      "major": false,
+      "cooldownDays": 110,
+      "conditions": [
+        {
+          "type": "family_role_exists",
+          "role": "elder_parent"
+        }
+      ],
+      "tags": [
+        "family",
+        "illness",
+        "obligation"
+      ],
+      "choices": [
+        {
+          "id": "doctor",
+          "title": "Hekim çağır",
+          "hint": "10 akçe harcarsın; bakım sorumluluğunu üstlenmiş olursun.",
+          "resultText": "Hekim çağırdın. {{parent}} kendisini yalnız bırakmadığını gördü.",
+          "requirements": [
+            {
+              "type": "money_at_least",
+              "value": 10
+            }
+          ],
+          "effects": [
+            {
+              "type": "money",
+              "amount": -10
+            },
+            {
+              "type": "family_relation",
+              "role": "parent",
+              "trust": 7,
+              "affection": 6
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "family_parent_recovery",
+              "minDays": 20,
+              "maxDays": 45
+            }
+          ]
+        },
+        {
+          "id": "care",
+          "title": "Birkaç gün yanında kal",
+          "hint": "3 gün kaybedersin; para harcamazsın.",
+          "resultText": "Üç gün boyunca {{parent}} ile ilgilendin. Bu, aile içinde güçlü biçimde hatırlandı.",
+          "effects": [
+            {
+              "type": "advance_days",
+              "amount": 3
+            },
+            {
+              "type": "family_relation",
+              "role": "parent",
+              "trust": 9,
+              "affection": 8,
+              "respect": 4
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "family_parent_recovery",
+              "minDays": 18,
+              "maxDays": 40
+            }
+          ]
+        },
+        {
+          "id": "delegate",
+          "title": "Bakımı diğer akrabalara bırak",
+          "hint": "Zaman ve para kazanırsın; mesafe oluşabilir.",
+          "resultText": "Bakımı diğer akrabalara bıraktın. {{parent}} bunu kişisel bir mesafe olarak yorumladı.",
+          "effects": [
+            {
+              "type": "family_relation",
+              "role": "parent",
+              "trust": -6,
+              "affection": -5,
+              "suspicion": 4
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "family_parent_recovery",
+              "minDays": 20,
+              "maxDays": 50
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "family_parent_recovery",
+      "category": "family",
+      "title": "Hastalığın Ardından",
+      "body": "{{parent}} yeniden ayağa kalktı. Hastalık sırasında kimin yanında olduğu aile içinde açıkça konuşuluyor.",
+      "weight": 100,
+      "major": false,
+      "cooldownDays": 999,
+      "scheduledOnly": true,
+      "conditions": [
+        {
+          "type": "family_role_exists",
+          "role": "parent"
+        }
+      ],
+      "tags": [
+        "family",
+        "followup",
+        "memory"
+      ],
+      "choices": [
+        {
+          "id": "visit",
+          "title": "Ziyaret et",
+          "hint": "İlişkiyi pekiştirirsin.",
+          "resultText": "{{parent}} ile uzun uzun konuştun. Hastalık dönemi aile hafızasında yer etti.",
+          "effects": [
+            {
+              "type": "family_relation",
+              "role": "parent",
+              "trust": 4,
+              "affection": 4
+            }
+          ]
+        },
+        {
+          "id": "move_on",
+          "title": "Gündelik işlerine dön",
+          "hint": "Yeni bir yükümlülük doğurmaz.",
+          "resultText": "Hastalık dönemi kapandı; hayat kaldığı yerden devam etti.",
+          "effects": []
+        }
+      ]
+    },
+    {
+      "id": "family_inheritance_dispute",
+      "category": "legacy",
+      "title": "Aile Mirasının Paylaşımı",
+      "body": "Önceki nesilden kalan bazı malların paylaşımı yüzünden {{sibling}} ile aranda görüş ayrılığı doğdu. Hukuken haklı olmak ile aile bağını korumak aynı şey olmayabilir.",
+      "weight": 36,
+      "major": true,
+      "cooldownDays": 160,
+      "conditions": [
+        {
+          "type": "generation_at_least",
+          "value": 2
+        },
+        {
+          "type": "family_role_exists",
+          "role": "sibling"
+        }
+      ],
+      "tags": [
+        "family",
+        "inheritance",
+        "legacy"
+      ],
+      "choices": [
+        {
+          "id": "equal",
+          "title": "Eşit paylaşımı savun",
+          "hint": "Daha az kazanç; aile bağı daha sağlam kalır.",
+          "resultText": "Eşit paylaşımı kabul ettin. {{sibling}} bunu adil bir karar olarak gördü.",
+          "effects": [
+            {
+              "type": "money",
+              "amount": 8
+            },
+            {
+              "type": "family_relation",
+              "role": "sibling",
+              "trust": 8,
+              "respect": 6,
+              "affection": 4
+            }
+          ]
+        },
+        {
+          "id": "claim",
+          "title": "Daha büyük pay talep et",
+          "hint": "Daha çok para; uzun süreli aile husumeti riski.",
+          "resultText": "Daha büyük payı aldın. Kazancın arttı ama {{sibling}} ile arandaki güven ciddi biçimde sarsıldı.",
+          "effects": [
+            {
+              "type": "money",
+              "amount": 20
+            },
+            {
+              "type": "family_relation",
+              "role": "sibling",
+              "trust": -15,
+              "affection": -10,
+              "suspicion": 14,
+              "debt": -5
+            }
+          ]
+        },
+        {
+          "id": "legal",
+          "title": "Kadının hükmüne başvur",
+          "hint": "Hukuk 35 gerektirir; sonucu kişisel pazarlık yerine kurala bağlarsın.",
+          "resultText": "Paylaşımı hukukî hükme bağladın. {{sibling}} karardan tam memnun olmasa da seni keyfî davranmakla suçlayamıyor.",
+          "requirements": [
+            {
+              "type": "skill_at_least",
+              "skill": "law",
+              "value": 35
+            }
+          ],
+          "effects": [
+            {
+              "type": "money",
+              "amount": 12
+            },
+            {
+              "type": "skill",
+              "skill": "law",
+              "amount": 1
+            },
+            {
+              "type": "family_relation",
+              "role": "sibling",
+              "respect": 6,
+              "trust": 1,
+              "suspicion": -2
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "medrese",
+              "amount": 2
+            }
+          ]
+        }
+      ]
     }
   ]
 }
