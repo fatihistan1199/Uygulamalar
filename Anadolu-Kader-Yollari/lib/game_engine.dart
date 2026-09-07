@@ -67,13 +67,63 @@ class DelayedEffect {
   factory DelayedEffect.fromJson(Map<String,dynamic> j)=>DelayedEffect(id:j['id'],dueDay:j['dueDay'],type:j['type'],source:j['source'],payload:Map<String,dynamic>.from(j['payload']));
 }
 
+class Injury {
+  Injury({required this.id,required this.name,required this.severity,required this.acquiredDay,this.permanent=false});
+  final String id,name; final int severity,acquiredDay; final bool permanent;
+  Map<String,dynamic> toJson()=>{'id':id,'name':name,'severity':severity,'acquiredDay':acquiredDay,'permanent':permanent};
+  factory Injury.fromJson(Map<String,dynamic> j)=>Injury(id:j['id'],name:j['name'],severity:j['severity'],acquiredDay:j['acquiredDay'],permanent:j['permanent']??false);
+}
+
+class ConflictResult {
+  ConflictResult({required this.summary,required this.success,required this.escaped,required this.damage,required this.dead,this.injury});
+  final String summary; final bool success,escaped,dead; final int damage; final Injury? injury;
+}
+
 class GameState {
-  GameState({required this.version,required this.seed,required this.rngState,required this.playerName,required this.background,required this.day,required this.money,required this.tension,required this.currentCityId,required this.cities,required this.npcs,required this.factions,required this.knowledge,required this.delayedEffects,required this.chronicle,Map<String,int>? inventory,int? lastMajorEventDay}):inventory=inventory??{},lastMajorEventDay=lastMajorEventDay??-999;
-  final int version,seed; int rngState,day,money,tension,lastMajorEventDay; final String playerName,background; String currentCityId;
-  final Map<String,CityState> cities; final Map<String,NpcState> npcs; final Map<String,FactionState> factions; final List<KnowledgeEntry> knowledge; final List<DelayedEffect> delayedEffects; final List<String> chronicle; final Map<String,int> inventory;
+  GameState({
+    required this.version,required this.seed,required this.rngState,required this.playerName,required this.background,
+    required this.day,required this.money,required this.tension,required this.currentCityId,required this.cities,
+    required this.npcs,required this.factions,required this.knowledge,required this.delayedEffects,required this.chronicle,
+    Map<String,int>? inventory,int? lastMajorEventDay,Map<String,int>? attributes,Map<String,int>? skills,
+    int? health,int? age,int? generation,bool? alive,List<Injury>? injuries,List<String>? lineage,String? deathCause
+  }):inventory=inventory??{},lastMajorEventDay=lastMajorEventDay??-999,
+    attributes=attributes??{'strength':40,'agility':40,'intellect':40,'rhetoric':40,'intuition':40,'willpower':40},
+    skills=skills??{'trade':25,'diplomacy':25,'law':20,'medicine':15,'religion':20,'military':20,'tracking':15,'espionage':10,'leadership':20,'localCulture':30},
+    health=health??100,age=age??22,generation=generation??1,alive=alive??true,injuries=injuries??[],lineage=lineage??[],deathCause=deathCause??'';
+
+  final int version,seed;
+  int rngState,day,money,tension,lastMajorEventDay,health,age,generation;
+  String playerName,background,currentCityId,deathCause;
+  bool alive;
+  final Map<String,CityState> cities; final Map<String,NpcState> npcs; final Map<String,FactionState> factions;
+  final List<KnowledgeEntry> knowledge; final List<DelayedEffect> delayedEffects; final List<String> chronicle;
+  final Map<String,int> inventory,attributes,skills; final List<Injury> injuries; final List<String> lineage;
+
   CityState get city=>cities[currentCityId]!;
-  Map<String,dynamic> toJson()=>{'version':version,'seed':seed,'rngState':rngState,'playerName':playerName,'background':background,'day':day,'money':money,'tension':tension,'currentCityId':currentCityId,'cities':cities.map((k,v)=>MapEntry(k,v.toJson())),'npcs':npcs.map((k,v)=>MapEntry(k,v.toJson())),'factions':factions.map((k,v)=>MapEntry(k,v.toJson())),'knowledge':knowledge.map((k)=>k.toJson()).toList(),'delayedEffects':delayedEffects.map((e)=>e.toJson()).toList(),'chronicle':chronicle,'inventory':inventory,'lastMajorEventDay':lastMajorEventDay};
-  factory GameState.fromJson(Map<String,dynamic> j)=>GameState(version:j['version']??2,seed:j['seed'],rngState:j['rngState'],playerName:j['playerName'],background:j['background'],day:j['day'],money:j['money'],tension:j['tension'],currentCityId:j['currentCityId'],cities:(j['cities'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,CityState.fromJson(Map<String,dynamic>.from(v)))),npcs:(j['npcs'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,NpcState.fromJson(Map<String,dynamic>.from(v)))),factions:(j['factions'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,FactionState.fromJson(Map<String,dynamic>.from(v)))),knowledge:(j['knowledge'] as List).map((e)=>KnowledgeEntry.fromJson(Map<String,dynamic>.from(e))).toList(),delayedEffects:(j['delayedEffects'] as List).map((e)=>DelayedEffect.fromJson(Map<String,dynamic>.from(e))).toList(),chronicle:(j['chronicle'] as List).cast<String>(),inventory:Map<String,int>.from((j['inventory'] as Map?)??{}),lastMajorEventDay:j['lastMajorEventDay']??-999);
+  Map<String,dynamic> toJson()=>{
+    'version':version,'seed':seed,'rngState':rngState,'playerName':playerName,'background':background,'day':day,'money':money,
+    'tension':tension,'currentCityId':currentCityId,'cities':cities.map((k,v)=>MapEntry(k,v.toJson())),
+    'npcs':npcs.map((k,v)=>MapEntry(k,v.toJson())),'factions':factions.map((k,v)=>MapEntry(k,v.toJson())),
+    'knowledge':knowledge.map((k)=>k.toJson()).toList(),'delayedEffects':delayedEffects.map((e)=>e.toJson()).toList(),
+    'chronicle':chronicle,'inventory':inventory,'lastMajorEventDay':lastMajorEventDay,'attributes':attributes,'skills':skills,
+    'health':health,'age':age,'generation':generation,'alive':alive,'injuries':injuries.map((i)=>i.toJson()).toList(),
+    'lineage':lineage,'deathCause':deathCause
+  };
+
+  factory GameState.fromJson(Map<String,dynamic> j)=>GameState(
+    version:j['version']??3,seed:j['seed'],rngState:j['rngState'],playerName:j['playerName'],background:j['background'],
+    day:j['day'],money:j['money'],tension:j['tension'],currentCityId:j['currentCityId'],
+    cities:(j['cities'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,CityState.fromJson(Map<String,dynamic>.from(v)))),
+    npcs:(j['npcs'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,NpcState.fromJson(Map<String,dynamic>.from(v)))),
+    factions:(j['factions'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,FactionState.fromJson(Map<String,dynamic>.from(v)))),
+    knowledge:(j['knowledge'] as List).map((e)=>KnowledgeEntry.fromJson(Map<String,dynamic>.from(e))).toList(),
+    delayedEffects:(j['delayedEffects'] as List).map((e)=>DelayedEffect.fromJson(Map<String,dynamic>.from(e))).toList(),
+    chronicle:(j['chronicle'] as List).cast<String>(),inventory:Map<String,int>.from((j['inventory'] as Map?)??{}),
+    lastMajorEventDay:j['lastMajorEventDay']??-999,attributes:Map<String,int>.from((j['attributes'] as Map?)??{}),
+    skills:Map<String,int>.from((j['skills'] as Map?)??{}),health:j['health']??100,age:j['age']??22,generation:j['generation']??1,
+    alive:j['alive']??true,injuries:((j['injuries'] as List?)??[]).map((e)=>Injury.fromJson(Map<String,dynamic>.from(e))).toList(),
+    lineage:((j['lineage'] as List?)??[]).cast<String>(),deathCause:j['deathCause']??''
+  );
 }
 
 class EventOption {const EventOption(this.id,this.title,this.hint);final String id,title,hint;}
@@ -118,7 +168,13 @@ class GameEngine {
       ['leyla','Leyla Hanım','antalya','Tercüman','tuccar','Yabancı tüccarlarla aracılık ağını büyütmek']];
     final npcs=<String,NpcState>{};
     for(final p in people){npcs[p[0]]=NpcState(id:p[0],name:p[1],cityId:p[2],profession:p[3],factionId:p[4],goal:p[5],relation:RelationState());}
-    return GameState(version:3,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999);
+    final attrs=<String,int>{'strength':40,'agility':40,'intellect':40,'rhetoric':40,'intuition':40,'willpower':40};
+    final skills=<String,int>{'trade':25,'diplomacy':25,'law':20,'medicine':15,'religion':20,'military':20,'tracking':15,'espionage':10,'leadership':20,'localCulture':30};
+    if(background=='Köylü ailesi'){attrs['willpower']=50;attrs['strength']=46;skills['localCulture']=48;skills['tracking']=32;}
+    if(background=='Tüccar ailesi'){attrs['rhetoric']=48;attrs['intuition']=46;skills['trade']=52;skills['diplomacy']=38;}
+    if(background=='Medrese öğrencisi'){attrs['intellect']=54;attrs['willpower']=45;skills['religion']=50;skills['law']=46;}
+    if(background=='Asker ailesi'){attrs['strength']=52;attrs['agility']=46;attrs['willpower']=48;skills['military']=52;skills['leadership']=36;}
+    return GameState(version:4,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999,attributes:attrs,skills:skills,health:100,age:22,generation:1,alive:true,injuries:[],lineage:[]);
   }
 
   void _sync()=>state.rngState=_rng.state;
@@ -189,6 +245,87 @@ class GameEngine {
     state.city.stock[good]=math.min(100,(state.city.stock[good]??60)+quantity*2);
     state.chronicle.add('${state.day}. gün — ${state.city.name} pazarında $quantity ${goods[good]!.toLowerCase()} sattı.');
     return '$quantity ${goods[good]!.toLowerCase()} satarak $total akçe kazandın.';
+  }
+
+
+  static const attributeNames=<String,String>{'strength':'Kuvvet','agility':'Çeviklik','intellect':'Zihin','rhetoric':'Hitabet','intuition':'Sezgi','willpower':'İrade'};
+  static const skillNames=<String,String>{'trade':'Ticaret','diplomacy':'Diplomasi','law':'Hukuk','medicine':'Tıp','religion':'Dinî ilimler','military':'Askerlik','tracking':'İz sürme','espionage':'Casusluk','leadership':'Liderlik','localCulture':'Yerel kültür'};
+
+  int checkScore(String attribute,String skill){
+    final a=state.attributes[attribute]??40,s=state.skills[skill]??20;
+    final score=(a*.45+s*.35+_rng.nextInt(41)*.50).round();
+    _sync();return score;
+  }
+
+  ConflictResult resolveConflict(String tactic){
+    if(!state.alive)return ConflictResult(summary:'Ölü bir karakter çatışmaya giremez.',success:false,escaped:false,damage:0,dead:true);
+    String attr='willpower',skill='military',label='Tedbirli savunma';int modifier=0;
+    if(tactic=='assault'){attr='strength';skill='military';label='Hızlı saldırı';modifier=3;}
+    if(tactic=='flee'){attr='agility';skill='tracking';label='Geri çekilme';modifier=-2;}
+    if(tactic=='parley'){attr='rhetoric';skill='diplomacy';label='Konuşarak çözme';modifier=-4;}
+    final difficulty=42+(state.city.banditry~/3)+((100-state.city.security)~/5);
+    final score=checkScore(attr,skill)+modifier;
+    final margin=score-difficulty;
+    int damage=0;bool success=false,escaped=false;Injury? injury;
+    if(margin>=15){success=true;damage=_rng.nextInt(7);}
+    else if(margin>=0){success=true;damage=7+_rng.nextInt(12);}
+    else if(margin>-15){escaped=tactic=='flee'||_rng.nextInt(100)<55;damage=16+_rng.nextInt(20);}
+    else{damage=34+_rng.nextInt(34);}
+    if(damage>=14){injury=_makeInjury(damage);}
+    _applyDamage(damage,cause:'Yol çatışması',injury:injury);
+    if(success){state.skills[skill]=clamp100((state.skills[skill]??0)+1);state.factions['yonetim']!.reputation=clamp100(state.factions['yonetim']!.reputation+1);}
+    state.chronicle.add('${state.day}. gün — $label: skor $score / güçlük $difficulty, hasar $damage.');
+    _sync();
+    final summary=state.alive
+      ? success?'$label başarılı oldu. $damage hasar aldın.':escaped?'Çatışmadan sıyrıldın; $damage hasar aldın.':'Taktik başarısız oldu; $damage hasar aldın.'
+      :'Çatışma ölümle sonuçlandı: ${state.deathCause}.';
+    return ConflictResult(summary:summary,success:success,escaped:escaped,damage:damage,dead:!state.alive,injury:injury);
+  }
+
+  Injury _makeInjury(int damage){
+    final names=damage>=45?['Ağır göğüs yarası','Kafatası travması','Derin bıçak yarası']:damage>=28?['Kırık kol','Omuz çıkığı','Derin kesik']:['Kaburga ezilmesi','Bilek burkulması','Yüzeysel kesik'];
+    final name=names[_rng.nextInt(names.length)];
+    final severity=math.max(1,math.min(100,damage+_rng.nextInt(16)));
+    final injury=Injury(id:'injury_${state.day}_${state.injuries.length}',name:name,severity:severity,acquiredDay:state.day,permanent:severity>=72);
+    state.injuries.add(injury);
+    return injury;
+  }
+
+  void _applyDamage(int damage,{required String cause,Injury? injury}){
+    state.health=math.max(0,state.health-damage);
+    if(state.health<=0)_die(cause);
+  }
+
+  void forceDamageForTest(int damage,{String cause='Ağır yaralanma'})=>_applyDamage(damage,cause:cause);
+
+  void _die(String cause){
+    if(!state.alive)return;
+    state.alive=false;state.deathCause=cause;state.health=0;
+    state.chronicle.add('${state.day}. gün — ${state.playerName} öldü. Sebep: $cause.');
+  }
+
+  List<String> successorOptions(){
+    final pool=['Ali','Zeynep','Mehmed','Ayşe','Yusuf','Meryem','Hasan','Fatma','Ömer','Selma'];
+    final start=(state.seed+state.generation*3)%pool.length;
+    return List.generate(3,(i)=>pool[(start+i*2)%pool.length]);
+  }
+
+  String assumeSuccessor(String name){
+    if(state.alive)return 'Halef yalnız mevcut karakter öldüğünde seçilebilir.';
+    final old=state.playerName;
+    state.lineage.add(old);state.playerName=name;state.background='Aile mirasçısı';state.generation++;state.age=18;state.health=100;state.alive=true;state.deathCause='';state.injuries.clear();
+    state.money=(state.money*.8).round();
+    for(final key in state.inventory.keys.toList()){state.inventory[key]=(state.inventory[key]!*.75).floor();}
+    for(final key in state.attributes.keys.toList()){state.attributes[key]=clamp100((state.attributes[key]!*0.68+22).round());}
+    for(final key in state.skills.keys.toList()){state.skills[key]=clamp100((state.skills[key]!*0.62+18).round());}
+    for(final f in state.factions.values){f.reputation=((f.reputation+50)/2).round();}
+    for(final n in state.npcs.values){
+      n.relation.trust=((n.relation.trust+50)/2).round();n.relation.respect=((n.relation.respect+50)/2).round();
+      n.relation.affection=((n.relation.affection+30)/2).round();n.relation.suspicion=((n.relation.suspicion+10)/2).round();
+      n.memories.add(MemoryEntry(text:'$old karakterinin mirasçısı olarak geldi',day:state.day,importance:45,trust:0,respect:0,fear:0,affection:0,suspicion:0));
+    }
+    state.chronicle.add('${state.day}. gün — $name, $old karakterinin mirasını devraldı. Dünya kaldığı yerden devam ediyor.');
+    return '$name ile ${state.generation}. nesil başladı.';
   }
 
   EventView pickEvent(){
