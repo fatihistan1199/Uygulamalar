@@ -16,3 +16,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/data/events_v1.json
+    - assets/data/story_v1.json
