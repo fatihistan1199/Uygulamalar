@@ -2,11 +2,13 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:anadolu_kader_yollari/game_engine.dart';
 import 'package:anadolu_kader_yollari/event_catalog.dart';
+import 'package:anadolu_kader_yollari/story_catalog.dart';
 
 void main(){
   TestWidgetsFlutterBinding.ensureInitialized();
   late EventCatalog catalog;
-  setUpAll(() async { catalog=await EventCatalog.loadDefault(); });
+  late StoryCatalog stories;
+  setUpAll(() async { catalog=await EventCatalog.loadDefault();stories=await StoryCatalog.loadDefault(); });
   test('aynı seed aynı başlangıç dünyasını üretir',(){
     final a=GameEngine.newGame(seed:472918321,name:'Hasan',background:'Tüccar ailesi');
     final b=GameEngine.newGame(seed:472918321,name:'Hasan',background:'Tüccar ailesi');
@@ -437,6 +439,77 @@ void main(){
     expect(social.payload['carrierNpc'],'mahmud');
     expect(social.payload['hop'],0);
     expect((social.payload['reliability'] as int),greaterThan(80));
+  });
+
+
+  test('yeni oyun hikâye ile açılır ve oyuncuyu tanıtır',(){
+    final s=GameEngine.newGame(seed:1701,name:'Hasan',background:'Köylü ailesi',gender:'male');
+    final e=GameEngine(s,catalog);
+    expect(s.narrativeQueue,['intro_identity','background_koylu','city_konya','intro_path']);
+    final story=e.currentStory(stories)!;
+    expect(story.title,'Sen Kimsin?');
+    expect(story.body,contains('Hasan'));
+    expect(story.body,contains('22 yaşında'));
+    expect(story.body,contains('Konya'));
+  });
+
+  test('ilk şehir ziyareti özel tanıtım, tekrar ziyaret dönüş sahnesi üretir',(){
+    final s=GameEngine.newGame(seed:1702,name:'Hasan',background:'Tüccar ailesi');
+    final e=GameEngine(s,catalog);
+    s.narrativeQueue.clear();
+    e.travel('kayseri');
+    expect(s.visitedCities,contains('kayseri'));
+    expect(s.narrativeQueue.last,'city_kayseri');
+    s.narrativeQueue.clear();
+    e.travel('konya');
+    expect(s.narrativeQueue.last,'city_return');
+  });
+
+  test('hikâye kuyruğu ve ziyaret edilen şehirler save load ile korunur',(){
+    final s=GameEngine.newGame(seed:1703,name:'Ayşe',background:'Medrese öğrencisi',gender:'female');
+    final e=GameEngine(s,catalog);
+    e.completeStory();
+    s.visitedCities.add('ankara');
+    s.narrativeQueue.add('city_ankara');
+    final restored=GameState.fromJson(Map<String,dynamic>.from(jsonDecode(jsonEncode(s.toJson()))));
+    expect(restored.narrativeQueue,s.narrativeQueue);
+    expect(restored.visitedCities,containsAll(['konya','ankara']));
+  });
+
+  test('iş yapmak yaşam yolunu ilerletir ve anlatı kilometre taşı üretir',(){
+    final s=GameEngine.newGame(seed:1704,name:'Hasan',background:'Asker ailesi');
+    final e=GameEngine(s,catalog);
+    s.narrativeQueue.clear();
+    final before=s.money;
+    final result=e.doLocalWork();
+    expect(result,isNotEmpty);
+    expect(s.eventFlags['first_work_done'],isTrue);
+    expect(s.eventFlags['work_count'],1);
+    expect(s.money,greaterThanOrEqualTo(before));
+    expect(s.narrativeQueue,contains('milestone_first_work'));
+    expect(e.lifeGoals().first.complete,isTrue);
+  });
+
+  test('ilk şehir olayı yaşam yolu görev kilometre taşını açar',(){
+    final s=GameEngine.newGame(seed:1705,name:'Hasan',background:'Tüccar ailesi');
+    final e=GameEngine(s,catalog);
+    s.narrativeQueue.clear();
+    s.pendingEvents.add('rumor');
+    final event=e.pickEvent();
+    e.resolve(event,'listen');
+    expect(s.eventFlags['first_task_done'],isTrue);
+    expect(s.narrativeQueue,contains('milestone_first_task'));
+    expect(e.lifeGoals()[1].complete,isTrue);
+  });
+
+  test('şehir atmosferi gerçek şehir durumuna göre anlatı değiştirir',(){
+    final s=GameEngine.newGame(seed:1706,name:'Hasan',background:'Köylü ailesi');
+    final e=GameEngine(s,catalog);
+    s.cities['konya']!.food=30;
+    expect(e.cityMoodText(),contains('erzak'));
+    s.cities['konya']!.food=70;
+    s.cities['konya']!.security=35;
+    expect(e.cityMoodText(),contains('güvenliği'));
   });
 
 }
