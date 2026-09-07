@@ -81,4 +81,72 @@ void main(){
     e.advance(10);
     expect(e.pickEvent().id,'grain');
   });
+
+  test('nitelik beceri kontrolü aynı seed ile deterministiktir',(){
+    final a=GameEngine.newGame(seed:404,name:'Hasan',background:'Asker ailesi');
+    final b=GameEngine.newGame(seed:404,name:'Hasan',background:'Asker ailesi');
+    final ea=GameEngine(a),eb=GameEngine(b);
+    expect(ea.checkScore('strength','military'),eb.checkScore('strength','military'));
+    expect(ea.checkScore('rhetoric','diplomacy'),eb.checkScore('rhetoric','diplomacy'));
+  });
+
+  test('çatışma sonucu aynı seed ve durumda tekrarlanabilir',(){
+    final a=GameEngine.newGame(seed:505,name:'Hasan',background:'Asker ailesi');
+    final b=GameEngine.newGame(seed:505,name:'Hasan',background:'Asker ailesi');
+    final ra=GameEngine(a).resolveConflict('defend');
+    final rb=GameEngine(b).resolveConflict('defend');
+    expect(ra.success,rb.success);
+    expect(ra.escaped,rb.escaped);
+    expect(ra.damage,rb.damage);
+    expect(ra.dead,rb.dead);
+    expect(ra.injury?.name,rb.injury?.name);
+  });
+
+  test('yaralanma save load ile korunur',(){
+    final s=GameEngine.newGame(seed:606,name:'Hasan',background:'Köylü ailesi');
+    final e=GameEngine(s);
+    e.forceDamageForTest(30);
+    expect(s.injuries,isNotEmpty);
+    final restored=GameState.fromJson(Map<String,dynamic>.from(jsonDecode(jsonEncode(s.toJson()))));
+    expect(restored.health,s.health);
+    expect(restored.injuries.length,s.injuries.length);
+    expect(restored.injuries.first.name,s.injuries.first.name);
+    expect(restored.injuries.first.severity,s.injuries.first.severity);
+  });
+
+  test('ölüm dünyayı sıfırlamaz',(){
+    final s=GameEngine.newGame(seed:707,name:'Hasan',background:'Tüccar ailesi');
+    final e=GameEngine(s);
+    s.currentCityId='kayseri';
+    s.cities['kayseri']!.food=37;
+    s.factions['ahi']!.power=71;
+    final npcCount=s.npcs.length;
+    e.forceDamageForTest(200,cause:'Test ölümü');
+    expect(s.alive,isFalse);
+    expect(s.currentCityId,'kayseri');
+    expect(s.cities['kayseri']!.food,37);
+    expect(s.factions['ahi']!.power,71);
+    expect(s.npcs.length,npcCount);
+  });
+
+  test('halef aynı dünya üzerinde yeni nesille devam eder',(){
+    final s=GameEngine.newGame(seed:808,name:'Hasan',background:'Medrese öğrencisi');
+    final e=GameEngine(s);
+    s.currentCityId='sivas';
+    s.cities['sivas']!.trade=83;
+    s.factions['yonetim']!.power=76;
+    final mahmudCity=s.npcs['mahmud']!.cityId;
+    e.forceDamageForTest(200,cause:'Test ölümü');
+    final next=e.successorOptions().first;
+    final message=e.assumeSuccessor(next);
+    expect(message,contains('2. nesil'));
+    expect(s.alive,isTrue);
+    expect(s.generation,2);
+    expect(s.currentCityId,'sivas');
+    expect(s.cities['sivas']!.trade,83);
+    expect(s.factions['yonetim']!.power,76);
+    expect(s.npcs['mahmud']!.cityId,mahmudCity);
+    expect(s.lineage,contains('Hasan'));
+  });
+
 }
