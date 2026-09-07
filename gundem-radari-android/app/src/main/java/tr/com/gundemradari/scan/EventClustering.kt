@@ -204,6 +204,13 @@ fun likelySameSearchEvent(a:EventEntity,b:EventEntity):Boolean{
         }
     }
 
+    if(kindA=="transport"&&kindB=="transport"){
+        val shared=tokens(aText).intersect(tokens(bText))
+        if(shared.size>=4){
+            return true
+        }
+    }
+
     val aTitle=titleTokens(a.title)
     val bTitle=titleTokens(b.title)
     val titleCommon=aTitle.intersect(bTitle).size
