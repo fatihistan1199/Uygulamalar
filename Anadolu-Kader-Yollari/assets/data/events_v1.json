@@ -1,0 +1,1377 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "id": "grain",
+      "category": "economy",
+      "title": "Kayseri’de Tahıl Meselesi",
+      "body": "Tahıl fiyatları yükseliyor. Esnaf, Tüccar Mahmud’un zahire depoladığını söylüyor; fakat söylentinin önemli kısmı rakiplerinden geliyor.",
+      "weight": 95,
+      "major": true,
+      "cooldownDays": 45,
+      "chainId": "kayseri_grain",
+      "chainStage": 1,
+      "conditions": [
+        {
+          "type": "city_is",
+          "value": "kayseri"
+        },
+        {
+          "type": "city_stat_below",
+          "stat": "food",
+          "value": 60
+        }
+      ],
+      "tags": [
+        "economy",
+        "rumor",
+        "politics"
+      ],
+      "choices": [
+        {
+          "id": "talk",
+          "title": "Mahmud’u dinle",
+          "hint": "Bilgi kazanırsın; onun anlatısına da maruz kalırsın.",
+          "resultText": "Mahmud fiyat artışını yol güvenliğine bağlıyor. Söylediği mümkün; fakat doğrulanmış değil.",
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "mahmud",
+              "trust": 7,
+              "respect": 2,
+              "affection": 2,
+              "suspicion": -2,
+              "memory": "Tahıl krizinde beni dinledi",
+              "importance": 38
+            },
+            {
+              "type": "knowledge",
+              "id": "mahmud_claim",
+              "text": "Mahmud, fiyat artışının yol güvenliğinden kaynaklandığını söylüyor.",
+              "source": "Tüccar Mahmud",
+              "reliability": 58
+            },
+            {
+              "type": "tension",
+              "amount": -3
+            },
+            {
+              "type": "set_flag",
+              "key": "grain_position",
+              "value": "listened"
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "grain_followup",
+              "minDays": 22,
+              "maxDays": 38
+            }
+          ]
+        },
+        {
+          "id": "judge",
+          "title": "Kadıyı haberdar et",
+          "hint": "Meşru yol; soruşturma ters sonuç da verebilir.",
+          "resultText": "Kadıya haber verdin. Mahmud bunu unutmayacak; soruşturmanın sonucu daha sonra ortaya çıkabilir.",
+          "effects": [
+            {
+              "type": "faction_reputation",
+              "faction": "yonetim",
+              "amount": 4
+            },
+            {
+              "type": "npc_relation",
+              "npc": "mahmud",
+              "trust": -7,
+              "respect": 3,
+              "fear": 3,
+              "affection": -4,
+              "suspicion": 10,
+              "memory": "Tahıl meselesini kadıya taşıdı",
+              "importance": 67
+            },
+            {
+              "type": "tension",
+              "amount": 7
+            },
+            {
+              "type": "set_flag",
+              "key": "grain_position",
+              "value": "reported"
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "grain_followup",
+              "minDays": 28,
+              "maxDays": 42
+            }
+          ]
+        },
+        {
+          "id": "buy",
+          "title": "Mahmud’dan tahıl al",
+          "hint": "Krizden korunabilirsin; bu alışveriş ileride hatırlanabilir.",
+          "resultText": "Tahıl aldın. Mahmud memnun; fakat kriz ağırlaşırsa bu alışveriş başka çevrelerde farklı yorumlanabilir.",
+          "effects": [
+            {
+              "type": "money",
+              "amount": -15
+            },
+            {
+              "type": "inventory",
+              "item": "grain",
+              "amount": 2
+            },
+            {
+              "type": "city_stat",
+              "stat": "food",
+              "amount": -3
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "tuccar",
+              "amount": 3
+            },
+            {
+              "type": "npc_relation",
+              "npc": "mahmud",
+              "trust": 5,
+              "debt": 3,
+              "memory": "Kriz sırasında benden tahıl aldı",
+              "importance": 42
+            },
+            {
+              "type": "set_flag",
+              "key": "grain_position",
+              "value": "bought"
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "grain_followup",
+              "minDays": 35,
+              "maxDays": 55
+            }
+          ]
+        },
+        {
+          "id": "ignore",
+          "title": "Karışma",
+          "hint": "Tarafsızlık da dünyanın gidişini değiştirebilir.",
+          "resultText": "Karışmadın. Şehirdeki gıda baskısı kendi başına ilerliyor.",
+          "effects": [
+            {
+              "type": "city_stat",
+              "stat": "food",
+              "amount": -5
+            },
+            {
+              "type": "npc_relation",
+              "npc": "yusuf",
+              "suspicion": 2,
+              "memory": "Tahıl krizinde sessiz kaldı",
+              "importance": 25
+            },
+            {
+              "type": "set_flag",
+              "key": "grain_position",
+              "value": "ignored"
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "grain_followup",
+              "minDays": 30,
+              "maxDays": 50
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grain_followup",
+      "category": "economy",
+      "title": "Tahıl Hesabı Geri Dönüyor",
+      "body": "Kayseri’de gıda sıkıntısı sürerken eski kararın yeniden konuşuluyor. Kadı, Ahiler ve tüccarlar meseleyi farklı anlatıyor.",
+      "weight": 100,
+      "major": true,
+      "cooldownDays": 999,
+      "chainId": "kayseri_grain",
+      "chainStage": 2,
+      "conditions": [
+        {
+          "type": "city_is",
+          "value": "kayseri"
+        }
+      ],
+      "tags": [
+        "economy",
+        "consequence",
+        "politics"
+      ],
+      "choices": [
+        {
+          "id": "open_books",
+          "title": "Hesapları açtırmayı destekle",
+          "hint": "Şeffaflık sağlar; tüccar çevresiyle aranı bozabilir.",
+          "resultText": "Hesapların incelenmesini destekledin. Şehirde gerilim düştü ama tüccarlar bunu baskı olarak görüyor.",
+          "effects": [
+            {
+              "type": "city_stat",
+              "stat": "order",
+              "amount": 6
+            },
+            {
+              "type": "tension",
+              "amount": -4
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "tuccar",
+              "amount": -6
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": 5
+            },
+            {
+              "type": "set_flag",
+              "key": "grain_chain_result",
+              "value": "audit"
+            }
+          ]
+        },
+        {
+          "id": "protect_trade",
+          "title": "Ticareti korumayı savun",
+          "hint": "Pazar istikrarını korur; kıtlık mağdurlarını kızdırabilir.",
+          "resultText": "Ticaretin sert müdahaleden korunmasını savundun. Tüccarlar rahatladı; Ahiler öfkeli.",
+          "effects": [
+            {
+              "type": "city_stat",
+              "stat": "trade",
+              "amount": 5
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "tuccar",
+              "amount": 7
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": -7
+            },
+            {
+              "type": "npc_relation",
+              "npc": "mahmud",
+              "trust": 6,
+              "respect": 3,
+              "memory": "Tahıl soruşturmasında ticareti savundu",
+              "importance": 58
+            },
+            {
+              "type": "set_flag",
+              "key": "grain_chain_result",
+              "value": "trade"
+            }
+          ]
+        },
+        {
+          "id": "mediate",
+          "title": "Arabuluculuk et",
+          "hint": "Diplomasi becerisi gerektirir; başarısızlık iki tarafı da kızdırabilir.",
+          "resultText": "Tarafları geçici bir tahıl dağıtım uzlaşmasına ikna ettin.",
+          "requirements": [
+            {
+              "type": "skill_at_least",
+              "skill": "diplomacy",
+              "value": 32
+            }
+          ],
+          "effects": [
+            {
+              "type": "city_stat",
+              "stat": "food",
+              "amount": 7
+            },
+            {
+              "type": "city_stat",
+              "stat": "order",
+              "amount": 5
+            },
+            {
+              "type": "skill",
+              "skill": "diplomacy",
+              "amount": 2
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": 3
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "tuccar",
+              "amount": 3
+            },
+            {
+              "type": "set_flag",
+              "key": "grain_chain_result",
+              "value": "compromise"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rumor",
+      "category": "knowledge",
+      "title": "Handaki Fısıltılar",
+      "body": "Yan masadaki iki yolcu yaklaşan yeni vergilerden söz ediyor. Birinin sarhoş olduğu açık; diğerinin kaynağını bilmiyorsun.",
+      "weight": 35,
+      "major": false,
+      "cooldownDays": 6,
+      "tags": [
+        "rumor",
+        "knowledge"
+      ],
+      "conditions": [],
+      "choices": [
+        {
+          "id": "listen",
+          "title": "Dinlemeye devam et",
+          "hint": "Kaynağı belirsiz bir bilgi edinebilirsin.",
+          "resultText": "Söylentiyi not ettin. Güvenilirliği düşük; gerçek bilgi olarak kabul edilmemeli.",
+          "effects": [
+            {
+              "type": "knowledge_random",
+              "id": "tax_rumor",
+              "text": "Yakında yeni bir vergi konulacağı söyleniyor.",
+              "source": "Handaki yolcular",
+              "minReliability": 24,
+              "maxReliability": 66
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "tax_echo",
+              "minDays": 10,
+              "maxDays": 22
+            }
+          ]
+        },
+        {
+          "id": "verify",
+          "title": "Başka bir kaynak ara",
+          "hint": "Bir gün harcarsın; daha güçlü bilgi edinebilirsin.",
+          "resultText": "Bir gün harcayıp ikinci kaynak buldun. Bilgi daha güçlü, yine de kesin değil.",
+          "effects": [
+            {
+              "type": "advance_days",
+              "amount": 1
+            },
+            {
+              "type": "knowledge_random",
+              "id": "tax_check",
+              "text": "Vergi düzenlemesi ihtimali bazı kâtipler arasında da konuşuluyor.",
+              "source": "Yerel kâtip çevresi",
+              "minReliability": 64,
+              "maxReliability": 88
+            },
+            {
+              "type": "skill",
+              "skill": "localCulture",
+              "amount": 1
+            }
+          ]
+        },
+        {
+          "id": "ignore",
+          "title": "Önemseme",
+          "hint": "Yanlış bilgiden korunursun; gerçek uyarıyı kaçırabilirsin.",
+          "resultText": "Söylentiyi kayda almadın.",
+          "effects": []
+        }
+      ]
+    },
+    {
+      "id": "tax_echo",
+      "category": "politics",
+      "title": "Vergi Söylentisi Büyüyor",
+      "body": "Günler önce handa duyduğun vergi söylentisi artık esnaf arasında da dolaşıyor. Bunun gerçek mi, örgütlü bir baskı mı olduğu belirsiz.",
+      "weight": 100,
+      "major": false,
+      "cooldownDays": 40,
+      "conditions": [],
+      "tags": [
+        "followup",
+        "rumor"
+      ],
+      "choices": [
+        {
+          "id": "warn",
+          "title": "Esnafı temkinli olmaya çağır",
+          "hint": "Paniği azaltabilir; söylentiyi sen de yaymış olursun.",
+          "resultText": "Esnafı acele karar vermemeye çağırdın.",
+          "effects": [
+            {
+              "type": "tension",
+              "amount": -3
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": 2
+            }
+          ]
+        },
+        {
+          "id": "exploit",
+          "title": "Fiyat artışından yararlan",
+          "hint": "Kâr ihtimali var; itibar riski de var.",
+          "resultText": "Belirsizliği ticari fırsata çevirdin.",
+          "requirements": [
+            {
+              "type": "skill_at_least",
+              "skill": "trade",
+              "value": 35
+            }
+          ],
+          "effects": [
+            {
+              "type": "money",
+              "amount": 12
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": -3
+            },
+            {
+              "type": "skill",
+              "skill": "trade",
+              "amount": 1
+            }
+          ]
+        },
+        {
+          "id": "report",
+          "title": "Yönetim çevresine bildir",
+          "hint": "Yönetimle bağını güçlendirebilir.",
+          "resultText": "Söylentinin yayılışını yönetime bildirdin.",
+          "effects": [
+            {
+              "type": "faction_reputation",
+              "faction": "yonetim",
+              "amount": 3
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "faction_dispute",
+      "category": "politics",
+      "title": "Han Avlusunda Tartışma",
+      "body": "Bir Ahi ustasıyla vergi memuru sert biçimde tartışıyor. İki taraf da seni tanıyor; sessiz kalman bile yorumlanabilir.",
+      "weight": 80,
+      "major": true,
+      "cooldownDays": 25,
+      "conditions": [
+        {
+          "type": "tension_above",
+          "value": 55
+        }
+      ],
+      "tags": [
+        "faction",
+        "politics"
+      ],
+      "choices": [
+        {
+          "id": "ahi",
+          "title": "Ahi ustasını destekle",
+          "hint": "Esnaf seni hatırlayacak.",
+          "resultText": "Ahi ustasını destekledin. Esnaf çevresi memnun; yönetim bunu taraf seçmek olarak görüyor.",
+          "effects": [
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": 8
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "yonetim",
+              "amount": -6
+            },
+            {
+              "type": "npc_relation",
+              "npc": "yusuf",
+              "trust": 9,
+              "respect": 6,
+              "affection": 3,
+              "suspicion": -4,
+              "memory": "Vergi tartışmasında Ahileri destekledi",
+              "importance": 54
+            }
+          ]
+        },
+        {
+          "id": "official",
+          "title": "Memuru destekle",
+          "hint": "Yönetim desteğini not edecek.",
+          "resultText": "Memuru destekledin. Yönetim çevresi bunu olumlu kaydetti; Ahiler rahatsız.",
+          "effects": [
+            {
+              "type": "faction_reputation",
+              "faction": "yonetim",
+              "amount": 8
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": -7
+            },
+            {
+              "type": "npc_relation",
+              "npc": "celal",
+              "trust": 5,
+              "respect": 4,
+              "memory": "Vergi tartışmasında yönetimi destekledi",
+              "importance": 50
+            }
+          ]
+        },
+        {
+          "id": "mediate",
+          "title": "Arabuluculuk et",
+          "hint": "Diplomasi 30 gerektirir.",
+          "resultText": "Taraflara geçici bir uzlaşma zemini sundun.",
+          "requirements": [
+            {
+              "type": "skill_at_least",
+              "skill": "diplomacy",
+              "value": 30
+            }
+          ],
+          "effects": [
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": 4
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "yonetim",
+              "amount": 4
+            },
+            {
+              "type": "tension",
+              "amount": -8
+            },
+            {
+              "type": "skill",
+              "skill": "diplomacy",
+              "amount": 1
+            }
+          ]
+        },
+        {
+          "id": "leave",
+          "title": "Uzaklaş",
+          "hint": "Taraflar bunu çekingenlik sayabilir.",
+          "resultText": "Uzaklaştın. Kriz senden bağımsız devam ediyor.",
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "yusuf",
+              "respect": -2,
+              "memory": "Tartışmadan uzaklaştı",
+              "importance": 18
+            },
+            {
+              "type": "npc_relation",
+              "npc": "celal",
+              "respect": -2,
+              "memory": "Tartışmadan uzaklaştı",
+              "importance": 18
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "caravan_refugees",
+      "category": "travel",
+      "title": "Kapı Önündeki Göçmenler",
+      "body": "Şehir kapısında birkaç aile, yakınlardaki çatışmadan kaçtıklarını söylüyor. Muhafızlar içeri alınmalarının güvenlik riski oluşturacağını düşünüyor.",
+      "weight": 48,
+      "major": false,
+      "cooldownDays": 18,
+      "conditions": [
+        {
+          "type": "city_stat_below",
+          "stat": "security",
+          "value": 72
+        }
+      ],
+      "tags": [
+        "travel",
+        "social"
+      ],
+      "choices": [
+        {
+          "id": "sponsor",
+          "title": "Kefil ol",
+          "hint": "Para ve itibar harcarsın.",
+          "resultText": "Ailelere geçici kefil oldun.",
+          "effects": [
+            {
+              "type": "money",
+              "amount": -8
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "medrese",
+              "amount": 4
+            },
+            {
+              "type": "city_stat",
+              "stat": "order",
+              "amount": -2
+            },
+            {
+              "type": "npc_relation",
+              "npc": "rukiyye",
+              "respect": 4,
+              "affection": 3,
+              "memory": "Göçmen ailelere kefil oldu",
+              "importance": 40
+            }
+          ]
+        },
+        {
+          "id": "refuse",
+          "title": "Muhafızların kararına bırak",
+          "hint": "Güvenlik korunur; merhametsiz bulunabilirsin.",
+          "resultText": "Meseleyi muhafızlara bıraktın.",
+          "effects": [
+            {
+              "type": "faction_reputation",
+              "faction": "yonetim",
+              "amount": 2
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "medrese",
+              "amount": -2
+            }
+          ]
+        },
+        {
+          "id": "question",
+          "title": "Hikâyelerini sınayarak dinle",
+          "hint": "Sezgi ve yerel kültür yardımcı olur.",
+          "resultText": "Ailelerin anlattıklarında çelişkiler buldun; ama bunun korkudan mı yalandan mı kaynaklandığı kesin değil.",
+          "requirements": [
+            {
+              "type": "attribute_at_least",
+              "attribute": "intuition",
+              "value": 42
+            }
+          ],
+          "effects": [
+            {
+              "type": "knowledge",
+              "id": "refugee_story",
+              "text": "Göçmen grubun anlattıklarında bazı tutarsızlıklar var.",
+              "source": "Kendi gözlemin",
+              "reliability": 76
+            },
+            {
+              "type": "skill",
+              "skill": "localCulture",
+              "amount": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sick_traveler",
+      "category": "medicine",
+      "title": "Handaki Ateşli Yolcu",
+      "body": "Hanın bir köşesinde yüksek ateşli bir yolcu yatıyor. Hancı onu dışarı çıkarmak istiyor; bazıları hastalığın bulaşıcı olduğunu düşünüyor.",
+      "weight": 46,
+      "major": false,
+      "cooldownDays": 20,
+      "conditions": [],
+      "tags": [
+        "medicine",
+        "social"
+      ],
+      "choices": [
+        {
+          "id": "treat",
+          "title": "Muayene et",
+          "hint": "Tıp 25 gerektirir; kendin de risk alırsın.",
+          "resultText": "Yolcuyu muayene ettin ve hanın onu ayrı bir odada tutmasını sağladın.",
+          "requirements": [
+            {
+              "type": "skill_at_least",
+              "skill": "medicine",
+              "value": 25
+            }
+          ],
+          "effects": [
+            {
+              "type": "skill",
+              "skill": "medicine",
+              "amount": 2
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "medrese",
+              "amount": 2
+            },
+            {
+              "type": "tension",
+              "amount": -2
+            }
+          ]
+        },
+        {
+          "id": "isolate",
+          "title": "Tecrit öner",
+          "hint": "Temkinli fakat sert bir karar.",
+          "resultText": "Yolcunun ayrı tutulmasını önerdin.",
+          "effects": [
+            {
+              "type": "city_stat",
+              "stat": "order",
+              "amount": 1
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "yonetim",
+              "amount": 1
+            }
+          ]
+        },
+        {
+          "id": "leave",
+          "title": "Karışma",
+          "hint": "Risk almazsın; sonuç başkalarının kararına kalır.",
+          "resultText": "Handan ayrıldın.",
+          "effects": []
+        }
+      ]
+    },
+    {
+      "id": "lost_letter",
+      "category": "espionage",
+      "title": "Mühürlü Mektup",
+      "body": "Dar bir sokakta üzerinde resmî mühür bulunan bir mektup buldun. Kime ait olduğu belli değil.",
+      "weight": 38,
+      "major": false,
+      "cooldownDays": 24,
+      "conditions": [],
+      "tags": [
+        "secret",
+        "espionage"
+      ],
+      "choices": [
+        {
+          "id": "return",
+          "title": "Kadılığa teslim et",
+          "hint": "Meşru ve güvenli yol.",
+          "resultText": "Mektubu açmadan teslim ettin.",
+          "effects": [
+            {
+              "type": "faction_reputation",
+              "faction": "yonetim",
+              "amount": 3
+            },
+            {
+              "type": "skill",
+              "skill": "law",
+              "amount": 1
+            }
+          ]
+        },
+        {
+          "id": "open",
+          "title": "Mührü bozmadan açmayı dene",
+          "hint": "Casusluk 25 gerektirir.",
+          "resultText": "Mektuptaki isimleri öğrendin; fakat metnin bağlamını hâlâ bilmiyorsun.",
+          "requirements": [
+            {
+              "type": "skill_at_least",
+              "skill": "espionage",
+              "value": 25
+            }
+          ],
+          "effects": [
+            {
+              "type": "knowledge",
+              "id": "sealed_letter",
+              "text": "Bazı tüccarlarla bir yönetim görevlisi arasında gizli yazışma var.",
+              "source": "Mühürlü mektup",
+              "reliability": 90
+            },
+            {
+              "type": "skill",
+              "skill": "espionage",
+              "amount": 2
+            },
+            {
+              "type": "tension",
+              "amount": 2
+            }
+          ]
+        },
+        {
+          "id": "destroy",
+          "title": "Mektubu yok et",
+          "hint": "Kimse kullanamaz; kimin çıkarını koruduğunu bilmezsin.",
+          "resultText": "Mektubu yok ettin. İçeriğiyle birlikte olası kanıt da kayboldu.",
+          "effects": [
+            {
+              "type": "set_flag",
+              "key": "lost_letter_destroyed",
+              "value": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "guild_price_dispute",
+      "category": "economy",
+      "title": "Lonca Fiyat Tartışması",
+      "body": "Zanaatkârlar fiyat birliği isterken bazı tüccarlar serbest pazarı savunuyor. İki taraf da kısa vadede haklı gerekçeler sunuyor.",
+      "weight": 48,
+      "major": false,
+      "cooldownDays": 18,
+      "conditions": [
+        {
+          "type": "city_stat_above",
+          "stat": "trade",
+          "value": 68
+        }
+      ],
+      "tags": [
+        "economy",
+        "faction"
+      ],
+      "choices": [
+        {
+          "id": "guild",
+          "title": "Lonca düzenini destekle",
+          "hint": "Fiyat istikrarı; daha az rekabet.",
+          "resultText": "Lonca düzenini destekledin.",
+          "effects": [
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": 5
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "tuccar",
+              "amount": -4
+            },
+            {
+              "type": "city_stat",
+              "stat": "order",
+              "amount": 2
+            },
+            {
+              "type": "city_stat",
+              "stat": "trade",
+              "amount": -1
+            }
+          ]
+        },
+        {
+          "id": "market",
+          "title": "Tüccarları destekle",
+          "hint": "Ticaret canlanabilir; fiyat dalgalanması artabilir.",
+          "resultText": "Daha serbest ticareti savundun.",
+          "effects": [
+            {
+              "type": "faction_reputation",
+              "faction": "tuccar",
+              "amount": 5
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": -4
+            },
+            {
+              "type": "city_stat",
+              "stat": "trade",
+              "amount": 3
+            },
+            {
+              "type": "city_stat",
+              "stat": "order",
+              "amount": -1
+            }
+          ]
+        },
+        {
+          "id": "case_by_case",
+          "title": "Ürüne göre farklı kural öner",
+          "hint": "Ticaret 35 ve hukuk 25 gerektirir.",
+          "resultText": "Tek kural yerine ürüne göre farklı sınırlar önerdin.",
+          "requirements": [
+            {
+              "type": "skill_at_least",
+              "skill": "trade",
+              "value": 35
+            },
+            {
+              "type": "skill_at_least",
+              "skill": "law",
+              "value": 25
+            }
+          ],
+          "effects": [
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": 2
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "tuccar",
+              "amount": 2
+            },
+            {
+              "type": "skill",
+              "skill": "trade",
+              "amount": 1
+            },
+            {
+              "type": "skill",
+              "skill": "law",
+              "amount": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "road_checkpoint",
+      "category": "travel",
+      "title": "Yol Kontrolü",
+      "body": "Şehir girişindeki yeni kontrol noktasında askerler kervanları uzun süre bekletiyor. Güvenlik artmış olabilir; ticaret aksıyor.",
+      "weight": 42,
+      "major": false,
+      "cooldownDays": 16,
+      "conditions": [
+        {
+          "type": "city_stat_below",
+          "stat": "security",
+          "value": 69
+        }
+      ],
+      "tags": [
+        "travel",
+        "politics"
+      ],
+      "choices": [
+        {
+          "id": "comply",
+          "title": "Bekle ve kurala uy",
+          "hint": "Zaman kaybedersin.",
+          "resultText": "Kontrolden sorunsuz geçtin.",
+          "effects": [
+            {
+              "type": "advance_days",
+              "amount": 1
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "yonetim",
+              "amount": 1
+            }
+          ]
+        },
+        {
+          "id": "bribe",
+          "title": "Hızlandırmak için para ver",
+          "hint": "5 akçe; kötü alışkanlık yaratabilir.",
+          "resultText": "Ödeme yaptın ve sırayı geçtin.",
+          "effects": [
+            {
+              "type": "money",
+              "amount": -5
+            },
+            {
+              "type": "npc_relation",
+              "npc": "yakup",
+              "suspicion": 3,
+              "memory": "Kontrol noktasını para ile aşmaya çalıştı",
+              "importance": 25
+            }
+          ]
+        },
+        {
+          "id": "argue",
+          "title": "Usulüne itiraz et",
+          "hint": "Hukuk 30 gerektirir.",
+          "resultText": "Kuralların uygulanışına itiraz edip gecikmeyi azalttın.",
+          "requirements": [
+            {
+              "type": "skill_at_least",
+              "skill": "law",
+              "value": 30
+            }
+          ],
+          "effects": [
+            {
+              "type": "skill",
+              "skill": "law",
+              "amount": 1
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "yonetim",
+              "amount": -1
+            },
+            {
+              "type": "city_stat",
+              "stat": "trade",
+              "amount": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scholar_debate",
+      "category": "knowledge",
+      "title": "Medresedeki Münazara",
+      "body": "Bir ders halkasında hukukla yerel örfün çatıştığı bir dava tartışılıyor. Hocalar da tek görüşte değil.",
+      "weight": 40,
+      "major": false,
+      "cooldownDays": 22,
+      "conditions": [],
+      "tags": [
+        "knowledge",
+        "law"
+      ],
+      "choices": [
+        {
+          "id": "law",
+          "title": "Hukukî ilkeyi öne çıkar",
+          "hint": "Hukuk bilgin gelişebilir.",
+          "resultText": "Genel ilkenin yerel baskıdan korunması gerektiğini savundun.",
+          "effects": [
+            {
+              "type": "skill",
+              "skill": "law",
+              "amount": 2
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "medrese",
+              "amount": 2
+            }
+          ]
+        },
+        {
+          "id": "custom",
+          "title": "Yerel örfü dikkate al",
+          "hint": "Yerel kültürün gelişebilir.",
+          "resultText": "Kararın uygulanabilir olması için yerel şartların hesaba katılması gerektiğini savundun.",
+          "effects": [
+            {
+              "type": "skill",
+              "skill": "localCulture",
+              "amount": 2
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": 1
+            }
+          ]
+        },
+        {
+          "id": "listen",
+          "title": "Tarafları dinle",
+          "hint": "Kesin tavır almadan bilgi edin.",
+          "resultText": "Münazarayı sonuna kadar dinledin.",
+          "effects": [
+            {
+              "type": "knowledge",
+              "id": "legal_custom",
+              "text": "Bazı hukuk meselelerinde yerel örf ile genel ilke arasında ciddi gerilim bulunuyor.",
+              "source": "Medrese münazarası",
+              "reliability": 88
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bandit_tip",
+      "category": "travel",
+      "title": "Eşkıya İhbarı",
+      "body": "Bir çoban, yakın geçitte silahlı bir grubun yolcuları gözlediğini söylüyor. Bunun gerçek ihbar mı, rakip güzergâha yönlendirme çabası mı olduğu bilinmiyor.",
+      "weight": 52,
+      "major": false,
+      "cooldownDays": 14,
+      "conditions": [
+        {
+          "type": "city_stat_above",
+          "stat": "banditry",
+          "value": 22
+        }
+      ],
+      "tags": [
+        "travel",
+        "danger",
+        "rumor"
+      ],
+      "choices": [
+        {
+          "id": "believe",
+          "title": "Güzergâhı değiştir",
+          "hint": "Zaman kaybedersin; pusudan kaçınabilirsin.",
+          "resultText": "Daha uzun ama daha güvenli olduğu söylenen yolu seçtin.",
+          "effects": [
+            {
+              "type": "advance_days",
+              "amount": 1
+            },
+            {
+              "type": "skill",
+              "skill": "tracking",
+              "amount": 1
+            }
+          ]
+        },
+        {
+          "id": "verify",
+          "title": "İzi kontrol et",
+          "hint": "İz sürme 25 gerektirir.",
+          "resultText": "Geçitte yakın zamanda kalabalık bir grubun geçtiğine dair izler buldun.",
+          "requirements": [
+            {
+              "type": "skill_at_least",
+              "skill": "tracking",
+              "value": 25
+            }
+          ],
+          "effects": [
+            {
+              "type": "knowledge",
+              "id": "bandit_tracks",
+              "text": "Yakın geçitte silahlı olabilecek kalabalık bir grubun izleri var.",
+              "source": "Kendi gözlemin",
+              "reliability": 82
+            },
+            {
+              "type": "skill",
+              "skill": "tracking",
+              "amount": 2
+            }
+          ]
+        },
+        {
+          "id": "ignore",
+          "title": "Yola devam et",
+          "hint": "Zaman kazanırsın; risk alırsın.",
+          "resultText": "İhbarı dikkate almadan yola devam etmeye karar verdin.",
+          "effects": [
+            {
+              "type": "tension",
+              "amount": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "market_fire",
+      "category": "economy",
+      "title": "Çarşıda Yangın",
+      "body": "Çarşının bir bölümünde yangın çıktı. Malları kurtarmak, insanları tahliye etmek ve düzeni korumak aynı anda mümkün görünmüyor.",
+      "weight": 28,
+      "major": true,
+      "emergency": true,
+      "cooldownDays": 60,
+      "conditions": [
+        {
+          "type": "city_stat_above",
+          "stat": "trade",
+          "value": 74
+        }
+      ],
+      "tags": [
+        "crisis",
+        "economy"
+      ],
+      "choices": [
+        {
+          "id": "people",
+          "title": "İnsanları tahliye etmeye yardım et",
+          "hint": "Mal kaybı artabilir.",
+          "resultText": "Önceliği insanların çıkışına verdin. Çarşı ağır zarar gördü ama can kaybı azaldı.",
+          "effects": [
+            {
+              "type": "city_stat",
+              "stat": "trade",
+              "amount": -8
+            },
+            {
+              "type": "city_stat",
+              "stat": "order",
+              "amount": 4
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": 5
+            }
+          ]
+        },
+        {
+          "id": "goods",
+          "title": "Depoları kurtarmaya çalış",
+          "hint": "Ekonomik kaybı azaltır; tehlikelidir.",
+          "resultText": "Depolardaki malların bir kısmını kurtardın, fakat bu tercih tepki çekti.",
+          "requirements": [
+            {
+              "type": "attribute_at_least",
+              "attribute": "strength",
+              "value": 44
+            }
+          ],
+          "effects": [
+            {
+              "type": "city_stat",
+              "stat": "trade",
+              "amount": -3
+            },
+            {
+              "type": "health",
+              "amount": -10
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "tuccar",
+              "amount": 4
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "medrese",
+              "amount": -2
+            }
+          ]
+        },
+        {
+          "id": "organize",
+          "title": "Tahliyeyi organize et",
+          "hint": "Liderlik 30 gerektirir.",
+          "resultText": "Esnaf ve muhafızları iki gruba ayırıp tahliye ile mal kurtarmayı birlikte yürüttün.",
+          "requirements": [
+            {
+              "type": "skill_at_least",
+              "skill": "leadership",
+              "value": 30
+            }
+          ],
+          "effects": [
+            {
+              "type": "city_stat",
+              "stat": "trade",
+              "amount": -4
+            },
+            {
+              "type": "city_stat",
+              "stat": "order",
+              "amount": 5
+            },
+            {
+              "type": "skill",
+              "skill": "leadership",
+              "amount": 2
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": 2
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "yonetim",
+              "amount": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "legacy_shadow",
+      "category": "legacy",
+      "title": "Eski Bir İsmin Gölgesi",
+      "body": "Bir yabancı seni dikkatle süzüp önceki nesildeki akrabanın adını anıyor. Onun hakkında duyduklarının iyi mi kötü mü olduğu hemen anlaşılmıyor.",
+      "weight": 44,
+      "major": false,
+      "cooldownDays": 30,
+      "conditions": [
+        {
+          "type": "generation_at_least",
+          "value": 2
+        }
+      ],
+      "tags": [
+        "legacy",
+        "memory"
+      ],
+      "choices": [
+        {
+          "id": "own",
+          "title": "Mirası sahiplen",
+          "hint": "Eski itibarın sana da bağlanır.",
+          "resultText": "Ailenden kalan adı açıkça sahiplendin.",
+          "effects": [
+            {
+              "type": "faction_reputation",
+              "faction": "yonetim",
+              "amount": 1
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": 1
+            }
+          ]
+        },
+        {
+          "id": "distance",
+          "title": "Kendi adınla değerlendirilmek iste",
+          "hint": "Geçmiş bağlarını zayıflatır.",
+          "resultText": "Önceki neslin kararlarının seni bütünüyle tanımlamadığını söyledin.",
+          "effects": [
+            {
+              "type": "skill",
+              "skill": "diplomacy",
+              "amount": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
