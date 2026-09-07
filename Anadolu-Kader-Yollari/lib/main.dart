@@ -31,6 +31,7 @@ class _GamePageState extends State<GamePage>{
   final nameCtrl=TextEditingController(text:'Hasan');
   final seedCtrl=TextEditingController();
   String background='Tüccar ailesi';
+  String gender='Erkek';
   GameState? state;
   GameEngine? engine;
   EventCatalog? catalog;
@@ -59,7 +60,7 @@ class _GamePageState extends State<GamePage>{
   void _newGame(){
     final parsed=int.tryParse(seedCtrl.text.trim());
     final seed=parsed??(DateTime.now().millisecondsSinceEpoch&0x7fffffff);
-    state=GameEngine.newGame(seed:seed,name:nameCtrl.text.trim().isEmpty?'Hasan':nameCtrl.text.trim(),background:background);
+    state=GameEngine.newGame(seed:seed,name:nameCtrl.text.trim().isEmpty?'Hasan':nameCtrl.text.trim(),background:background,gender:gender=='Kadın'?'female':'male');
     if(catalog==null)return;
     engine=GameEngine(state!,catalog!);activeEvent=null;outcome='Seed: $seed';tab=0;
     setState((){});_save();
@@ -78,7 +79,7 @@ class _GamePageState extends State<GamePage>{
     try{
       state=GameState.fromJson(Map<String,dynamic>.from(jsonDecode(raw) as Map));
       if(catalog==null)throw StateError('Olay kataloğu hazır değil');
-      engine=GameEngine(state!,catalog!);nameCtrl.text=state!.playerName;background=state!.background;
+      engine=GameEngine(state!,catalog!);nameCtrl.text=state!.playerName;background=state!.background;gender=state!.playerGender=='female'?'Kadın':'Erkek';
       activeEvent=null;outcome='Kayıt yüklendi. Dünya ${state!.day}. günden devam ediyor.';tab=0;
       if(mounted)setState((){});
     }catch(_){
@@ -155,6 +156,13 @@ class _GamePageState extends State<GamePage>{
           onChanged:(v)=>setState(()=>background=v!),
         ),
         const SizedBox(height:12),
+        DropdownButtonFormField<String>(
+          initialValue:gender,
+          decoration:const InputDecoration(labelText:'Cinsiyet',border:OutlineInputBorder()),
+          items:['Erkek','Kadın'].map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),
+          onChanged:(v)=>setState(()=>gender=v!),
+        ),
+        const SizedBox(height:12),
         TextField(controller:seedCtrl,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Seed (boş bırakılabilir)',helperText:'Aynı seed aynı başlangıç dünyasını üretir.',border:OutlineInputBorder())),
         const SizedBox(height:16),
         if(contentLoading)const Padding(padding:EdgeInsets.symmetric(vertical:8),child:LinearProgressIndicator()),
@@ -227,7 +235,7 @@ class _GamePageState extends State<GamePage>{
   Widget _characterCard(BuildContext context)=>Card(child:ExpansionTile(
     leading:CircleAvatar(child:Text('${state!.generation}')),
     title:Text('${state!.playerName} • ${state!.age} yaş'),
-    subtitle:Text('Sağlık ${state!.health}/100 • Nesil ${state!.generation}'),
+    subtitle:Text('${state!.playerGender=='female'?'Kadın':state!.playerGender=='male'?'Erkek':'Belirsiz'} • Sağlık ${state!.health}/100 • Nesil ${state!.generation}'),
     children:[Padding(padding:const EdgeInsets.fromLTRB(16,0,16,14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       const Text('Nitelikler',style:TextStyle(fontWeight:FontWeight.bold)),
       Wrap(spacing:6,runSpacing:4,children:state!.attributes.entries.map((e)=>Chip(label:Text('${GameEngine.attributeNames[e.key]} ${e.value}'))).toList()),
@@ -404,17 +412,21 @@ class _GamePageState extends State<GamePage>{
 
   Widget _familyTab(BuildContext context){
     final members=state!.family.values.toList()..sort((a,b)=>a.id.compareTo(b.id));
+    final current=state!.family[state!.playerFamilyId];
     return ListView(padding:const EdgeInsets.all(12),children:[
       Text('Aile ve Soy',style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
-      const Text('Akrabalık, yaşlar ve uygun halefler dünyayla birlikte kaydedilir. NPC aileleri ise Kişiler sayfasında yaşar.'),
+      const Text('Akrabalık artık yalnız soy kaydı değildir: güven, yakınlık, şüphe ve yükümlülükler olay seçeneklerini değiştirebilir.'),
       const SizedBox(height:8),
       ...members.map((m){
         final parents=m.parentIds.map((id)=>state!.family[id]?.name??id).join(', ');
         final children=m.childIds.map((id)=>state!.family[id]?.name??id).join(', ');
+        final spouse=m.spouseId==null?'':(state!.family[m.spouseId!]?.name??m.spouseId!);
+        final bond=current?.relations[m.id];
+        final sex=m.gender=='female'?'Kadın':m.gender=='male'?'Erkek':'Belirsiz';
         return Card(child:ListTile(
           leading:CircleAvatar(child:Icon(m.id==state!.playerFamilyId?Icons.person:Icons.account_tree_outlined)),
           title:Text('${m.name}${m.id==state!.playerFamilyId?' (oynanan kişi)':''}'),
-          subtitle:Text('${m.age} yaş • ${m.alive?'hayatta':'vefat etti'}${parents.isEmpty?'':'\nEbeveyn: $parents'}${children.isEmpty?'':'\nÇocuk: $children'}'),
+          subtitle:Text('$sex • ${m.age} yaş • ${m.alive?'hayatta':'vefat etti'}${spouse.isEmpty?'':'\nEş: $spouse'}${parents.isEmpty?'':'\nEbeveyn: $parents'}${children.isEmpty?'':'\nÇocuk: $children'}${bond==null?'':'\nBağ: güven ${bond.trust} • yakınlık ${bond.affection} • şüphe ${bond.suspicion} • borç ${bond.debt}'}'),
         ));
       }),
     ]);
