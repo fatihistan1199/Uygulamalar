@@ -375,6 +375,7 @@ class GameEngine {
   }
 
   bool _eventEligible(EventDefinition def){
+    if(def.scheduledOnly)return false;
     if(!_conditionsMet(def.conditions))return false;
     final last=state.eventLastDay[def.id];
     if(last!=null&&state.day-last<def.cooldownDays)return false;
