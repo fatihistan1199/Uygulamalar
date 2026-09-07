@@ -1,0 +1,19 @@
+[
+  {"id":"trt_haber","name":"TRT Haber","group":"turkey","endpoint":"https://www.trthaber.com/manset_articles.rss","kind":"rss","trust":0.78,"enabled":true,"staged":false,"note":"Manşet RSS"},
+  {"id":"bbc_world","name":"BBC World","group":"world","endpoint":"https://feeds.bbci.co.uk/news/world/rss.xml","kind":"rss","trust":0.84,"enabled":true,"staged":false,"note":"World RSS"},
+  {"id":"al_jazeera","name":"Al Jazeera","group":"world","endpoint":"https://www.aljazeera.com/xml/rss/all.xml","kind":"rss","trust":0.76,"enabled":true,"staged":false,"note":"All news RSS"},
+  {"id":"gdacs","name":"GDACS","group":"official","endpoint":"https://www.gdacs.org/xml/rss.xml","kind":"rss","trust":0.95,"enabled":true,"staged":false,"note":"Global disaster RSS"},
+  {"id":"usgs","name":"USGS","group":"official","endpoint":"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.atom","kind":"rss","trust":1.0,"enabled":true,"staged":false,"note":"Son bir saat depremleri"},
+  {"id":"afad","name":"AFAD","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"Doğrulanmış otomatik uç bulunmadı."},
+  {"id":"haberturk","name":"Habertürk","group":"turkey","endpoint":"","kind":"staged","trust":0.68,"enabled":false,"staged":true,"note":"Doğrulanmış RSS uç bulunmadı."},
+  {"id":"sozcu","name":"Sözcü","group":"turkey","endpoint":"","kind":"staged","trust":0.62,"enabled":false,"staged":true,"note":"Doğrulanmış RSS uç bulunmadı."},
+  {"id":"dw_turkce","name":"DW Türkçe","group":"turkey","endpoint":"","kind":"staged","trust":0.75,"enabled":false,"staged":true,"note":"Doğrulanmış Türkçe RSS uç bulunmadı."},
+  {"id":"euronews_tr","name":"Euronews Türkçe","group":"turkey","endpoint":"","kind":"staged","trust":0.72,"enabled":false,"staged":true,"note":"Doğrulanmış Türkçe RSS uç bulunmadı."},
+  {"id":"tcmb","name":"TCMB","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"Doğrulanmış otomatik uç bulunmadı."},
+  {"id":"meb","name":"MEB","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"Doğrulanmış otomatik uç bulunmadı."},
+  {"id":"icisleri","name":"İçişleri Bakanlığı","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"Doğrulanmış otomatik uç bulunmadı."},
+  {"id":"spk","name":"SPK","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"Doğrulanmış otomatik uç bulunmadı."},
+  {"id":"who","name":"WHO","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"Doğrulanmış RSS uç bulunmadı."},
+  {"id":"gdelt","name":"GDELT","group":"world","endpoint":"","kind":"staged","trust":0.7,"enabled":false,"staged":true,"note":"Yanıt zaman aşımı nedeniyle staged durumda."},
+  {"id":"eksi_gundem","name":"Ekşi Gündem","group":"social","endpoint":"","kind":"staged","trust":0.25,"enabled":false,"staged":true,"note":"Erişim koruması aşılmadan otomatik tarama yapılamaz."}
+]
