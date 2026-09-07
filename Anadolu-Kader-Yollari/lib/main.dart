@@ -222,6 +222,7 @@ class _GamePageState extends State<GamePage>{
         Text('Gerilim ${state!.tension}'),
       ]),
     ]))),
+    _characterCard(context),
     if(!state!.alive)_successorPanel(context)
     else if(state!.narrativeQueue.isNotEmpty&&storyCatalog!=null)_storyCard(context)
     else if(activeEvent!=null)_eventCard(context)
