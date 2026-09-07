@@ -364,7 +364,7 @@ void main(){
     s.pendingEvents.add('grain');
     final event=e.pickEvent();
     e.resolve(event,'talk');
-    expect(s.delayedEffects.any((x)=>x.type=='social_reputation'&&x.payload['sourceNpc']=='mahmud'),isTrue);
+    expect(s.delayedEffects.any((x)=>x.type=='social_reputation'&&x.payload['originNpc']=='mahmud'&&x.payload['carrierNpc']=='mahmud'),isTrue);
   });
 
 
@@ -403,7 +403,7 @@ void main(){
     final event=e.pickEvent();
     expect(event.id,'tax_rumor_verification');
     final result=e.resolve(event,'cross_check');
-    expect(result,contains('Yanlış'));
+    expect(result,contains('yanlışlandı'));
     final entry=s.knowledge.firstWhere((k)=>k.id=='tax_test');
     expect(entry.refuted,isTrue);
     expect(entry.confirmed,isFalse);
