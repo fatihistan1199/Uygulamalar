@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,6 +19,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import tr.com.gundemradari.data.*
+import tr.com.gundemradari.religion.ReligionTracker
 import tr.com.gundemradari.research.EventResearchReport
 import tr.com.gundemradari.research.EventResearchService
 import tr.com.gundemradari.scan.ScanCoordinator
@@ -26,9 +28,9 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 enum class FeedTab(val label:String){
-    MISS("Kaçırma"),
     TURKEY("Türkiye"),
     WORLD("Dünya"),
+    RELIGION("Din"),
     MISSED("Kaçırmış Olabileceklerin")
 }
 
@@ -38,7 +40,7 @@ class GundemViewModel(context:Context):ViewModel(){
     private val repo=SourceRepository(context,dao)
     private val scanner=ScanCoordinator(db)
     private val researcher=EventResearchService(dao)
-    val tab=MutableStateFlow(FeedTab.MISS)
+    val tab=MutableStateFlow(FeedTab.TURKEY)
     val scanning=MutableStateFlow(false)
     val scanMessage=MutableStateFlow("Henüz taranmadı")
     val sources=dao.sources().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
@@ -46,13 +48,15 @@ class GundemViewModel(context:Context):ViewModel(){
     val researchReport=MutableStateFlow<EventResearchReport?>(null)
     val events=tab.flatMapLatest{
         when(it){
-            FeedTab.MISS->dao.mainFeed()
             FeedTab.TURKEY->dao.turkeyFeed()
             FeedTab.WORLD->dao.worldFeed()
+            FeedTab.RELIGION->dao.religionFeed()
             FeedTab.MISSED->dao.missedFeed(System.currentTimeMillis()-7L*24*3600*1000)
         }
     }.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
+
     init{viewModelScope.launch{repo.seed()}}
+
     fun scan()=viewModelScope.launch{
         if(scanning.value)return@launch
         scanning.value=true
@@ -84,6 +88,7 @@ class GundemViewModel(context:Context):ViewModel(){
     val message by vm.scanMessage.collectAsStateWithLifecycle()
     val last by vm.lastScan.collectAsStateWithLifecycle()
     val research by vm.researchReport.collectAsStateWithLifecycle()
+
     Column(Modifier.fillMaxSize().padding(16.dp)){
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
             Column{
@@ -92,13 +97,30 @@ class GundemViewModel(context:Context):ViewModel(){
             }
             Button(onClick=vm::scan,enabled=!scanning){Text(if(scanning)"Taranıyor…" else "Şimdi tara")}
         }
+
         if(scanning)LinearProgressIndicator(Modifier.fillMaxWidth().padding(top=12.dp))
-        ScrollableTabRow(selectedTabIndex=FeedTab.entries.indexOf(tab),edgePadding=0.dp){
-            FeedTab.entries.forEach{t->Tab(selected=tab==t,onClick={vm.tab.value=t},text={Text(t.label)})}
+
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+            ScrollableTabRow(
+                selectedTabIndex=FeedTab.entries.indexOf(tab),
+                edgePadding=0.dp,
+                modifier=Modifier.weight(1f)
+            ){
+                FeedTab.entries.forEach{t->
+                    Tab(selected=tab==t,onClick={vm.tab.value=t},text={Text(t.label)})
+                }
+            }
+            IconButton(onClick=onSettings,modifier=Modifier.padding(start=4.dp)){
+                Text("⚙",style=MaterialTheme.typography.titleLarge)
+            }
         }
-        TextButton(onClick=onSettings){Text("⚙ Ayarlar › Kaynaklar")}
+
         if(events.isEmpty()){
-            Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){Text("Bu bölümde henüz önemli olay yok.\\nŞimdi tara düğmesine bas.")}
+            Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){
+                Text(if(tab==FeedTab.RELIGION)
+                    "Takip listesindeki din gündemi için henüz kayıt yok.\\nŞimdi tara düğmesine bas."
+                    else "Bu bölümde henüz önemli olay yok.\\nŞimdi tara düğmesine bas.")
+            }
         } else LazyColumn(verticalArrangement=Arrangement.spacedBy(10.dp)){
             items(events,key={it.id}){e->EventCard(e,onResearch={vm.research(e)})}
         }
@@ -106,20 +128,23 @@ class GundemViewModel(context:Context):ViewModel(){
     research?.let{ResearchDialog(it,vm::closeResearch)}
 }
 
-private fun eventDate(millis:Long):String=SimpleDateFormat("dd.MM.yyyy HH:mm",Locale("tr","TR")).format(Date(millis))
+private fun eventDate(millis:Long):String=
+    SimpleDateFormat("dd.MM.yyyy HH:mm",Locale("tr","TR")).format(Date(millis))
 
 @Composable private fun EventCard(e:EventEntity,onResearch:()->Unit){
     Card{
-        Column(Modifier.padding(14.dp)){
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
-                Text("Önem ${e.importance.toInt()} · Doğrulama ${e.verification}/4",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
-                Text(eventDate(e.publishedAt?:e.updatedAt),style=MaterialTheme.typography.labelSmall)
-            }
-            Text(e.title,style=MaterialTheme.typography.titleMedium)
-            if(e.summary.isNotBlank())Text(e.summary,style=MaterialTheme.typography.bodyMedium,maxLines=3)
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
-                Text("${e.sourceCount} kaynak · ${e.changeNote}",style=MaterialTheme.typography.labelSmall)
-                IconButton(onClick=onResearch,modifier=Modifier.size(30.dp)){Text("🔍")}
+        SelectionContainer{
+            Column(Modifier.padding(14.dp)){
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
+                    Text("Önem ${e.importance.toInt()} · Doğrulama ${e.verification}/4",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
+                    Text(eventDate(e.publishedAt?:e.updatedAt),style=MaterialTheme.typography.labelSmall)
+                }
+                Text(e.title,style=MaterialTheme.typography.titleMedium)
+                if(e.summary.isNotBlank())Text(e.summary,style=MaterialTheme.typography.bodyMedium,maxLines=3)
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
+                    Text("${e.sourceCount} kaynak · ${e.changeNote}",style=MaterialTheme.typography.labelSmall)
+                    IconButton(onClick=onResearch,modifier=Modifier.size(30.dp)){Text("🔍")}
+                }
             }
         }
     }
@@ -138,31 +163,33 @@ private fun eventDate(millis:Long):String=SimpleDateFormat("dd.MM.yyyy HH:mm",Lo
         title={Text("Araştırma")},
         confirmButton={TextButton(onClick=onClose){Text("Kapat")}},
         text={
-            Column(Modifier.heightIn(max=520.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
-                Text(report.event.title,style=MaterialTheme.typography.titleMedium)
-                Text("${report.independentSourceCount} bağımsız kaynak · $verification",style=MaterialTheme.typography.bodyMedium)
-                if(report.officialSourceCount>0)Text("${report.officialSourceCount} resmî kaynak bu olay kümesinde.")
-                if(report.socialSourceCount>0)Text("${report.socialSourceCount} sosyal/erken sinyal kaynağı bulunuyor.")
-                if(report.commonTerms.isNotEmpty()){
+            SelectionContainer{
+                Column(Modifier.heightIn(max=520.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                    Text(report.event.title,style=MaterialTheme.typography.titleMedium)
+                    Text("${report.independentSourceCount} bağımsız kaynak · $verification",style=MaterialTheme.typography.bodyMedium)
+                    if(report.officialSourceCount>0)Text("${report.officialSourceCount} resmî kaynak bu olay kümesinde.")
+                    if(report.socialSourceCount>0)Text("${report.socialSourceCount} sosyal/erken sinyal kaynağı bulunuyor.")
+                    if(report.commonTerms.isNotEmpty()){
+                        HorizontalDivider()
+                        Text("Kaynakların ortak odağı",style=MaterialTheme.typography.labelLarge)
+                        Text(report.commonTerms.joinToString(" · "))
+                    } else if(report.independentSourceCount<2){
+                        Text("Tek kaynak bulunduğu için kaynak karşılaştırması sınırlı.",style=MaterialTheme.typography.bodySmall)
+                    }
+                    if(report.firstAt!=null){
+                        HorizontalDivider()
+                        Text("Zaman çizgisi",style=MaterialTheme.typography.labelLarge)
+                        Text("İlk kayıt: ${eventDate(report.firstAt)}")
+                        if(report.latestAt!=null && report.latestAt!=report.firstAt)Text("Son kayıt: ${eventDate(report.latestAt)}")
+                    }
                     HorizontalDivider()
-                    Text("Kaynakların ortak odağı",style=MaterialTheme.typography.labelLarge)
-                    Text(report.commonTerms.joinToString(" · "))
-                } else if(report.independentSourceCount<2){
-                    Text("Tek kaynak bulunduğu için kaynak karşılaştırması sınırlı.",style=MaterialTheme.typography.bodySmall)
-                }
-                if(report.firstAt!=null){
-                    HorizontalDivider()
-                    Text("Zaman çizgisi",style=MaterialTheme.typography.labelLarge)
-                    Text("İlk kayıt: ${eventDate(report.firstAt)}")
-                    if(report.latestAt!=null && report.latestAt!=report.firstAt)Text("Son kayıt: ${eventDate(report.latestAt)}")
-                }
-                HorizontalDivider()
-                Text("Kaynaklar",style=MaterialTheme.typography.labelLarge)
-                report.sources.distinctBy{it.sourceName}.forEach{row->
-                    Column(Modifier.padding(bottom=6.dp)){
-                        Text(row.sourceName,style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
-                        Text(row.title,style=MaterialTheme.typography.bodySmall)
-                        Text(eventDate(row.publishedAt?:row.firstSeenAt),style=MaterialTheme.typography.labelSmall)
+                    Text("Kaynaklar",style=MaterialTheme.typography.labelLarge)
+                    report.sources.distinctBy{it.sourceName}.forEach{row->
+                        Column(Modifier.padding(bottom=6.dp)){
+                            Text(row.sourceName,style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
+                            Text(row.title,style=MaterialTheme.typography.bodySmall)
+                            Text(eventDate(row.publishedAt?:row.firstSeenAt),style=MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
             }
@@ -175,10 +202,20 @@ private fun eventDate(millis:Long):String=SimpleDateFormat("dd.MM.yyyy HH:mm",Lo
     Column(Modifier.fillMaxSize().padding(16.dp)){
         TextButton(onClick=onBack){Text("‹ Gündem")}
         Text("Kaynaklar",style=MaterialTheme.typography.headlineSmall)
+
+        ElevatedCard(Modifier.fillMaxWidth().padding(vertical=8.dp)){
+            Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(3.dp)){
+                Text("Din takip listesi",style=MaterialTheme.typography.titleMedium)
+                Text("Açıklamaları öncelikli; bunlarla ilgili haberler de Din sayfasında takip edilir.",style=MaterialTheme.typography.bodySmall)
+                ReligionTracker.displayFollowList.forEach{Text("• $it",style=MaterialTheme.typography.bodySmall)}
+            }
+        }
+
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
             OutlinedButton(onClick={vm.action(1)}){Text("Tümünü seç")}
             OutlinedButton(onClick={vm.action(0)}){Text("Tümünü kaldır")}
         }
+
         LazyColumn{
             items(rows,key={it.id}){s->
                 Row(Modifier.fillMaxWidth().padding(vertical=9.dp),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){

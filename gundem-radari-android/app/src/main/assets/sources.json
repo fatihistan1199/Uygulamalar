@@ -9,6 +9,8 @@
   {"id":"euronews_tr","name":"Euronews Türkçe","group":"turkey","endpoint":"https://tr.euronews.com/rss?format=mrss&level=theme&name=news","kind":"rss","trust":0.72,"enabled":true,"staged":false,"note":"Resmî Türkçe MRSS"},
   {"id":"birgun","name":"BirGün","group":"turkey","endpoint":"https://www.birgun.net/rss/home","kind":"rss","trust":0.62,"enabled":true,"staged":false,"note":"Resmî tüm içerikler RSS"},
 
+  {"id":"diyanet_haber","name":"Diyanet Haber","group":"religion_direct","endpoint":"https://www.diyanethaber.com.tr/rss","kind":"rss","trust":0.90,"enabled":true,"staged":false,"note":"Diyanet Haber resmî RSS · din içerikleri Din sayfasında öncelikli"},
+
   {"id":"bbc_world","name":"BBC World","group":"world","endpoint":"https://feeds.bbci.co.uk/news/world/rss.xml","kind":"rss","trust":0.84,"enabled":true,"staged":false,"note":"World RSS · Türkçeye çevrilir"},
   {"id":"al_jazeera","name":"Al Jazeera","group":"world","endpoint":"https://www.aljazeera.com/xml/rss/all.xml","kind":"rss","trust":0.76,"enabled":true,"staged":false,"note":"All news RSS · Türkçeye çevrilir"},
   {"id":"cnn_world","name":"CNN World","group":"world","endpoint":"https://rss.cnn.com/rss/edition_world.rss","kind":"rss","trust":0.76,"enabled":true,"staged":false,"note":"World RSS · Türkçeye çevrilir"},

@@ -16,7 +16,8 @@ import kotlinx.coroutines.flow.Flow
     @PrimaryKey val id:String, val title:String, val summary:String, val scope:String,
     val importance:Double, val noise:Double, val verification:Int, val velocity:Double,
     val sourceCount:Int, val firstSeenAt:Long, val updatedAt:Long, val changeNote:String,
-    val publishedAt:Long? = null)
+    val publishedAt:Long? = null,
+    @ColumnInfo(defaultValue="0") val religionPriority:Int=0)
 @Entity(primaryKeys=["eventId","rawUrl"],tableName="event_items") data class EventItemEntity(val eventId:String,val rawUrl:String)
 @Entity(tableName="event_versions") data class EventVersionEntity(
     @PrimaryKey(autoGenerate=true) val id:Long=0, val eventId:String, val version:Int,
@@ -51,6 +52,7 @@ data class ResearchItemRow(
     @Query("SELECT * FROM events WHERE noise < 50 ORDER BY importance DESC,updatedAt DESC LIMIT 60") fun mainFeed():Flow<List<EventEntity>>
     @Query("SELECT * FROM events WHERE scope='turkey' AND noise < 50 ORDER BY importance DESC,updatedAt DESC LIMIT 60") fun turkeyFeed():Flow<List<EventEntity>>
     @Query("SELECT * FROM events WHERE scope='world' AND noise < 50 ORDER BY importance DESC,updatedAt DESC LIMIT 60") fun worldFeed():Flow<List<EventEntity>>
+    @Query("SELECT * FROM events WHERE religionPriority > 0 AND noise < 70 ORDER BY religionPriority DESC,importance DESC,updatedAt DESC LIMIT 80") fun religionFeed():Flow<List<EventEntity>>
     @Query("SELECT * FROM events WHERE importance >= 55 AND firstSeenAt > :after AND noise < 50 ORDER BY importance DESC") fun missedFeed(after:Long):Flow<List<EventEntity>>
     @Query("""
         SELECT s.name AS sourceName, s.groupName AS groupName, r.title AS title, r.summary AS summary,
@@ -67,7 +69,7 @@ data class ResearchItemRow(
 
 @Database(
     entities=[SourceEntity::class,RawItemEntity::class,EventEntity::class,EventItemEntity::class,EventVersionEntity::class,ScanHistoryEntity::class],
-    version=3,
+    version=4,
     exportSchema=false
 )
 abstract class AppDatabase:RoomDatabase(){
@@ -87,9 +89,18 @@ abstract class AppDatabase:RoomDatabase(){
                 db.execSQL("DELETE FROM raw_items")
             }
         }
+        private val MIGRATION_3_4=object:Migration(3,4){
+            override fun migrate(db:SupportSQLiteDatabase){
+                db.execSQL("ALTER TABLE events ADD COLUMN religionPriority INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("DELETE FROM event_items")
+                db.execSQL("DELETE FROM event_versions")
+                db.execSQL("DELETE FROM events")
+                db.execSQL("DELETE FROM raw_items")
+            }
+        }
         fun get(context:Context)=INSTANCE?: synchronized(this){
             INSTANCE?:Room.databaseBuilder(context.applicationContext,AppDatabase::class.java,"gundem-radari.db")
-                .addMigrations(MIGRATION_1_2,MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4)
                 .build()
                 .also{INSTANCE=it}
         }
