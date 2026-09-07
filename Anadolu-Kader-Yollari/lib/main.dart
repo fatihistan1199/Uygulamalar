@@ -1,109 +1,271 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'game_engine.dart';
 
-void main() { WidgetsFlutterBinding.ensureInitialized(); runApp(const KaderApp()); }
+void main(){WidgetsFlutterBinding.ensureInitialized();runApp(const KaderApp());}
 
-class City {
-  City(this.id,this.name,this.food,this.trade,this.order);
-  final String id; final String name; int food; int trade; int order;
-  Map<String,dynamic> toJson()=>{'id':id,'name':name,'food':food,'trade':trade,'order':order};
-  factory City.fromJson(Map<String,dynamic> j)=>City(j['id'],j['name'],j['food'],j['trade'],j['order']);
-}
-
-class KaderApp extends StatelessWidget {
+class KaderApp extends StatelessWidget{
   const KaderApp({super.key});
   @override Widget build(BuildContext context)=>MaterialApp(
     debugShowCheckedModeBanner:false,
     title:'Anadolu: Kader Yolları',
-    theme:ThemeData(useMaterial3:true,colorScheme:ColorScheme.fromSeed(seedColor:const Color(0xff0e7490)),scaffoldBackgroundColor:const Color(0xfff7f0dd)),
+    theme:ThemeData(
+      useMaterial3:true,
+      colorScheme:ColorScheme.fromSeed(seedColor:const Color(0xff087f8c)),
+      scaffoldBackgroundColor:const Color(0xfff7f0dd),
+      cardTheme:const CardThemeData(margin:EdgeInsets.symmetric(vertical:6)),
+    ),
     home:const GamePage(),
   );
 }
 
-class GamePage extends StatefulWidget { const GamePage({super.key}); @override State<GamePage> createState()=>_GamePageState(); }
+class GamePage extends StatefulWidget{
+  const GamePage({super.key});
+  @override State<GamePage> createState()=>_GamePageState();
+}
 
-class _GamePageState extends State<GamePage> {
-  final rng=Random();
+class _GamePageState extends State<GamePage>{
+  static const saveKey='kader_save_v2';
   final nameCtrl=TextEditingController(text:'Hasan');
-  List<City> cities=[];
-  String? currentCity;
-  int day=1,money=50,tension=20;
+  final seedCtrl=TextEditingController();
   String background='Tüccar ailesi';
-  String? event;
+  GameState? state;
+  GameEngine? engine;
+  EventView? activeEvent;
   String? outcome;
-  int? delayedDay;
-  bool started=false;
-  final chronicle=<String>[];
+  int tab=0;
+  bool hasSave=false;
 
-  @override void initState(){ super.initState(); _hasSave(); }
-  Future<void> _hasSave() async { final p=await SharedPreferences.getInstance(); if(p.containsKey('kader_save')) setState(()=>outcome='Kayıt bulundu. Menüden devam edebilirsin.'); }
+  @override void initState(){super.initState();_checkSave();}
+  @override void dispose(){nameCtrl.dispose();seedCtrl.dispose();super.dispose();}
+
+  Future<void> _checkSave()async{
+    final p=await SharedPreferences.getInstance();
+    if(mounted)setState(()=>hasSave=p.containsKey(saveKey));
+  }
 
   void _newGame(){
-    cities=[City('konya','Konya',66,78,61),City('kayseri','Kayseri',52,88,54),City('sivas','Sivas',69,70,62),City('ankara','Ankara',71,64,59),City('antalya','Antalya',76,91,65)];
-    currentCity='konya'; day=1; money=50; tension=20; event=null; delayedDay=null; chronicle..clear()..add('1. gün — ${nameCtrl.text} Konya’da yolculuğuna başladı.');
-    started=true; outcome=null; setState((){}); _save();
+    final parsed=int.tryParse(seedCtrl.text.trim());
+    final seed=parsed??(DateTime.now().millisecondsSinceEpoch&0x7fffffff);
+    state=GameEngine.newGame(seed:seed,name:nameCtrl.text.trim().isEmpty?'Hasan':nameCtrl.text.trim(),background:background);
+    engine=GameEngine(state!);activeEvent=null;outcome='Seed: $seed';tab=0;
+    setState((){});_save();
   }
 
-  City get city=>cities.firstWhere((c)=>c.id==currentCity);
-
-  Future<void> _save() async {
-    if(!started)return; final p=await SharedPreferences.getInstance();
-    await p.setString('kader_save',jsonEncode({'day':day,'money':money,'tension':tension,'currentCity':currentCity,'background':background,'name':nameCtrl.text,'delayedDay':delayedDay,'cities':cities.map((e)=>e.toJson()).toList(),'chronicle':chronicle}));
+  Future<void> _save()async{
+    if(state==null)return;
+    final p=await SharedPreferences.getInstance();
+    await p.setString(saveKey,jsonEncode(state!.toJson()));
+    if(mounted)setState(()=>hasSave=true);
   }
 
-  Future<void> _load() async {
-    final p=await SharedPreferences.getInstance(); final raw=p.getString('kader_save'); if(raw==null)return;
-    final j=jsonDecode(raw); day=j['day']; money=j['money']; tension=j['tension']; currentCity=j['currentCity']; background=j['background']; nameCtrl.text=j['name']; delayedDay=j['delayedDay'];
-    cities=(j['cities'] as List).map((e)=>City.fromJson(Map<String,dynamic>.from(e))).toList(); chronicle..clear()..addAll((j['chronicle'] as List).cast<String>());
-    started=true; event=null; outcome='Aynı dünyadan devam ediyorsun.'; setState((){});
-  }
-
-  void _advance(int n){
-    for(var i=0;i<n;i++){ day++; for(final c in cities){ if(rng.nextDouble()<.12)c.food=(c.food-1).clamp(0,100).toInt(); c.trade=(c.trade+rng.nextInt(3)-1).clamp(0,100).toInt(); }
-      if(delayedDay!=null && day>=delayedDay!){ final k=cities.firstWhere((c)=>c.id=='kayseri'); k.order=(k.order-12).clamp(0,100).toInt(); tension=(tension+12).clamp(0,100).toInt(); outcome='Eski tahıl kararı geri döndü: Kayseri’de soruşturma büyüdü.'; chronicle.add('$day. gün — Tahıl soruşturması yeniden açıldı.'); delayedDay=null; }
+  Future<void> _load()async{
+    final p=await SharedPreferences.getInstance();final raw=p.getString(saveKey);
+    if(raw==null)return;
+    try{
+      state=GameState.fromJson(Map<String,dynamic>.from(jsonDecode(raw) as Map));
+      engine=GameEngine(state!);nameCtrl.text=state!.playerName;background=state!.background;
+      activeEvent=null;outcome='Kayıt yüklendi. Dünya ${state!.day}. günden devam ediyor.';tab=0;
+      if(mounted)setState((){});
+    }catch(_){
+      if(mounted)setState(()=>outcome='Kayıt bu sürümle uyumlu değil. Yeni oyun başlat.');
     }
-    outcome??='$n gün geçti. Dünya sen beklerken de değişti.'; setState((){}); _save();
   }
 
-  void _travel(String id){ final from=city.name; currentCity=id; final d=3+rng.nextInt(5); _advance(d); chronicle.add('$day. gün — $from’dan ${city.name} şehrine ulaştı.'); outcome='$d günlük yolculuğun ardından ${city.name} şehrine vardın.'; setState((){}); _save(); }
+  void _advance(int days){
+    engine!.advance(days);outcome='$days gün geçti. Dünya ve fraksiyonlar senden bağımsız hareket etti.';
+    setState((){});_save();
+  }
 
-  void _seek(){ if(city.id=='kayseri' && city.food<60){event='grain';}else{event='rumor';} setState((){}); }
+  void _seek(){activeEvent=engine!.pickEvent();outcome=null;setState((){});}
 
-  void _choose(String c){
-    if(event=='grain'){
-      if(c=='talk'){ outcome='Mahmud fiyat artışını yol güvenliğine bağlıyor. Doğru söylüyor olabilir.'; tension=(tension-3).clamp(0,100).toInt(); }
-      if(c=='judge'){ outcome='Kadıya haber verdin. Şimdilik hiçbir şey değişmedi.'; delayedDay=day+30+rng.nextInt(31); tension=(tension+7).clamp(0,100).toInt(); }
-      if(c=='buy'){ if(money>=15){money-=15; city.food=(city.food-3).clamp(0,100).toInt(); delayedDay=day+45+rng.nextInt(46); outcome='Tahıl aldın. Kârlı olabilir; fakat daha sonra hatırlanabilir.';}else{outcome='Yeterli akçen yok.';} }
-      if(c=='ignore'){ city.food=(city.food-5).clamp(0,100).toInt(); outcome='Karışmadın. Kriz yine de ilerliyor.'; }
-      chronicle.add('$day. gün — Kayseri tahıl meselesinde bir taraf seçti.');
-    } else { outcome=c=='listen'?'Söylenti: Yeni vergiler hazırlanıyor olabilir. Kaynak güvenilir değil.':'Söylentiyi önemsemedin.'; }
-    event=null; setState((){}); _save();
+  void _choose(EventOption option){
+    outcome=engine!.resolve(activeEvent!,option.id);
+    state!.chronicle.add('${state!.day}. gün — ${activeEvent!.title}: ${option.title}.');
+    activeEvent=null;setState((){});_save();
+  }
+
+  Future<void> _travel()async{
+    final id=await showDialog<String>(context:context,builder:(context)=>SimpleDialog(
+      title:const Text('Nereye gideceksin?'),
+      children:state!.cities.values.where((c)=>c.id!=state!.currentCityId).map((c)=>SimpleDialogOption(
+        onPressed:()=>Navigator.pop(context,c.id),
+        child:Padding(padding:const EdgeInsets.symmetric(vertical:8),child:Row(children:[
+          Expanded(child:Text(c.name,style:const TextStyle(fontWeight:FontWeight.w600))),
+          Text('Güvenlik ${c.security}'),
+        ])),
+      )).toList(),
+    ));
+    if(id==null)return;
+    final from=state!.city.name;final days=engine!.travel(id);
+    outcome='$from → ${state!.city.name}: $days gün. Yol riski güvenlik ve eşkıyalığa göre hesaplandı.';
+    setState((){});_save();
   }
 
   @override Widget build(BuildContext context){
-    if(!started)return Scaffold(body:SafeArea(child:Center(child:ConstrainedBox(constraints:const BoxConstraints(maxWidth:520),child:Padding(padding:const EdgeInsets.all(24),child:Column(mainAxisAlignment:MainAxisAlignment.center,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
-      const Icon(Icons.route,size:72),Text('ANADOLU',textAlign:TextAlign.center,style:Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight:FontWeight.w900)),Text('Kader Yolları',textAlign:TextAlign.center,style:Theme.of(context).textTheme.headlineSmall),const SizedBox(height:24),
-      TextField(controller:nameCtrl,decoration:const InputDecoration(labelText:'Ad',border:OutlineInputBorder())),const SizedBox(height:12),
-      DropdownButtonFormField<String>(value:background,decoration:const InputDecoration(labelText:'Geçmiş',border:OutlineInputBorder()),items:['Köylü ailesi','Tüccar ailesi','Medrese öğrencisi','Asker ailesi'].map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),onChanged:(v)=>setState(()=>background=v!)),
-      const SizedBox(height:16),FilledButton(onPressed:_newGame,child:const Text('Yeni Oyun')),OutlinedButton(onPressed:_load,child:const Text('Devam Et')),if(outcome!=null)Padding(padding:const EdgeInsets.only(top:10),child:Text(outcome!,textAlign:TextAlign.center))
-    ]))))));
-    return Scaffold(appBar:AppBar(title:Text('${city.name} • $day. gün'),actions:[IconButton(onPressed:_save,icon:const Icon(Icons.save_outlined))]),drawer:Drawer(child:SafeArea(child:ListView(padding:const EdgeInsets.all(12),children:[Text('Kader Defteri',style:Theme.of(context).textTheme.headlineSmall),const Divider(),...chronicle.reversed.take(12).map((e)=>ListTile(dense:true,title:Text(e)))]))),body:SafeArea(child:ListView(padding:const EdgeInsets.all(12),children:[
-      Card(child:Padding(padding:const EdgeInsets.all(14),child:Row(children:[const CircleAvatar(child:Icon(Icons.person)),const SizedBox(width:10),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(nameCtrl.text,style:Theme.of(context).textTheme.titleLarge),Text(background)])),Column(crossAxisAlignment:CrossAxisAlignment.end,children:[Text('$money akçe'),Text('Gerilim $tension')])]))),
-      if(event==null)...[
-        if(outcome!=null)Card(child:Padding(padding:const EdgeInsets.all(14),child:Text(outcome!))),
-        Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(city.name,style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),const SizedBox(height:10),Wrap(spacing:8,children:[Chip(label:Text('Gıda ${city.food}')),Chip(label:Text('Ticaret ${city.trade}')),Chip(label:Text('Huzur ${city.order}'))])]))),
-        FilledButton.icon(onPressed:_seek,icon:const Icon(Icons.forum_outlined),label:const Text('Şehirde dolaş / bilgi ara')),OutlinedButton.icon(onPressed:()=>_travelDialog(context),icon:const Icon(Icons.map_outlined),label:const Text('Seyahat et')),OutlinedButton.icon(onPressed:()=>_advance(7),icon:const Icon(Icons.calendar_month),label:const Text('Bir hafta geçir'))
-      ] else _eventCard(context)
+    if(state==null)return _menu(context);
+    return Scaffold(
+      appBar:AppBar(
+        title:Text('${state!.city.name} • ${state!.day}. gün'),
+        actions:[IconButton(tooltip:'Kaydet',onPressed:_save,icon:const Icon(Icons.save_outlined))],
+      ),
+      drawer:_chronicleDrawer(context),
+      bottomNavigationBar:NavigationBar(
+        selectedIndex:tab,
+        onDestinationSelected:(i)=>setState(()=>tab=i),
+        destinations:const[
+          NavigationDestination(icon:Icon(Icons.auto_stories_outlined),selectedIcon:Icon(Icons.auto_stories),label:'Oyun'),
+          NavigationDestination(icon:Icon(Icons.groups_outlined),selectedIcon:Icon(Icons.groups),label:'Kişiler'),
+          NavigationDestination(icon:Icon(Icons.menu_book_outlined),selectedIcon:Icon(Icons.menu_book),label:'Bilgi'),
+          NavigationDestination(icon:Icon(Icons.account_balance_outlined),selectedIcon:Icon(Icons.account_balance),label:'Çevreler'),
+        ],
+      ),
+      body:SafeArea(child:IndexedStack(index:tab,children:[_gameTab(context),_peopleTab(context),_knowledgeTab(context),_factionsTab(context)])),
+    );
+  }
+
+  Widget _menu(BuildContext context)=>Scaffold(
+    body:SafeArea(child:Center(child:ConstrainedBox(
+      constraints:const BoxConstraints(maxWidth:520),
+      child:ListView(shrinkWrap:true,padding:const EdgeInsets.all(24),children:[
+        const Icon(Icons.route,size:72),
+        Text('ANADOLU',textAlign:TextAlign.center,style:Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight:FontWeight.w900)),
+        Text('Kader Yolları',textAlign:TextAlign.center,style:Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height:24),
+        TextField(controller:nameCtrl,decoration:const InputDecoration(labelText:'Ad',border:OutlineInputBorder())),
+        const SizedBox(height:12),
+        DropdownButtonFormField<String>(
+          initialValue:background,
+          decoration:const InputDecoration(labelText:'Geçmiş',border:OutlineInputBorder()),
+          items:['Köylü ailesi','Tüccar ailesi','Medrese öğrencisi','Asker ailesi'].map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),
+          onChanged:(v)=>setState(()=>background=v!),
+        ),
+        const SizedBox(height:12),
+        TextField(controller:seedCtrl,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Seed (boş bırakılabilir)',helperText:'Aynı seed aynı başlangıç dünyasını üretir.',border:OutlineInputBorder())),
+        const SizedBox(height:16),
+        FilledButton(onPressed:_newGame,child:const Text('Yeni Oyun')),
+        OutlinedButton(onPressed:hasSave?_load:null,child:const Text('Devam Et')),
+        if(outcome!=null)Padding(padding:const EdgeInsets.only(top:10),child:Text(outcome!,textAlign:TextAlign.center)),
+      ]),
+    ))),
+  );
+
+  Widget _chronicleDrawer(BuildContext context)=>Drawer(child:SafeArea(child:ListView(
+    padding:const EdgeInsets.all(12),
+    children:[
+      Text('Kader Defteri',style:Theme.of(context).textTheme.headlineSmall),
+      Text('Seed ${state!.seed} • ${state!.background}',style:Theme.of(context).textTheme.bodySmall),
+      const Divider(),
+      ...state!.chronicle.reversed.take(30).map((e)=>ListTile(dense:true,leading:const Icon(Icons.history,size:18),title:Text(e))),
+    ],
+  )));
+
+  Widget _gameTab(BuildContext context)=>ListView(padding:const EdgeInsets.all(12),children:[
+    Card(child:Padding(padding:const EdgeInsets.all(14),child:Row(children:[
+      const CircleAvatar(child:Icon(Icons.person)),
+      const SizedBox(width:10),
+      Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text(state!.playerName,style:Theme.of(context).textTheme.titleLarge),
+        Text(state!.background),
+      ])),
+      Column(crossAxisAlignment:CrossAxisAlignment.end,children:[
+        Text('${state!.money} akçe',style:const TextStyle(fontWeight:FontWeight.bold)),
+        Text('Gerilim ${state!.tension}'),
+      ]),
+    ]))),
+    if(activeEvent!=null)_eventCard(context)else...[
+      if(outcome!=null)Card(child:Padding(padding:const EdgeInsets.all(14),child:Text(outcome!))),
+      _cityCard(context),
+      FilledButton.icon(onPressed:_seek,icon:const Icon(Icons.forum_outlined),label:const Text('Şehirde dolaş / bilgi ara')),
+      OutlinedButton.icon(onPressed:_travel,icon:const Icon(Icons.map_outlined),label:const Text('Seyahat et')),
+      OutlinedButton.icon(onPressed:()=>_advance(7),icon:const Icon(Icons.calendar_month),label:const Text('Bir hafta geçir')),
+      if(state!.delayedEffects.isNotEmpty)Padding(
+        padding:const EdgeInsets.only(top:8),
+        child:Text('Arka planda ${state!.delayedEffects.length} çözülmemiş sonuç var.',style:Theme.of(context).textTheme.bodySmall),
+      ),
+    ],
+  ]);
+
+  Widget _cityCard(BuildContext context){
+    final c=state!.city;
+    return Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Text(c.name,style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
+      const SizedBox(height:10),
+      Wrap(spacing:7,runSpacing:7,children:[
+        Chip(label:Text('Gıda ${c.food}')),Chip(label:Text('Ticaret ${c.trade}')),Chip(label:Text('Huzur ${c.order}')),
+        Chip(label:Text('Güvenlik ${c.security}')),Chip(label:Text('Refah ${c.prosperity}')),Chip(label:Text('Eşkıyalık ${c.banditry}')),
+      ]),
     ])));
   }
 
-  Widget _eventCard(BuildContext context){
-    final grain=event=='grain';
-    final opts=grain?[['talk','Mahmud’u dinle','Bilgi kazanırsın; onun anlatısına da maruz kalırsın.'],['judge','Kadıyı haberdar et','Meşru yol; gecikmiş sonucu olabilir.'],['buy','15 akçelik tahıl al','Ekonomik fırsat; bedeli belirsiz.'],['ignore','Karışma','Tarafsızlık da sonuç üretir.']]:[['listen','Dinlemeye devam et','Şüpheli bilgi edinebilirsin.'],['ignore','Önemseme','Yanlış bilgiden korunursun; gerçek uyarıyı kaçırabilirsin.']];
-    return Card(child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[Container(height:150,decoration:BoxDecoration(borderRadius:BorderRadius.circular(16),gradient:const LinearGradient(colors:[Color(0xff0e7490),Color(0xff4c1d95)])),child:const Icon(Icons.auto_stories,size:64,color:Colors.white)),const SizedBox(height:16),Text(grain?'Kayseri’de Tahıl Meselesi':'Handaki Fısıltılar',style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),const SizedBox(height:8),Text(grain?'Tahıl fiyatları yükseliyor. Esnaf, Mahmud’un zahire depoladığını söylüyor; söylentinin kaynağı ise ticari rakipleri.':'Yan masadaki iki yolcu yaklaşan yeni vergilerden söz ediyor. Birinin sarhoş olduğu açık.'),const SizedBox(height:14),...opts.map((o)=>Padding(padding:const EdgeInsets.only(bottom:8),child:OutlinedButton(onPressed:()=>_choose(o[0]),child:Align(alignment:Alignment.centerLeft,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(o[1],style:const TextStyle(fontWeight:FontWeight.bold)),Text(o[2],style:Theme.of(context).textTheme.bodySmall)])))))])));
+  Widget _eventCard(BuildContext context)=>Card(child:Padding(
+    padding:const EdgeInsets.all(18),
+    child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      Container(height:135,decoration:BoxDecoration(borderRadius:BorderRadius.circular(16),gradient:const LinearGradient(colors:[Color(0xff087f8c),Color(0xff5b2387)])),child:const Icon(Icons.auto_stories,size:60,color:Colors.white)),
+      const SizedBox(height:16),
+      Text(activeEvent!.title,style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
+      const SizedBox(height:8),Text(activeEvent!.body),
+      const SizedBox(height:14),
+      ...activeEvent!.options.map((o)=>Padding(padding:const EdgeInsets.only(bottom:8),child:OutlinedButton(
+        onPressed:()=>_choose(o),
+        child:Align(alignment:Alignment.centerLeft,child:Padding(padding:const EdgeInsets.symmetric(vertical:5),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Text(o.title,style:const TextStyle(fontWeight:FontWeight.bold)),Text(o.hint,style:Theme.of(context).textTheme.bodySmall),
+        ]))),
+      ))),
+    ]),
+  ));
+
+  Widget _peopleTab(BuildContext context){
+    final people=state!.npcs.values.toList()..sort((a,b){
+      final ac=a.cityId==state!.currentCityId?0:1,bc=b.cityId==state!.currentCityId?0:1;
+      if(ac!=bc)return ac.compareTo(bc);return a.name.compareTo(b.name);
+    });
+    return ListView(padding:const EdgeInsets.all(12),children:[
+      Text('Kişiler',style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
+      const Text('İlişki tek puan değildir. Güven, saygı, korku, sevgi ve şüphe ayrı tutulur.'),
+      const SizedBox(height:8),
+      ...people.map((n)=>Card(child:ExpansionTile(
+        leading:CircleAvatar(child:Text(n.name.characters.first)),
+        title:Text(n.name),
+        subtitle:Text('${n.profession} • ${state!.cities[n.cityId]!.name} • ${state!.factions[n.factionId]!.name}'),
+        children:[Padding(padding:const EdgeInsets.fromLTRB(16,0,16,14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Text('Hedef: ${n.goal}',style:const TextStyle(fontStyle:FontStyle.italic)),
+          const SizedBox(height:8),
+          Wrap(spacing:6,runSpacing:4,children:[
+            Chip(label:Text('Güven ${n.relation.trust}')),Chip(label:Text('Saygı ${n.relation.respect}')),Chip(label:Text('Korku ${n.relation.fear}')),
+            Chip(label:Text('Sevgi ${n.relation.affection}')),Chip(label:Text('Şüphe ${n.relation.suspicion}')),Chip(label:Text('Borç ${n.relation.debt}')),
+          ]),
+          if(n.memories.isNotEmpty)...[
+            const Divider(),const Text('Seni neden böyle görüyor?',style:TextStyle(fontWeight:FontWeight.bold)),
+            ...n.memories.reversed.take(5).map((m)=>ListTile(dense:true,contentPadding:EdgeInsets.zero,title:Text(m.text),subtitle:Text('${m.day}. gün • önem ${m.importance}'))),
+          ],
+        ]))],
+      ))),
+    ]);
   }
 
-  Future<void> _travelDialog(BuildContext context) async { final id=await showDialog<String>(context:context,builder:(_)=>SimpleDialog(title:const Text('Nereye gideceksin?'),children:cities.where((c)=>c.id!=currentCity).map((c)=>SimpleDialogOption(onPressed:()=>Navigator.pop(context,c.id),child:Padding(padding:const EdgeInsets.all(8),child:Text(c.name)))).toList())); if(id!=null)_travel(id); }
+  Widget _knowledgeTab(BuildContext context)=>ListView(padding:const EdgeInsets.all(12),children:[
+    Text('Bilgi ve Söylentiler',style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
+    const Text('Oyuncunun bildiği ile dünyanın gerçeği aynı şey değildir.'),
+    const SizedBox(height:8),
+    if(state!.knowledge.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(18),child:Text('Henüz kayıtlı bilgi yok. Hanlarda dinle, insanlarla konuş veya bilgiyi doğrulat.'))),
+    ...state!.knowledge.reversed.map((k)=>Card(child:ListTile(
+      leading:Icon(k.confirmed?Icons.verified:Icons.hearing),
+      title:Text(k.text),
+      subtitle:Text('${k.label} • Kaynak: ${k.source} • ${k.day}. gün'),
+      trailing:Text('%${k.reliability}',style:const TextStyle(fontWeight:FontWeight.bold)),
+    ))),
+  ]);
+
+  Widget _factionsTab(BuildContext context)=>ListView(padding:const EdgeInsets.all(12),children:[
+    Text('Toplumsal Çevreler',style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
+    const Text('Bir çevreyle yakınlaşmak başka bir çevrede maliyet yaratabilir. Güç değerleri oyuncudan bağımsız da değişir.'),
+    const SizedBox(height:8),
+    ...state!.factions.values.map((f)=>Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Text(f.name,style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.bold)),
+      const SizedBox(height:8),Text('Sana bakış: ${f.reputation}/100'),LinearProgressIndicator(value:f.reputation/100),
+      const SizedBox(height:8),Text('Dünya gücü: ${f.power}/100'),LinearProgressIndicator(value:f.power/100),
+    ])))),
+  ]);
 }
