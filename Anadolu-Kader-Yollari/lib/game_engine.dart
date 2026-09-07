@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'event_catalog.dart';
 
 class KaderRng {
   KaderRng(int seed) : state = seed & 0x7fffffff;
@@ -85,11 +86,13 @@ class GameState {
     required this.day,required this.money,required this.tension,required this.currentCityId,required this.cities,
     required this.npcs,required this.factions,required this.knowledge,required this.delayedEffects,required this.chronicle,
     Map<String,int>? inventory,int? lastMajorEventDay,Map<String,int>? attributes,Map<String,int>? skills,
-    int? health,int? age,int? generation,bool? alive,List<Injury>? injuries,List<String>? lineage,String? deathCause
+    int? health,int? age,int? generation,bool? alive,List<Injury>? injuries,List<String>? lineage,String? deathCause,
+    Map<String,dynamic>? eventFlags,List<String>? pendingEvents,Map<String,int>? eventLastDay
   }):inventory=inventory??{},lastMajorEventDay=lastMajorEventDay??-999,
     attributes=attributes??{'strength':40,'agility':40,'intellect':40,'rhetoric':40,'intuition':40,'willpower':40},
     skills=skills??{'trade':25,'diplomacy':25,'law':20,'medicine':15,'religion':20,'military':20,'tracking':15,'espionage':10,'leadership':20,'localCulture':30},
-    health=health??100,age=age??22,generation=generation??1,alive=alive??true,injuries=injuries??[],lineage=lineage??[],deathCause=deathCause??'';
+    health=health??100,age=age??22,generation=generation??1,alive=alive??true,injuries=injuries??[],lineage=lineage??[],deathCause=deathCause??'',
+    eventFlags=eventFlags??{},pendingEvents=pendingEvents??[],eventLastDay=eventLastDay??{};
 
   final int version,seed;
   int rngState,day,money,tension,lastMajorEventDay,health,age,generation;
@@ -98,8 +101,10 @@ class GameState {
   final Map<String,CityState> cities; final Map<String,NpcState> npcs; final Map<String,FactionState> factions;
   final List<KnowledgeEntry> knowledge; final List<DelayedEffect> delayedEffects; final List<String> chronicle;
   final Map<String,int> inventory,attributes,skills; final List<Injury> injuries; final List<String> lineage;
+  final Map<String,dynamic> eventFlags; final List<String> pendingEvents; final Map<String,int> eventLastDay;
 
   CityState get city=>cities[currentCityId]!;
+
   Map<String,dynamic> toJson()=>{
     'version':version,'seed':seed,'rngState':rngState,'playerName':playerName,'background':background,'day':day,'money':money,
     'tension':tension,'currentCityId':currentCityId,'cities':cities.map((k,v)=>MapEntry(k,v.toJson())),
@@ -107,11 +112,11 @@ class GameState {
     'knowledge':knowledge.map((k)=>k.toJson()).toList(),'delayedEffects':delayedEffects.map((e)=>e.toJson()).toList(),
     'chronicle':chronicle,'inventory':inventory,'lastMajorEventDay':lastMajorEventDay,'attributes':attributes,'skills':skills,
     'health':health,'age':age,'generation':generation,'alive':alive,'injuries':injuries.map((i)=>i.toJson()).toList(),
-    'lineage':lineage,'deathCause':deathCause
+    'lineage':lineage,'deathCause':deathCause,'eventFlags':eventFlags,'pendingEvents':pendingEvents,'eventLastDay':eventLastDay
   };
 
   factory GameState.fromJson(Map<String,dynamic> j)=>GameState(
-    version:j['version']??3,seed:j['seed'],rngState:j['rngState'],playerName:j['playerName'],background:j['background'],
+    version:j['version']??4,seed:j['seed'],rngState:j['rngState'],playerName:j['playerName'],background:j['background'],
     day:j['day'],money:j['money'],tension:j['tension'],currentCityId:j['currentCityId'],
     cities:(j['cities'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,CityState.fromJson(Map<String,dynamic>.from(v)))),
     npcs:(j['npcs'] as Map<String,dynamic>).map((k,v)=>MapEntry(k,NpcState.fromJson(Map<String,dynamic>.from(v)))),
@@ -122,7 +127,10 @@ class GameState {
     lastMajorEventDay:j['lastMajorEventDay']??-999,attributes:Map<String,int>.from((j['attributes'] as Map?)??{}),
     skills:Map<String,int>.from((j['skills'] as Map?)??{}),health:j['health']??100,age:j['age']??22,generation:j['generation']??1,
     alive:j['alive']??true,injuries:((j['injuries'] as List?)??[]).map((e)=>Injury.fromJson(Map<String,dynamic>.from(e))).toList(),
-    lineage:((j['lineage'] as List?)??[]).cast<String>(),deathCause:j['deathCause']??''
+    lineage:((j['lineage'] as List?)??[]).cast<String>(),deathCause:j['deathCause']??'',
+    eventFlags:Map<String,dynamic>.from((j['eventFlags'] as Map?)??{}),
+    pendingEvents:((j['pendingEvents'] as List?)??[]).cast<String>(),
+    eventLastDay:Map<String,int>.from((j['eventLastDay'] as Map?)??{})
   );
 }
 
@@ -130,8 +138,8 @@ class EventOption {const EventOption(this.id,this.title,this.hint);final String 
 class EventView {const EventView({required this.id,required this.title,required this.body,required this.options});final String id,title,body;final List<EventOption> options;}
 
 class GameEngine {
-  GameEngine(this.state):_rng=KaderRng(state.rngState);
-  final GameState state; final KaderRng _rng;
+  GameEngine(this.state,this.catalog):_rng=KaderRng(state.rngState);
+  final GameState state; final EventCatalog catalog; final KaderRng _rng;
 
   static GameState newGame({required int seed,required String name,required String background}){
     final cities=<String,CityState>{
@@ -174,7 +182,7 @@ class GameEngine {
     if(background=='Tüccar ailesi'){attrs['rhetoric']=48;attrs['intuition']=46;skills['trade']=52;skills['diplomacy']=38;}
     if(background=='Medrese öğrencisi'){attrs['intellect']=54;attrs['willpower']=45;skills['religion']=50;skills['law']=46;}
     if(background=='Asker ailesi'){attrs['strength']=52;attrs['agility']=46;attrs['willpower']=48;skills['military']=52;skills['leadership']=36;}
-    return GameState(version:4,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999,attributes:attrs,skills:skills,health:100,age:22,generation:1,alive:true,injuries:[],lineage:[]);
+    return GameState(version:5,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999,attributes:attrs,skills:skills,health:100,age:22,generation:1,alive:true,injuries:[],lineage:[],eventFlags:{},pendingEvents:[],eventLastDay:{});
   }
 
   void _sync()=>state.rngState=_rng.state;
