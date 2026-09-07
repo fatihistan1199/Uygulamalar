@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'event_catalog.dart';
+import 'story_catalog.dart';
 
 class KaderRng {
   KaderRng(int seed) : state = seed & 0x7fffffff;
@@ -98,6 +99,17 @@ class ActionRollResult {
   bool get succeeded=>outcome==ActionOutcome.success||outcome==ActionOutcome.criticalSuccess;
 }
 
+class StoryView {
+  const StoryView({required this.id,required this.kicker,required this.title,required this.body,required this.continueLabel});
+  final String id,kicker,title,body,continueLabel;
+}
+
+class LifeGoal {
+  const LifeGoal({required this.title,required this.description,required this.complete});
+  final String title,description;
+  final bool complete;
+}
+
 class GameState {
   GameState({
     required this.version,required this.seed,required this.rngState,required this.playerName,required this.background,
@@ -107,14 +119,14 @@ class GameState {
     int? health,int? age,int? generation,bool? alive,List<Injury>? injuries,List<String>? lineage,String? deathCause,
     Map<String,dynamic>? eventFlags,List<String>? pendingEvents,Map<String,int>? eventLastDay,
     Map<String,FamilyMember>? family,String? playerFamilyId,int? nextLifeId,String? playerGender,
-    Map<String,bool>? worldFacts,List<String>? recentEventIds
+    Map<String,bool>? worldFacts,List<String>? recentEventIds,List<String>? narrativeQueue,List<String>? visitedCities
   }):inventory=inventory??{},lastMajorEventDay=lastMajorEventDay??-999,
     attributes=attributes??{'strength':40,'agility':40,'intellect':40,'rhetoric':40,'intuition':40,'willpower':40},
     skills=skills??{'trade':25,'diplomacy':25,'law':20,'medicine':15,'religion':20,'military':20,'tracking':15,'espionage':10,'leadership':20,'localCulture':30},
     health=health??100,age=age??22,generation=generation??1,alive=alive??true,injuries=injuries??[],lineage=lineage??[],deathCause=deathCause??'',
     eventFlags=eventFlags??{},pendingEvents=pendingEvents??[],eventLastDay=eventLastDay??{},
     family=family??{},playerFamilyId=playerFamilyId??'player',nextLifeId=nextLifeId??1,playerGender=playerGender??'unknown',
-    worldFacts=worldFacts??{},recentEventIds=recentEventIds??[] {
+    worldFacts=worldFacts??{},recentEventIds=recentEventIds??[],narrativeQueue=narrativeQueue??[],visitedCities=visitedCities??[currentCityId] {
       // v0.5 kayıtlarında soy alanı yoktu; dünya verisine dokunmadan ince bir başlangıç ağacı üret.
       if(this.family.isEmpty){
         this.family['player']=FamilyMember(id:'player',name:playerName,age:this.age,cityId:currentCityId,gender:this.playerGender,isPlayerLine:true);
@@ -130,7 +142,7 @@ class GameState {
   final Map<String,int> inventory,attributes,skills; final List<Injury> injuries; final List<String> lineage;
   final Map<String,dynamic> eventFlags; final List<String> pendingEvents; final Map<String,int> eventLastDay;
   final Map<String,FamilyMember> family; String playerFamilyId; int nextLifeId;
-  final Map<String,bool> worldFacts; final List<String> recentEventIds;
+  final Map<String,bool> worldFacts; final List<String> recentEventIds,narrativeQueue,visitedCities;
 
   CityState get city=>cities[currentCityId]!;
 
@@ -143,7 +155,7 @@ class GameState {
     'health':health,'age':age,'generation':generation,'alive':alive,'injuries':injuries.map((i)=>i.toJson()).toList(),
     'lineage':lineage,'deathCause':deathCause,'eventFlags':eventFlags,'pendingEvents':pendingEvents,'eventLastDay':eventLastDay,
     'family':family.map((k,v)=>MapEntry(k,v.toJson())),'playerFamilyId':playerFamilyId,'nextLifeId':nextLifeId,'playerGender':playerGender,
-    'worldFacts':worldFacts,'recentEventIds':recentEventIds
+    'worldFacts':worldFacts,'recentEventIds':recentEventIds,'narrativeQueue':narrativeQueue,'visitedCities':visitedCities
   };
 
   factory GameState.fromJson(Map<String,dynamic> j)=>GameState(
@@ -165,7 +177,9 @@ class GameState {
     family:((j['family'] as Map?)??{}).map((k,v)=>MapEntry(k.toString(),FamilyMember.fromJson(Map<String,dynamic>.from(v)))),
     playerFamilyId:j['playerFamilyId']??'player',nextLifeId:j['nextLifeId']??1,playerGender:j['playerGender']??'unknown',
     worldFacts:Map<String,bool>.from((j['worldFacts'] as Map?)??{}),
-    recentEventIds:((j['recentEventIds'] as List?)??[]).cast<String>()
+    recentEventIds:((j['recentEventIds'] as List?)??[]).cast<String>(),
+    narrativeQueue:((j['narrativeQueue'] as List?)??[]).cast<String>(),
+    visitedCities:((j['visitedCities'] as List?)??[j['currentCityId']]).cast<String>()
   );
 }
 
@@ -242,7 +256,13 @@ class GameEngine {
       'road_bandit_network':seed%5==0,
       'epidemic_prepared':false,
     };
-    return GameState(version:9,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999,attributes:attrs,skills:skills,health:100,age:22,generation:1,alive:true,injuries:[],lineage:[],eventFlags:{},pendingEvents:[],eventLastDay:{},family:family,playerFamilyId:'player',nextLifeId:1,playerGender:gender,worldFacts:worldFacts,recentEventIds:[]);
+    final backgroundScene=switch(background){
+      'Köylü ailesi'=>'background_koylu',
+      'Medrese öğrencisi'=>'background_medrese',
+      'Asker ailesi'=>'background_asker',
+      _=>'background_tuccar',
+    };
+    return GameState(version:10,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999,attributes:attrs,skills:skills,health:100,age:22,generation:1,alive:true,injuries:[],lineage:[],eventFlags:{},pendingEvents:[],eventLastDay:{},family:family,playerFamilyId:'player',nextLifeId:1,playerGender:gender,worldFacts:worldFacts,recentEventIds:[],narrativeQueue:['intro_identity',backgroundScene,'city_konya','intro_path'],visitedCities:['konya']);
   }
 
   void _sync()=>state.rngState=_rng.state;
@@ -526,10 +546,88 @@ class GameEngine {
 
   int travel(String cityId){
     final from=state.city.name;final destination=state.cities[cityId]!;
+    final firstVisit=!state.visitedCities.contains(cityId);
     final base=3+_rng.nextInt(5);final dangerPenalty=((destination.banditry+(100-destination.security))/70).floor();final days=math.max(2,base+dangerPenalty);
-    state.currentCityId=cityId;advance(days);state.chronicle.add('${state.day}. gün — $from’dan ${destination.name} şehrine ulaştı.');_sync();return days;
+    state.currentCityId=cityId;advance(days);state.chronicle.add('${state.day}. gün — $from’dan ${destination.name} şehrine ulaştı.');
+    if(firstVisit){
+      state.visitedCities.add(cityId);
+      state.narrativeQueue.add('city_$cityId');
+    }else{
+      state.narrativeQueue.add('city_return');
+    }
+    _sync();return days;
   }
 
+
+  String cityMoodText(){
+    final c=state.city;
+    if(c.food<40)return 'Pazarda erzak kaygısı yüzlerden okunuyor; insanlar fiyatları ve ambarları konuşuyor.';
+    if(c.order<40)return 'Sokaklarda huzursuzluk var; küçük tartışmalar bile hızla kalabalık topluyor.';
+    if(c.security<45||c.banditry>45)return 'Şehir kapılarında yol güvenliği konuşuluyor; dışarıdan gelenlerin çoğu eşkıya haberleri taşıyor.';
+    if(c.trade>82)return 'Hanlar ve çarşı hareketli; yeni gelen kervanlar fiyatları ve haberleri sürekli değiştiriyor.';
+    if(c.prosperity>75)return 'Şehrin refahı görünür durumda; yeni yapılar, kalabalık dükkânlar ve iş arayan insanlar dikkat çekiyor.';
+    return 'Şehir görünürde dengeli; fakat çarşı, aileler ve güç çevreleri kendi hesaplarını sessizce sürdürüyor.';
+  }
+
+  StoryView? currentStory(StoryCatalog stories){
+    if(state.narrativeQueue.isEmpty)return null;
+    final id=state.narrativeQueue.first;
+    final def=stories[id];
+    if(def==null)return StoryView(id:id,kicker:'Hikâye',title:'Yol Devam Ediyor',body:'Hayatında yeni bir dönem başlıyor.',continueLabel:'Devam et');
+    var title=_renderText(def.title).replaceAll('{{age}}','${state.age}').replaceAll('{{city_mood}}',cityMoodText());
+    var body=_renderText(def.body).replaceAll('{{age}}','${state.age}').replaceAll('{{city_mood}}',cityMoodText());
+    return StoryView(id:id,kicker:_renderText(def.kicker),title:title,body:body,continueLabel:def.continueLabel);
+  }
+
+  void completeStory(){
+    if(state.narrativeQueue.isNotEmpty)state.narrativeQueue.removeAt(0);
+  }
+
+  List<LifeGoal> lifeGoals(){
+    final player=state.family[state.playerFamilyId];
+    return [
+      LifeGoal(title:'Geçimini sağla',description:'Şehirde bir iş bul ve ilk kazancını elde et.',complete:state.eventFlags['first_work_done']==true),
+      LifeGoal(title:'Bir meseleye karış',description:'Bir görev veya şehir olayında karar ver.',complete:state.eventFlags['first_task_done']==true),
+      LifeGoal(title:'Bir yuva kur',description:'İstersen evlen ve hayatını başka biriyle birleştir.',complete:player?.spouseId!=null),
+      LifeGoal(title:'Yeni nesil',description:'Bir çocuğun olsun ve soyunun geleceğini şekillendir.',complete:player?.childIds.isNotEmpty==true),
+    ];
+  }
+
+  String doLocalWork(){
+    final c=state.city;
+    late String title,attribute,skill;
+    late int difficulty;
+    if(c.id=='kayseri'){title='Bir handa kervan yüklerinin hesabına yardım ettin';attribute='intellect';skill='trade';difficulty=35;}
+    else if(c.id=='sivas'){title='Yola çıkacak bir kervanın hazırlığında çalıştın';attribute='willpower';skill='tracking';difficulty=37;}
+    else if(c.id=='ankara'){title='Çarşıdaki bir dokumacı grubunun teslimat işine yardım ettin';attribute='agility';skill='localCulture';difficulty=34;}
+    else if(c.id=='antalya'){title='Limanda gelen malların boşaltma ve kayıt işine katıldın';attribute='strength';skill='trade';difficulty=38;}
+    else {title='Konya’da bir hanın günlük işlerine yardım ettin';attribute='willpower';skill='localCulture';difficulty=34;}
+    final check=rollAction(attribute:attribute,skill:skill,difficulty:difficulty);
+    final pay=switch(check.outcome){
+      ActionOutcome.criticalSuccess=>10,
+      ActionOutcome.success=>7,
+      ActionOutcome.partial=>4,
+      ActionOutcome.failure=>1,
+      ActionOutcome.criticalFailure=>0,
+    };
+    state.money+=pay;
+    if(check.succeeded)state.skills[skill]=clamp100((state.skills[skill]??0)+1);
+    advance(1);
+    final first=state.eventFlags['first_work_done']!=true;
+    state.eventFlags['first_work_done']=true;
+    state.eventFlags['work_count']=((state.eventFlags['work_count'] as int?)??0)+1;
+    if(first&&!state.narrativeQueue.contains('milestone_first_work'))state.narrativeQueue.add('milestone_first_work');
+    state.chronicle.add('${state.day}. gün — $title; $pay akçe kazandı.');
+    _sync();
+    final ending=switch(check.outcome){
+      ActionOutcome.criticalSuccess=>'İşi beklenenden iyi yaptın; seni yeniden çağırabileceklerini söylediler.',
+      ActionOutcome.success=>'İşini düzgün tamamladın ve emeğinin karşılığını aldın.',
+      ActionOutcome.partial=>'İş tamamlandı ama birkaç aksaklık yüzünden kazancın sınırlı kaldı.',
+      ActionOutcome.failure=>'İşte zorlandın; yine de günün sonunda küçük bir ödeme aldın.',
+      ActionOutcome.criticalFailure=>'İş ters gitti ve bu kez para kazanamadın. Yine de neyin yanlış gittiğini gördün.',
+    };
+    return '$title. $ending';
+  }
 
   static const goods=<String,String>{'grain':'Tahıl','cloth':'Kumaş','salt':'Tuz','leather':'Deri'};
   static const basePrices=<String,int>{'grain':7,'cloth':12,'salt':9,'leather':11};
@@ -1024,6 +1122,9 @@ class GameEngine {
     if(def.major)state.lastMajorEventDay=state.day;
     state.eventLastDay[def.id]=state.day;
     state.pendingEvents.remove(def.id);
+    final firstTask=state.eventFlags['first_task_done']!=true;
+    state.eventFlags['first_task_done']=true;
+    if(firstTask&&!state.narrativeQueue.contains('milestone_first_task'))state.narrativeQueue.add('milestone_first_task');
     state.recentEventIds.remove(def.id);
     state.recentEventIds.add(def.id);
     while(state.recentEventIds.length>6)state.recentEventIds.removeAt(0);
