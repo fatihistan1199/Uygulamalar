@@ -262,7 +262,7 @@ class GameEngine {
       'Asker ailesi'=>'background_asker',
       _=>'background_tuccar',
     };
-    return GameState(version:10,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999,attributes:attrs,skills:skills,health:100,age:22,generation:1,alive:true,injuries:[],lineage:[],eventFlags:{},pendingEvents:[],eventLastDay:{},family:family,playerFamilyId:'player',nextLifeId:1,playerGender:gender,worldFacts:worldFacts,recentEventIds:[],narrativeQueue:['intro_identity',backgroundScene,'city_konya','intro_path'],visitedCities:['konya']);
+    return GameState(version:10,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999,attributes:attrs,skills:skills,health:100,age:22,generation:1,alive:true,injuries:[],lineage:[],eventFlags:{},pendingEvents:[],eventLastDay:{},family:family,playerFamilyId:'player',nextLifeId:1,playerGender:gender,worldFacts:worldFacts,recentEventIds:[],narrativeQueue:['intro_identity',backgroundScene,'city_konya','hook_konya','intro_path'],visitedCities:['konya']);
   }
 
   void _sync()=>state.rngState=_rng.state;
@@ -551,7 +551,7 @@ class GameEngine {
     state.currentCityId=cityId;advance(days);state.chronicle.add('${state.day}. gün — $from’dan ${destination.name} şehrine ulaştı.');
     if(firstVisit){
       state.visitedCities.add(cityId);
-      state.narrativeQueue.add('city_$cityId');
+      state.narrativeQueue.addAll(['city_$cityId','hook_$cityId']);
     }else{
       state.narrativeQueue.add('city_return');
     }
