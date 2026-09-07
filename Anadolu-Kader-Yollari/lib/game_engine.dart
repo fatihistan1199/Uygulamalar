@@ -465,21 +465,44 @@ class GameEngine {
       }else if(effect.type=='rumor_spreads'){
         state.factions['yonetim']!.reputation=clamp100(state.factions['yonetim']!.reputation-2);
       }else if(effect.type=='social_reputation'){
-        final source=state.npcs[effect.payload['sourceNpc']];
+        final origin=state.npcs[effect.payload['originNpc']];
+        final carrier=state.npcs[effect.payload['carrierNpc']];
         final signal=(effect.payload['signal'] as num?)?.toInt()??0;
-        if(source!=null&&signal!=0&&_rng.nextInt(100)<76){
+        final hop=(effect.payload['hop'] as num?)?.toInt()??0;
+        final reliability=(effect.payload['reliability'] as num?)?.toInt()??70;
+        if(origin!=null&&carrier!=null&&signal!=0&&reliability>=25&&_rng.nextInt(100)<reliability){
           final sign=signal>0?1:-1;
-          final strength=math.max(1,math.min(4,signal.abs()~/5));
-          final faction=state.factions[source.factionId];
-          if(faction!=null)faction.reputation=clamp100(faction.reputation+sign*strength);
-          final contacts=source.npcRelations.entries.where((e)=>(e.value.trust>=45||e.value.affection>=45)&&state.npcs[e.key]?.alive==true).toList()..sort((a,b)=>a.key.compareTo(b.key));
-          for(final contact in contacts.take(3)){
-            if(_rng.nextInt(100)>=62)continue;
-            final target=state.npcs[contact.key]!;
-            target.relation.change(trust:sign*math.max(1,strength~/2),respect:sign,suspicion:sign<0?strength: -1);
-            target.memories.add(MemoryEntry(text:'${source.name} çevresinden oyuncu hakkında haber aldı',day:state.day,importance:20+strength*5,trust:0,respect:0,fear:0,affection:0,suspicion:0));
+          final rawStrength=math.max(1,signal.abs()~/6);
+          final strength=math.max(1,math.min(4,rawStrength-hop));
+          if(hop<=1){
+            final faction=state.factions[carrier.factionId];
+            if(faction!=null&&_rng.nextInt(100)<70)faction.reputation=clamp100(faction.reputation+sign*strength);
           }
-          state.chronicle.add('${state.day}. gün — ${source.name} çevresinde önceki davranışının yankıları duyuldu.');
+          final contacts=carrier.npcRelations.entries.where((e)=>(e.value.trust>=45||e.value.affection>=45)&&state.npcs[e.key]?.alive==true&&e.key!=origin.id).toList()..sort((a,b)=>a.key.compareTo(b.key));
+          var propagated=false;
+          for(final contact in contacts.take(2)){
+            if(_rng.nextInt(100)>=math.max(24,reliability-18))continue;
+            final target=state.npcs[contact.key]!;
+            target.relation.change(trust:sign*math.max(1,strength~/2),respect:sign,suspicion:sign<0?strength:-1);
+            target.memories.add(MemoryEntry(
+              text:'${carrier.name}, ${origin.name} kaynaklı oyuncu haberini aktardı',
+              day:state.day,importance:18+strength*5,trust:0,respect:0,fear:0,affection:0,suspicion:0,
+              source:carrier.name,kind:'rumor',
+            ));
+            if(!propagated&&hop<2){
+              final nextReliability=reliability-24;
+              final nextSignal=(signal*.65).round();
+              if(nextReliability>=25&&nextSignal.abs()>=3){
+                state.delayedEffects.add(DelayedEffect(
+                  id:'social_${origin.id}_${target.id}_${state.day}_${state.delayedEffects.length}',
+                  dueDay:state.day+2+_rng.nextInt(6),type:'social_reputation',source:'social_network',
+                  payload:{'originNpc':origin.id,'carrierNpc':target.id,'signal':nextSignal,'reason':effect.payload['reason'],'hop':hop+1,'reliability':nextReliability},
+                ));
+                propagated=true;
+              }
+            }
+          }
+          state.chronicle.add('${state.day}. gün — ${origin.name} kaynaklı bir haber sosyal ağda ${hop+1}. halkaya ulaştı.');
         }
       }else if(effect.type=='family_echo'){
         final source=state.family[effect.payload['sourceFamily']];
@@ -795,7 +818,7 @@ class GameEngine {
     state.delayedEffects.add(DelayedEffect(
       id:'social_${npc.id}_${state.day}_${state.delayedEffects.length}',
       dueDay:due,type:'social_reputation',source:'npc_memory',
-      payload:{'sourceNpc':npc.id,'signal':signal,'reason':reason},
+      payload:{'originNpc':npc.id,'carrierNpc':npc.id,'signal':signal,'reason':reason,'hop':0,'reliability':92},
     ));
   }
 
