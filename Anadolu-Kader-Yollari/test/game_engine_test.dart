@@ -367,4 +367,76 @@ void main(){
     expect(s.delayedEffects.any((x)=>x.type=='social_reputation'&&x.payload['sourceNpc']=='mahmud'),isTrue);
   });
 
+
+  test('Story Director büyük olay sonrası toparlanma moduna geçer',(){
+    final s=GameEngine.newGame(seed:1601,name:'Hasan',background:'Tüccar ailesi');
+    final e=GameEngine(s,catalog);
+    s.lastMajorEventDay=s.day;
+    expect(e.storyDirectorMode(),'recovery');
+    expect(e.directorWeightForTest('rumor'),greaterThan(catalog['rumor']!.weight));
+    expect(e.directorWeightForTest('market_fire'),lessThan(catalog['market_fire']!.weight));
+  });
+
+  test('dünya gerçeği oyuncu bilgisinden ayrı tutulur ve save load korunur',(){
+    final s=GameEngine.newGame(seed:1602,name:'Hasan',background:'Köylü ailesi');
+    expect(s.worldFacts.containsKey('tax_plan'),isTrue);
+    expect(s.knowledge.where((k)=>k.factId=='tax_plan'),isEmpty);
+    final e=GameEngine(s,catalog);
+    s.pendingEvents.add('rumor');
+    final rumor=e.pickEvent();
+    e.resolve(rumor,'listen');
+    expect(s.knowledge.any((k)=>k.factId=='tax_plan'),isTrue);
+    expect(s.recentEventIds,contains('rumor'));
+    final restored=GameState.fromJson(Map<String,dynamic>.from(jsonDecode(jsonEncode(s.toJson()))));
+    expect(restored.worldFacts['tax_plan'],s.worldFacts['tax_plan']);
+    expect(restored.recentEventIds,contains('rumor'));
+  });
+
+  test('vergi söylentisi gerçek dünya olgusuna göre yanlışlanabilir',(){
+    final s=GameEngine.newGame(seed:1,name:'Hasan',background:'Medrese öğrencisi');
+    final e=GameEngine(s,catalog);
+    expect(s.worldFacts['tax_plan'],isFalse);
+    s.attributes['intuition']=100;
+    s.skills['localCulture']=100;
+    s.knowledge.add(KnowledgeEntry(id:'tax_test',text:'Yeni vergi hazırlanıyor.',source:'Test kaynağı',reliability:60,day:s.day,factId:'tax_plan'));
+    s.pendingEvents.add('tax_rumor_verification');
+    final event=e.pickEvent();
+    expect(event.id,'tax_rumor_verification');
+    final result=e.resolve(event,'cross_check');
+    expect(result,contains('Yanlış'));
+    final entry=s.knowledge.firstWhere((k)=>k.id=='tax_test');
+    expect(entry.refuted,isTrue);
+    expect(entry.confirmed,isFalse);
+    expect(entry.reliability,100);
+  });
+
+  test('Mahmud ve Yusuf hedefleri oyuncudan bağımsız zincir oluşturur',(){
+    final s=GameEngine.newGame(seed:1604,name:'Hasan',background:'Tüccar ailesi');
+    final e=GameEngine(s,catalog);
+    s.cities['kayseri']!.food=48;
+    e.runNpcGoalForTest('mahmud');
+    expect(s.worldFacts['mahmud_stockpiling'],isTrue);
+    expect(s.eventFlags['mahmud_stockpiling'],isTrue);
+    e.runNpcGoalForTest('yusuf');
+    expect(s.worldFacts['ahi_countermove'],isTrue);
+    expect(s.eventFlags['ahi_countermove'],isTrue);
+    s.currentCityId='kayseri';
+    s.pendingEvents.add('kayseri_network_pressure');
+    expect(e.pickEvent().id,'kayseri_network_pressure');
+  });
+
+  test('sosyal yayılım kaynağı taşıyıcıyı ve mesafeyi kaydeder',(){
+    final s=GameEngine.newGame(seed:1605,name:'Hasan',background:'Tüccar ailesi');
+    final e=GameEngine(s,catalog);
+    s.currentCityId='kayseri';
+    s.pendingEvents.add('grain');
+    final event=e.pickEvent();
+    e.resolve(event,'talk');
+    final social=s.delayedEffects.firstWhere((x)=>x.type=='social_reputation');
+    expect(social.payload['originNpc'],'mahmud');
+    expect(social.payload['carrierNpc'],'mahmud');
+    expect(social.payload['hop'],0);
+    expect((social.payload['reliability'] as int),greaterThan(80));
+  });
+
 }
