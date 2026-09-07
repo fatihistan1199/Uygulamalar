@@ -10,12 +10,26 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: gradle:8.10.2-jdk17
     defaults:
       run:
         working-directory: gundem-radari-android
     steps:
       - uses: actions/checkout@v4
+      - name: Java 17 kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK kur
+        uses: android-actions/setup-android@v3
+      - name: Android 35 bileşenlerini kur
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Gradle kur
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
       - name: Debug APK olustur
         run: gradle :app:assembleDebug --no-daemon
       - name: APK'yi yukle
