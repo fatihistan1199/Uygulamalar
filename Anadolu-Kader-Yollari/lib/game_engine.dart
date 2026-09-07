@@ -89,6 +89,15 @@ class ConflictResult {
   final String summary; final bool success,escaped,dead; final int damage; final Injury? injury;
 }
 
+enum ActionOutcome { criticalFailure, failure, partial, success, criticalSuccess }
+
+class ActionRollResult {
+  const ActionRollResult({required this.roll,required this.chance,required this.outcome});
+  final int roll,chance;
+  final ActionOutcome outcome;
+  bool get succeeded=>outcome==ActionOutcome.success||outcome==ActionOutcome.criticalSuccess;
+}
+
 class GameState {
   GameState({
     required this.version,required this.seed,required this.rngState,required this.playerName,required this.background,
@@ -409,32 +418,107 @@ class GameEngine {
   static const skillNames=<String,String>{'trade':'Ticaret','diplomacy':'Diplomasi','law':'Hukuk','medicine':'Tıp','religion':'Dinî ilimler','military':'Askerlik','tracking':'İz sürme','espionage':'Casusluk','leadership':'Liderlik','localCulture':'Yerel kültür'};
 
   int checkScore(String attribute,String skill){
-    final a=state.attributes[attribute]??40,s=state.skills[skill]??20;
-    final score=(a*.45+s*.35+_rng.nextInt(41)*.50).round();
-    _sync();return score;
+    final result=rollAction(attribute:attribute,skill:skill,difficulty:35);
+    return result.chance-result.roll+50;
+  }
+
+  int actionChance({
+    required String attribute,
+    required String skill,
+    int difficulty=35,
+    int modifier=0,
+    int? opponentAttribute,
+    int? opponentSkill,
+    String? secondarySkill,
+  }){
+    final a=state.attributes[attribute]??40;
+    final s=state.skills[skill]??20;
+    final secondary=secondarySkill==null?0:(state.skills[secondarySkill]??0);
+    final actor=a*.62+s*.33+secondary*.05;
+    final opposition=opponentAttribute==null
+      ? difficulty.toDouble()
+      : opponentAttribute*.65+(opponentSkill??20)*.35;
+    return math.max(5,math.min(95,(50+(actor-opposition)*3.5+modifier).round()));
+  }
+
+  ActionRollResult rollAction({
+    required String attribute,
+    required String skill,
+    int difficulty=35,
+    int modifier=0,
+    int? opponentAttribute,
+    int? opponentSkill,
+    String? secondarySkill,
+  }){
+    final chance=actionChance(attribute:attribute,skill:skill,difficulty:difficulty,modifier:modifier,opponentAttribute:opponentAttribute,opponentSkill:opponentSkill,secondarySkill:secondarySkill);
+    final roll=1+_rng.nextInt(100);
+    late ActionOutcome outcome;
+    final criticalSuccessLimit=math.max(2,math.min(8,chance~/10));
+    if(roll<=criticalSuccessLimit)outcome=ActionOutcome.criticalSuccess;
+    else if(roll<=chance)outcome=ActionOutcome.success;
+    else if(roll<=math.min(96,chance+12))outcome=ActionOutcome.partial;
+    else if(roll>=97)outcome=ActionOutcome.criticalFailure;
+    else outcome=ActionOutcome.failure;
+    _sync();
+    return ActionRollResult(roll:roll,chance:chance,outcome:outcome);
+  }
+
+  String chanceLabel(int chance){
+    if(chance>=80)return 'Çok avantajlı';
+    if(chance>=65)return 'Avantajlı';
+    if(chance>=45)return 'Dengeli';
+    if(chance>=25)return 'Zor';
+    return 'Çok zor';
+  }
+
+  ({String attribute,String skill,int modifier,int opponentAttribute,int opponentSkill,String label}) _conflictProfile(String tactic){
+    var attribute='willpower',skill='military',modifier=0,label='Tedbirli savunma';
+    if(tactic=='assault'){attribute='strength';skill='military';modifier=2;label='Hızlı saldırı';}
+    if(tactic=='flee'){attribute='agility';skill='tracking';modifier=4;label='Geri çekilme';}
+    if(tactic=='parley'){attribute='rhetoric';skill='diplomacy';modifier=-2;label='Konuşarak çözme';}
+    final opponentAttribute=20+(state.city.banditry*.55).round();
+    final opponentSkill=18+((100-state.city.security)*.45).round();
+    return(attribute:attribute,skill:skill,modifier:modifier,opponentAttribute:opponentAttribute,opponentSkill:opponentSkill,label:label);
+  }
+
+  String conflictRiskLabel(String tactic){
+    final p=_conflictProfile(tactic);
+    return chanceLabel(actionChance(attribute:p.attribute,skill:p.skill,modifier:p.modifier,opponentAttribute:p.opponentAttribute,opponentSkill:p.opponentSkill));
   }
 
   ConflictResult resolveConflict(String tactic){
     if(!state.alive)return ConflictResult(summary:'Ölü bir karakter çatışmaya giremez.',success:false,escaped:false,damage:0,dead:true);
-    String attr='willpower',skill='military',label='Tedbirli savunma';int modifier=0;
-    if(tactic=='assault'){attr='strength';skill='military';label='Hızlı saldırı';modifier=3;}
-    if(tactic=='flee'){attr='agility';skill='tracking';label='Geri çekilme';modifier=-2;}
-    if(tactic=='parley'){attr='rhetoric';skill='diplomacy';label='Konuşarak çözme';modifier=-4;}
-    final difficulty=42+(state.city.banditry~/3)+((100-state.city.security)~/5);
-    final score=checkScore(attr,skill)+modifier;
-    final margin=score-difficulty;
+    final p=_conflictProfile(tactic);
+    final check=rollAction(attribute:p.attribute,skill:p.skill,modifier:p.modifier,opponentAttribute:p.opponentAttribute,opponentSkill:p.opponentSkill);
     int damage=0;bool success=false,escaped=false;Injury? injury;
-    if(margin>=15){success=true;damage=_rng.nextInt(7);}
-    else if(margin>=0){success=true;damage=7+_rng.nextInt(12);}
-    else if(margin>-15){escaped=tactic=='flee'||_rng.nextInt(100)<55;damage=16+_rng.nextInt(20);}
-    else{damage=34+_rng.nextInt(34);}
-    if(damage>=14){injury=_makeInjury(damage);}
+    switch(check.outcome){
+      case ActionOutcome.criticalSuccess:
+        success=true;damage=_rng.nextInt(4);
+      case ActionOutcome.success:
+        success=true;damage=3+_rng.nextInt(9);
+      case ActionOutcome.partial:
+        escaped=tactic=='flee'||tactic=='parley';damage=10+_rng.nextInt(14);
+      case ActionOutcome.failure:
+        escaped=tactic=='flee'&&_rng.nextInt(100)<35;damage=20+_rng.nextInt(18);
+      case ActionOutcome.criticalFailure:
+        damage=38+_rng.nextInt(28);
+    }
+    if(damage>=14)injury=_makeInjury(damage);
     _applyDamage(damage,cause:'Yol çatışması',injury:injury);
-    if(success){state.skills[skill]=clamp100((state.skills[skill]??0)+1);state.factions['yonetim']!.reputation=clamp100(state.factions['yonetim']!.reputation+1);}
-    state.chronicle.add('${state.day}. gün — $label: skor $score / güçlük $difficulty, hasar $damage.');
+    if(success){
+      state.skills[p.skill]=clamp100((state.skills[p.skill]??0)+1);
+      state.factions['yonetim']!.reputation=clamp100(state.factions['yonetim']!.reputation+1);
+    }
+    state.chronicle.add('${state.day}. gün — ${p.label}: zar ${check.roll}, hasar $damage.');
     _sync();
     final summary=state.alive
-      ? success?'$label başarılı oldu. $damage hasar aldın.':escaped?'Çatışmadan sıyrıldın; $damage hasar aldın.':'Taktik başarısız oldu; $damage hasar aldın.'
+      ? switch(check.outcome){
+          ActionOutcome.criticalSuccess=>'${p.label} olağanüstü başarılı oldu. $damage hasar aldın.',
+          ActionOutcome.success=>'${p.label} başarılı oldu. $damage hasar aldın.',
+          ActionOutcome.partial=>escaped?'Tam sonuç alamadın ama çatışmadan sıyrıldın; $damage hasar aldın.':'Üstünlük kuramadın; yine de ayakta kaldın. $damage hasar aldın.',
+          ActionOutcome.failure=>'Taktik başarısız oldu; $damage hasar aldın.',
+          ActionOutcome.criticalFailure=>'Taktik ağır biçimde ters tepti; $damage hasar aldın.',
+        }
       :'Çatışma ölümle sonuçlandı: ${state.deathCause}.';
     return ConflictResult(summary:summary,success:success,escaped:escaped,damage:damage,dead:!state.alive,injury:injury);
   }
