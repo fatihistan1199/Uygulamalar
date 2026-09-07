@@ -98,6 +98,41 @@
       "title": "Bir Meseleye Karıştın",
       "body": "Artık yalnız şehrin içinden geçen biri değilsin. Bir meselede taraf oldun ve insanlar verdiğin kararı hatırlayacak. Bundan sonraki olaylar, önceki seçimlerinin izlerini taşıyabilir.",
       "continueLabel": "Devam et"
+    },
+    {
+      "id": "hook_konya",
+      "kicker": "Konya'da İlk Gün",
+      "title": "Han Kapısındaki Tartışma",
+      "body": "Şehri izlemeye daha yeni başlamışken bir hanın önünde yüksek sesler duyuyorsun. Bir kervancı, kaybolan mühürlü bir evrak yüzünden kâtibi suçluyor; çevredeki esnaf ise kimin doğru söylediğinden emin değil. Kimse henüz senden bir şey istemiyor. Yine de bu şehirde insanların meselelerine karışmadan uzun süre görünmez kalamayacağını anlıyorsun.",
+      "continueLabel": "Şehre karış"
+    },
+    {
+      "id": "hook_kayseri",
+      "kicker": "Kayseri'de İlk Gün",
+      "title": "Ambarların Önündeki Sessizlik",
+      "body": "Çarşı kalabalık ama zahire ambarlarının çevresinde tuhaf bir sessizlik var. İki hamal, içeride normalden fazla tahıl tutulduğunu fısıldıyor; yanlarından geçen bir tüccar duyduklarını inkâr ediyor. Bu şehirde ekmeğin fiyatı yalnız hasada değil, insanların ne sakladığına da bağlı olabilir.",
+      "continueLabel": "Şehre karış"
+    },
+    {
+      "id": "hook_sivas",
+      "kicker": "Sivas'ta İlk Gün",
+      "title": "Doğu Yolundan Gelen Haber",
+      "body": "Akşama doğru yorgun bir kervan şehre giriyor. Hayvanlardan biri yaralı, iki yük sandığı eksik. Kervancılar yol üzerinde silahlı bir topluluk gördüklerini söylüyor ama bunun eşkıya mı, asker mi olduğunu kimse kesin bilmiyor. Sivas'ta uzak bir yolun hikâyesi, ertesi gün şehir içindeki fiyatları bile değiştirebilir.",
+      "continueLabel": "Şehre karış"
+    },
+    {
+      "id": "hook_ankara",
+      "kicker": "Ankara'da İlk Gün",
+      "title": "Dokumacıların Fısıltısı",
+      "body": "Kalenin gölgesindeki çarşıda birkaç dokumacı dükkânlarını erken kapatıyor. Fiyatları birlikte belirlemek isteyenlerle buna karşı çıkan tüccarlar arasında bir gerilim olduğu söyleniyor. Görünürde küçük bir esnaf meselesi; fakat şehirde hangi grubun sözünün geçeceğini belirleyecek daha büyük bir çekişmenin başlangıcı olabilir.",
+      "continueLabel": "Şehre karış"
+    },
+    {
+      "id": "hook_antalya",
+      "kicker": "Antalya'da İlk Gün",
+      "title": "Liman Defterindeki Eksik Satır",
+      "body": "Limanın yakınında bir gümrük kâtibi, gelen malların kaydını tekrar tekrar sayıyor. Bir sandık listede var ama rıhtımda yok. Tercümanlar, gemiciler ve gümrük görevlileri birbirini suçlamadan önce dikkatle susuyor. Deniz ticaretinde kayıp bir sandık bazen yalnız bir sandık değildir.",
+      "continueLabel": "Şehre karış"
     }
   ]
 }
