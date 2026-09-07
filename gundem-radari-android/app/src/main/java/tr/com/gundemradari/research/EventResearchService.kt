@@ -13,8 +13,8 @@ import tr.com.gundemradari.web.summarizeResearch
 data class EventResearchReport(
     val event:EventEntity,
     val whatHappened:List<String>,
-    val details:List<String>,
-    val background:List<String>,
+    val whyImportant:List<String>,
+    val latestSituation:List<String>,
     val displayArticles:List<ResearchedArticle>,
     val firstAt:Long?,
     val latestAt:Long?
@@ -28,9 +28,10 @@ class EventResearchService(
     suspend fun build(event:EventEntity):EventResearchReport=coroutineScope{
         val rows=dao.researchItems(event.id)
         val times=rows.map{it.publishedAt?:it.firstSeenAt}
-        val query=rows.firstOrNull{it.originalTitle.isNotBlank()}?.originalTitle ?: event.title
+        val bestRows=rows.sortedByDescending{it.trust}
+        val query=bestRows.firstOrNull{it.originalTitle.isNotBlank()}?.originalTitle ?: event.title
 
-        val primaryArticles=rows.distinctBy{it.url}.take(3).mapIndexed{index,row->
+        val primaryArticles=bestRows.distinctBy{it.url}.take(4).mapIndexed{index,row->
             async{
                 articleReader.read(row.url)?.let{d->
                     ResearchedArticle(
@@ -40,16 +41,13 @@ class EventResearchService(
                         description=d.description.ifBlank{row.summary},
                         paragraphs=d.paragraphs,
                         publishedAt=row.publishedAt,
-                        isPrimary=index==0
+                        isPrimary=index==0,
+                        quality=row.trust
                     )
                 } ?: ResearchedArticle(
-                    sourceName=row.sourceName,
-                    title=row.title,
-                    url=row.url,
-                    description=row.summary,
-                    paragraphs=emptyList(),
-                    publishedAt=row.publishedAt,
-                    isPrimary=index==0
+                    sourceName=row.sourceName,title=row.title,url=row.url,
+                    description=row.summary,paragraphs=emptyList(),publishedAt=row.publishedAt,
+                    isPrimary=index==0,quality=row.trust
                 )
             }
         }.awaitAll()
@@ -60,7 +58,7 @@ class EventResearchService(
 
         val webArticles=webResults
             .filter{wr->primaryArticles.none{it.title.equals(wr.title,true)}}
-            .take(6)
+            .take(5)
             .map{wr->
                 async{
                     articleReader.read(wr.url)?.let{d->
@@ -71,16 +69,13 @@ class EventResearchService(
                             description=d.description.ifBlank{wr.snippet},
                             paragraphs=d.paragraphs,
                             publishedAt=wr.publishedAt,
-                            isPrimary=false
+                            isPrimary=false,
+                            quality=0.55
                         )
                     } ?: ResearchedArticle(
-                        sourceName=wr.source.ifBlank{"Web kaynağı"},
-                        title=wr.title,
-                        url=wr.url,
-                        description=wr.snippet,
-                        paragraphs=emptyList(),
-                        publishedAt=wr.publishedAt,
-                        isPrimary=false
+                        sourceName=wr.source.ifBlank{"Web kaynağı"},title=wr.title,url=wr.url,
+                        description=wr.snippet,paragraphs=emptyList(),publishedAt=wr.publishedAt,
+                        isPrimary=false,quality=0.50
                     )
                 }
             }.awaitAll()
@@ -94,17 +89,18 @@ class EventResearchService(
 
         val visible=allArticles
             .sortedWith(
-                compareByDescending<ResearchedArticle>{it.isPrimary}
+                compareByDescending<ResearchedArticle>{it.quality}
                     .thenByDescending{it.description.length+it.paragraphs.sumOf{p->p.length}}
             )
             .distinctBy{it.sourceName.lowercase()}
             .take(2)
+            .mapIndexed{index,a->a.copy(isPrimary=index==0)}
 
         EventResearchReport(
             event=event,
             whatHappened=summary.whatHappened,
-            details=summary.details,
-            background=summary.background,
+            whyImportant=summary.whyImportant,
+            latestSituation=summary.latestSituation,
             displayArticles=visible,
             firstAt=times.minOrNull(),
             latestAt=times.maxOrNull()

@@ -8,6 +8,7 @@ private val trLocale=Locale("tr","TR")
 
 data class ClassificationDecision(
     val scope:String,
+    val topic:String,
     val turkeyScore:Int,
     val worldScore:Int,
     val reason:String
@@ -68,17 +69,29 @@ object EventClassifier {
         "beyaz saray","pentagon","kremlin","avrupa parlamentosu"
     )
 
-    private fun normalize(text:String)=text.lowercase(trLocale)
-        .replace('’','\'')
-        .replace(Regex("\\s+")," ")
+    private val topics=linkedMapOf(
+        "disaster" to listOf("deprem","sel","yangın","orman yangını","yanardağ","volkan","tsunami","heyelan","çığ","kasırga","afet"),
+        "security" to listOf("savaş","çatışma","saldırı","füze","operasyon","terör","askeri","askerî","işgal"),
+        "politics" to listOf("seçim","referandum","meclis","tbmm","cumhurbaşkanı","hükümet","bakan","parti","anayasa"),
+        "economy" to listOf("faiz","enflasyon","tcmb","döviz","borsa","vergi","bütçe","asgari ücret","işsizlik","ekonomi"),
+        "health" to listOf("salgın","virüs","sağlık","hastane","ilaç","aşı","hastalık"),
+        "education" to listOf("meb","okul","üniversite","öğretmen","öğrenci","eğitim","sınav"),
+        "science_tech" to listOf("yapay zeka","teknoloji","uzay","bilim","uydu","siber","internet")
+    )
+
+    private fun normalize(text:String)=text.lowercase(trLocale).replace('’','\'').replace(Regex("\\s+")," ")
 
     private fun has(text:String,term:String):Boolean =
-        Regex("(?<![\\p{L}\\p{N}])${Regex.escape(term.lowercase(trLocale))}(?![\\p{L}\\p{N}])")
-            .containsMatchIn(text)
+        Regex("(?<![\\p{L}\\p{N}])${Regex.escape(term.lowercase(trLocale))}(?![\\p{L}\\p{N}])").containsMatchIn(text)
+
+    private fun detectTopic(text:String):String{
+        val scored=topics.mapValues{(_,terms)->terms.count{has(text,it)}}
+        return scored.maxByOrNull{it.value}?.takeIf{it.value>0}?.key ?: "society"
+    }
 
     fun classify(event:EventEntity,items:List<ClassificationItemRow>):ClassificationDecision{
         if(event.religionPriority>0){
-            return ClassificationDecision("religion",0,0,"din takip listesi")
+            return ClassificationDecision("religion","religion",0,0,"din takip motoru")
         }
 
         val combined=normalize(buildString{
@@ -100,24 +113,26 @@ object EventClassifier {
         if(sourceGroups.any{it=="turkey"})turkeyScore+=1
 
         val explicitForeign=foreignPlaces.any{has(combined,it)}
-        val explicitTurkey=turkeyExplicit.any{has(combined,it)} ||
-            turkeyInstitutions.any{has(combined,it)}
+        val explicitTurkey=turkeyExplicit.any{has(combined,it)} || turkeyInstitutions.any{has(combined,it)}
+        val topic=detectTopic(combined)
+
+        if(topic=="disaster"&&explicitForeign)worldScore+=2
+        if(topic=="politics"&&explicitTurkey)turkeyScore+=2
+        if(topic=="economy"&&(has(combined,"tcmb")||has(combined,"türk lirası")))turkeyScore+=3
 
         val scope=when{
-            explicitForeign && !explicitTurkey -> "world"
-            explicitForeign && turkeyScore<worldScore+2 -> "world"
-            explicitTurkey && turkeyScore>=worldScore -> "turkey"
-            worldScore>turkeyScore -> "world"
-            turkeyScore>=3 -> "turkey"
-            sourceGroups.count{it=="world_tr"}>sourceGroups.count{it=="turkey"} -> "world"
-            sourceGroups.any{it=="turkey"} -> "turkey"
-            else -> "world"
+            explicitForeign&&!explicitTurkey->"world"
+            explicitForeign&&turkeyScore<worldScore+2->"world"
+            explicitTurkey&&turkeyScore>=worldScore->"turkey"
+            worldScore>turkeyScore->"world"
+            turkeyScore>=3->"turkey"
+            sourceGroups.count{it=="world_tr"}>sourceGroups.count{it=="turkey"}->"world"
+            sourceGroups.any{it=="turkey"}->"turkey"
+            else->"world"
         }
 
         return ClassificationDecision(
-            scope=scope,
-            turkeyScore=turkeyScore,
-            worldScore=worldScore,
+            scope=scope,topic=topic,turkeyScore=turkeyScore,worldScore=worldScore,
             reason=if(scope=="turkey")"Türkiye coğrafyası/kurumu" else "yabancı coğrafya/dünya bağlamı"
         )
     }

@@ -11,22 +11,15 @@ class ReligionWebWatcher(private val search:NewsWebSearch=NewsWebSearch()){
     suspend fun fetch(source:SourceEntity):List<FetchedItem> = coroutineScope{
         ReligionTracker.searchQueries.map{query->
             async{
-                search.search(query,limit=6,expandDescriptions=false)
-                    .filter{ReligionTracker.matches(it.title,it.snippet)}
+                search.search(query,limit=7,expandDescriptions=false)
+                    .filter{row->ReligionWatchEngine.evaluate(source,row.title,row.snippet).accepted}
                     .map{row->
                         FetchedItem(
-                            source=source,
-                            url=row.url,
-                            title=row.title,
-                            summary=row.snippet,
-                            publishedAt=row.publishedAt,
-                            originalTitle=row.title,
-                            originalSummary=row.snippet
+                            source=source,url=row.url,title=row.title,summary=row.snippet,
+                            publishedAt=row.publishedAt,originalTitle=row.title,originalSummary=row.snippet
                         )
                     }
             }
-        }.awaitAll().flatten()
-            .distinctBy{it.url}
-            .take(45)
+        }.awaitAll().flatten().distinctBy{it.url}.take(45)
     }
 }

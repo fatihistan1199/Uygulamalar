@@ -16,15 +16,15 @@ data class ArticleDetails(
 
 data class ResearchSummary(
     val whatHappened:List<String>,
-    val details:List<String>,
-    val background:List<String>
+    val whyImportant:List<String>,
+    val latestSituation:List<String>
 )
 
 class ArticleReader {
     suspend fun read(url:String):ArticleDetails?=withContext(Dispatchers.IO){
         runCatching{
             val first=Jsoup.connect(url)
-                .userAgent("Mozilla/5.0 (Android) GundemRadari/0.6")
+                .userAgent("Mozilla/5.0 (Android) GundemRadari/0.10")
                 .timeout(14000)
                 .followRedirects(true)
                 .get()
@@ -41,7 +41,7 @@ class ArticleReader {
                 if(external!=null){
                     runCatching{
                         Jsoup.connect(external)
-                            .userAgent("Mozilla/5.0 (Android) GundemRadari/0.6")
+                            .userAgent("Mozilla/5.0 (Android) GundemRadari/0.10")
                             .timeout(14000)
                             .followRedirects(true)
                             .get()
@@ -61,15 +61,8 @@ class ArticleReader {
             ).firstOrNull{it.length>=45}.orEmpty().replace(Regex("\\s+")," ").trim()
 
             val selectors=listOf(
-                "article p",
-                "[itemprop=articleBody] p",
-                ".article-body p",
-                ".article-content p",
-                ".news-content p",
-                ".story-body p",
-                ".content-detail p",
-                ".detail-content p",
-                "main p"
+                "article p","[itemprop=articleBody] p",".article-body p",".article-content p",
+                ".news-content p",".story-body p",".content-detail p",".detail-content p","main p"
             )
 
             val paras=selectors.asSequence()
@@ -116,77 +109,88 @@ fun summarizeResearch(eventTitle:String,articles:List<ResearchedArticle>):Resear
         .filter{it.length>3}
         .toSet()
 
-    data class Candidate(
-        val text:String,
-        val score:Int,
-        val primary:Boolean,
-        val background:Boolean
+    val impactMarkers=listOf(
+        "etkiledi","etkileyecek","sonuç","nedeniyle","risk","can kaybı","yaralı","ölü",
+        "iptal","kapatıldı","yasak","ekonomi","piyasa","faiz","seçim","ülke genelinde",
+        "milyon","bin kişi","yıkım","hasar","kriz","güvenlik"
+    )
+    val latestMarkers=listOf(
+        "son durum","son olarak","bugün","şu anda","halen","devam ediyor","açıklandı",
+        "duyurdu","bildirdi","güncel","son açıklama","arttı","yükseldi","düştü","ulaştı"
     )
 
-    val backgroundMarkers=listOf(
-        "daha önce","geçen yıl","geçen ay","geçen hafta","önceki","süreç","başlamıştı",
-        "başladı","ardından","sonrasında","yıllardır","uzun süredir","tarihinde","bu yana",
-        "geçmişte","ilk kez","daha önceki"
+    data class Candidate(
+        val text:String,
+        val relevance:Int,
+        val impact:Boolean,
+        val latest:Boolean,
+        val quality:Double,
+        val publishedAt:Long?
     )
 
     val candidates=mutableListOf<Candidate>()
-    articles.forEachIndexed{articleIndex,article->
+    articles.forEach{article->
         val blocks=buildList{
             if(article.description.isNotBlank())add(article.description)
             addAll(article.paragraphs.take(14))
         }
-        blocks.forEachIndexed{idx,block->
+
+        blocks.forEachIndexed{index,block->
             block.split(Regex("(?<=[.!?])\\s+"))
                 .map{it.replace(Regex("\\s+")," ").trim()}
                 .filter{it.length in 55..360}
                 .forEach{sentence->
                     val lower=sentence.lowercase(locale)
-                    val terms=lower.split(Regex("[^\\p{L}\\p{N}]+"))
-                        .filter{it.length>3}
-                        .toSet()
+                    val terms=lower.split(Regex("[^\\p{L}\\p{N}]+")).filter{it.length>3}.toSet()
                     val overlap=terms.intersect(queryTerms).size
-                    val hasNumber=sentence.any(Char::isDigit)
-                    val hasQuote=sentence.contains("\"")||sentence.contains("“")||sentence.contains("”")
-                    val isBackground=backgroundMarkers.any{lower.contains(it)}
-                    var score=overlap*7
-                    if(articleIndex==0)score+=8
-                    if(idx<4)score+=5
-                    if(hasNumber)score+=2
-                    if(hasQuote)score+=2
-                    if(sentence.length in 80..220)score+=2
-                    if(isBackground)score+=1
-                    candidates+=Candidate(sentence,score,articleIndex==0,isBackground)
+                    val relevance=overlap*7 + if(index<4)4 else 0 + if(sentence.any(Char::isDigit))2 else 0
+                    candidates+=Candidate(
+                        text=sentence,
+                        relevance=relevance,
+                        impact=impactMarkers.any{lower.contains(it)},
+                        latest=latestMarkers.any{lower.contains(it)},
+                        quality=article.quality,
+                        publishedAt=article.publishedAt
+                    )
                 }
         }
     }
 
-    val selected=mutableListOf<Candidate>()
-    for(c in candidates.sortedByDescending{it.score}){
-        if(selected.none{sentenceSimilarity(it.text,c.text)>.62}){
-            selected+=c
-            if(selected.size>=14)break
+    fun distinctTake(input:List<Candidate>,count:Int,used:Set<String> = emptySet()):List<String>{
+        val out=mutableListOf<String>()
+        for(c in input){
+            if(c.text in used)continue
+            if(out.none{sentenceSimilarity(it,c.text)>.62}){
+                out+=c.text
+                if(out.size>=count)break
+            }
         }
+        return out
     }
 
-    val primaryLead=selected.filter{it.primary&&!it.background}.take(2)
-    val what=(if(primaryLead.isNotEmpty())primaryLead else selected.filter{!it.background}.take(2))
-        .map{it.text}
-
-    val background=selected
-        .filter{it.background && it.text !in what}
-        .take(3)
-        .map{it.text}
-
-    val details=selected
-        .filter{it.text !in what && it.text !in background}
-        .take(6)
-        .map{it.text}
-
-    return ResearchSummary(
-        whatHappened=what,
-        details=details,
-        background=background
+    val ranked=candidates.sortedWith(
+        compareByDescending<Candidate>{it.relevance + (it.quality/12).toInt()}
+            .thenByDescending{it.quality}
     )
+    val what=distinctTake(ranked,2)
+
+    val whyCandidates=candidates.filter{it.impact}.sortedWith(
+        compareByDescending<Candidate>{it.relevance + (it.quality/10).toInt()}
+            .thenByDescending{it.quality}
+    )
+    val why=distinctTake(whyCandidates,2,what.toSet()).ifEmpty{
+        distinctTake(ranked,1,what.toSet())
+    }
+
+    val latestCandidates=candidates.sortedWith(
+        compareByDescending<Candidate>{it.latest}
+            .thenByDescending{it.publishedAt?:0L}
+            .thenByDescending{it.relevance}
+    )
+    val used=(what+why).toSet()
+    val latest=distinctTake(latestCandidates,2,used)
+
+    return ResearchSummary(whatHappened=what,whyImportant=why,latestSituation=latest)
 }
 
 private fun sentenceSimilarity(a:String,b:String):Double{
@@ -203,5 +207,6 @@ data class ResearchedArticle(
     val description:String,
     val paragraphs:List<String>,
     val publishedAt:Long?,
-    val isPrimary:Boolean
+    val isPrimary:Boolean,
+    val quality:Double
 )
