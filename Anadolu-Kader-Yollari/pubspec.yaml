@@ -1,7 +1,7 @@
 name: anadolu_kader_yollari
 description: Anadolu Kader Yollari v0.1 prototype
 publish_to: "none"
-version: 0.7.0+1
+version: 0.8.0+1
 environment:
   sdk: ">=3.8.0 <4.0.0"
 dependencies:
