@@ -219,7 +219,7 @@ fun likelySameSearchEvent(a:EventEntity,b:EventEntity):Boolean{
             )
         ) || (
             titleCommon>=1 &&
-            overall>=0.52
+            overall>=0.40
         )
     }else{
         (
