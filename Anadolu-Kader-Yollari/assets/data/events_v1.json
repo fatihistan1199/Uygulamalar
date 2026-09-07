@@ -151,6 +151,12 @@
               "minDays": 35,
               "maxDays": 55
             }
+          ],
+          "requirements": [
+            {
+              "type": "money_at_least",
+              "value": 15
+            }
           ]
         },
         {
@@ -321,7 +327,8 @@
             }
           ]
         }
-      ]
+      ],
+      "scheduledOnly": true
     },
     {
       "id": "rumor",
@@ -471,7 +478,8 @@
             }
           ]
         }
-      ]
+      ],
+      "scheduledOnly": true
     },
     {
       "id": "faction_dispute",
@@ -651,6 +659,12 @@
               "affection": 3,
               "memory": "Göçmen ailelere kefil oldu",
               "importance": 40
+            }
+          ],
+          "requirements": [
+            {
+              "type": "money_at_least",
+              "value": 8
             }
           ]
         },
@@ -1020,6 +1034,12 @@
               "suspicion": 3,
               "memory": "Kontrol noktasını para ile aşmaya çalıştı",
               "importance": 25
+            }
+          ],
+          "requirements": [
+            {
+              "type": "money_at_least",
+              "value": 5
             }
           ]
         },
