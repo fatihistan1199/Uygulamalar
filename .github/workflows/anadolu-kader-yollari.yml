@@ -1,0 +1,36 @@
+name: Anadolu Kader Yollari Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Anadolu-Kader-Yollari/**'
+      - '.github/workflows/anadolu-kader-yollari.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Anadolu-Kader-Yollari
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - name: Android host projesini oluştur
+        run: flutter create . --platforms=android --org com.fatihistan1199 --project-name anadolu_kader_yollari
+      - name: Bağımlılıkları yükle
+        run: flutter pub get
+      - name: Statik kontrol
+        run: flutter analyze --no-fatal-infos
+      - name: Debug APK derle
+        run: flutter build apk --debug
+      - name: APK artefaktını yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Anadolu-Kader-Yollari-v0.1-debug
+          path: Anadolu-Kader-Yollari/build/app/outputs/flutter-apk/app-debug.apk
