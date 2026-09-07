@@ -213,7 +213,7 @@ data class SearchEventRow(
         SourceEntity::class,SourceHealthEntity::class,RawItemEntity::class,EventEntity::class,
         EventItemEntity::class,EventVersionEntity::class,ScanHistoryEntity::class
     ],
-    version=9, exportSchema=false
+    version=10, exportSchema=false
 )
 abstract class AppDatabase:RoomDatabase(){
     abstract fun dao():GundemDao
@@ -248,9 +248,17 @@ abstract class AppDatabase:RoomDatabase(){
                 db.execSQL("DELETE FROM event_items");db.execSQL("DELETE FROM event_versions");db.execSQL("DELETE FROM events");db.execSQL("DELETE FROM raw_items")
             }
         }
+        private val MIGRATION_9_10=object:Migration(9,10){
+            override fun migrate(db:SupportSQLiteDatabase){
+                db.execSQL("DELETE FROM event_items")
+                db.execSQL("DELETE FROM event_versions")
+                db.execSQL("DELETE FROM events")
+                db.execSQL("DELETE FROM raw_items")
+            }
+        }
         fun get(context:Context)=INSTANCE?:synchronized(this){
             INSTANCE?:Room.databaseBuilder(context.applicationContext,AppDatabase::class.java,"gundem-radari.db")
-                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8,MIGRATION_8_9)
+                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8,MIGRATION_8_9,MIGRATION_9_10)
                 .build().also{INSTANCE=it}
         }
     }
