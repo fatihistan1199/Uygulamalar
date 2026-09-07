@@ -13,10 +13,35 @@ private val stopWords=setOf(
     "bugün","dün","video","youtube"
 )
 
+private fun canonicalToken(raw:String):String{
+    var token=raw
+    val suffixes=listOf(
+        "sında","sinde","sunda","sünde",
+        "ında","inde","unda","ünde",
+        "daki","deki","taki","teki",
+        "ını","ini","unu","ünü",
+        "dan","den","tan","ten",
+        "da","de","ta","te"
+    )
+
+    for(suffix in suffixes){
+        if(
+            token.endsWith(suffix) &&
+            token.length-suffix.length>=4
+        ){
+            token=token.dropLast(suffix.length)
+            break
+        }
+    }
+
+    return token
+}
+
 private fun tokens(text:String):Set<String> =
     sanitizeNewsText(text)
         .lowercase(clusterLocale)
         .split(Regex("[^\\p{L}\\p{N}]+"))
+        .map(::canonicalToken)
         .filter{it.length>2 && it !in stopWords}
         .toSet()
 
