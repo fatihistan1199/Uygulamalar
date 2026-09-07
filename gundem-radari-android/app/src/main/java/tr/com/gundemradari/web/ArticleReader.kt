@@ -24,7 +24,7 @@ class ArticleReader {
     suspend fun read(url:String):ArticleDetails?=withContext(Dispatchers.IO){
         runCatching{
             val first=Jsoup.connect(url)
-                .userAgent("Mozilla/5.0 (Android) GundemRadari/0.10")
+                .userAgent("Mozilla/5.0 (Android) GundemRadari/0.12")
                 .timeout(14000)
                 .followRedirects(true)
                 .get()
@@ -41,7 +41,7 @@ class ArticleReader {
                 if(external!=null){
                     runCatching{
                         Jsoup.connect(external)
-                            .userAgent("Mozilla/5.0 (Android) GundemRadari/0.10")
+                            .userAgent("Mozilla/5.0 (Android) GundemRadari/0.12")
                             .timeout(14000)
                             .followRedirects(true)
                             .get()

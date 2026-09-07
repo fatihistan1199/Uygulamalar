@@ -189,19 +189,13 @@ data class SearchEventRow(
         LEFT JOIN event_items ei ON ei.eventId=e.id
         LEFT JOIN raw_items r ON r.url=ei.rawUrl
         WHERE e.scope=:scope AND e.noise < 70
-          AND (
-              e.title LIKE :pattern COLLATE NOCASE OR
-              e.summary LIKE :pattern COLLATE NOCASE OR
-              r.title LIKE :pattern COLLATE NOCASE OR
-              r.summary LIKE :pattern COLLATE NOCASE
-          )
         GROUP BY e.id
         ORDER BY (
             e.importance - MIN(30.0, MAX(0.0, ((:now-e.updatedAt)/3600000.0)*0.55))
         ) DESC, e.updatedAt DESC
-        LIMIT 100
+        LIMIT 120
     """)
-    suspend fun searchEvents(scope:String,pattern:String,now:Long):List<SearchEventRow>
+    suspend fun searchEvents(scope:String,now:Long):List<SearchEventRow>
 
     @Insert suspend fun scan(row:ScanHistoryEntity)
     @Query("SELECT max(finishedAt) FROM scan_history")
@@ -213,7 +207,7 @@ data class SearchEventRow(
         SourceEntity::class,SourceHealthEntity::class,RawItemEntity::class,EventEntity::class,
         EventItemEntity::class,EventVersionEntity::class,ScanHistoryEntity::class
     ],
-    version=10, exportSchema=false
+    version=11, exportSchema=false
 )
 abstract class AppDatabase:RoomDatabase(){
     abstract fun dao():GundemDao
@@ -256,9 +250,17 @@ abstract class AppDatabase:RoomDatabase(){
                 db.execSQL("DELETE FROM raw_items")
             }
         }
+        private val MIGRATION_10_11=object:Migration(10,11){
+            override fun migrate(db:SupportSQLiteDatabase){
+                db.execSQL("DELETE FROM event_items")
+                db.execSQL("DELETE FROM event_versions")
+                db.execSQL("DELETE FROM events")
+                db.execSQL("DELETE FROM raw_items")
+            }
+        }
         fun get(context:Context)=INSTANCE?:synchronized(this){
             INSTANCE?:Room.databaseBuilder(context.applicationContext,AppDatabase::class.java,"gundem-radari.db")
-                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8,MIGRATION_8_9,MIGRATION_9_10)
+                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8,MIGRATION_8_9,MIGRATION_9_10,MIGRATION_10_11)
                 .build().also{INSTANCE=it}
         }
     }

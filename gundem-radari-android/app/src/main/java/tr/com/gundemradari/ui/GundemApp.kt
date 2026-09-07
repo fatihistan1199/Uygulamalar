@@ -44,6 +44,8 @@ import tr.com.gundemradari.data.*
 import tr.com.gundemradari.research.EventResearchReport
 import tr.com.gundemradari.research.EventResearchService
 import tr.com.gundemradari.scan.ScanCoordinator
+import tr.com.gundemradari.scan.similarity
+import tr.com.gundemradari.web.NewsWebSearch
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -62,6 +64,7 @@ class GundemViewModel(context:Context):ViewModel(){
     private val repo=SourceRepository(context,dao)
     private val scanner=ScanCoordinator(db)
     private val researcher=EventResearchService(dao)
+    private val webSearch=NewsWebSearch()
 
     val tab=MutableStateFlow(FeedTab.TURKEY)
     val scanning=MutableStateFlow(false)
@@ -143,7 +146,6 @@ class GundemViewModel(context:Context):ViewModel(){
                 val now=System.currentTimeMillis()
                 val rows=dao.searchEvents(
                     scope=scope,
-                    pattern="%${terms.first()}%",
                     now=now
                 )
 
@@ -155,29 +157,152 @@ class GundemViewModel(context:Context):ViewModel(){
                     .map{it.event}
 
                 if(hits.isNotEmpty()){
-                    val merged=(searchResults.value+hits)
-                        .distinctBy{it.id}
-                        .sortedByDescending{event->
-                            event.importance -
-                                kotlin.math.min(
-                                    30.0,
-                                    kotlin.math.max(
-                                        0.0,
-                                        ((now-event.updatedAt)/3600000.0)*0.55
-                                    )
-                                )
-                        }
-                    searchResults.value=merged
-                    hiddenSearchIds.value=merged.map{it.id}.toSet()
+                    searchResults.value=mergeSearchEvents(
+                        searchResults.value,
+                        hits,
+                        now
+                    )
+                    hiddenSearchIds.value=searchResults.value
+                        .filterNot{it.id.startsWith("websearch:")}
+                        .map{it.id}
+                        .toSet()
                 }
             }
 
+            // Kullanıcıya en hızlı yerel sonuçları önce ver.
             collectScope("turkey")
-            delay(350)
+
+            delay(300)
             collectScope("world")
-            delay(450)
+
+            delay(400)
             collectScope("religion")
+
+            // Yerel arşiv az sonuç verdiyse Google News ile sessizce genişlet.
+            if(searchResults.value.size<12 && isActive){
+                val now=System.currentTimeMillis()
+                val external=runCatching{
+                    webSearch.search(
+                        query=clean,
+                        limit=12,
+                        expandDescriptions=false
+                    )
+                }.getOrElse{emptyList()}
+                    .map{row->
+                        EventEntity(
+                            id="websearch:${row.url.hashCode()}",
+                            title=row.title,
+                            summary=row.snippet,
+                            scope="search",
+                            importance=externalSearchImportance(
+                                row.title,
+                                row.snippet,
+                                row.publishedAt,
+                                now
+                            ),
+                            noise=0.0,
+                            verification=0,
+                            velocity=0.0,
+                            sourceCount=1,
+                            firstSeenAt=row.publishedAt?:now,
+                            updatedAt=row.publishedAt?:now,
+                            changeNote="",
+                            publishedAt=row.publishedAt,
+                            religionPriority=0,
+                            topic="search",
+                            bestContentQuality=50.0
+                        )
+                    }
+
+                searchResults.value=mergeSearchEvents(
+                    searchResults.value,
+                    external,
+                    now
+                )
+            }
         }
+    }
+
+    private fun mergeSearchEvents(
+        current:List<EventEntity>,
+        incoming:List<EventEntity>,
+        now:Long
+    ):List<EventEntity>{
+        val merged=current.toMutableList()
+
+        incoming.forEach{candidate->
+            val candidateText=candidate.title+" "+candidate.summary
+            val matchIndex=merged.indexOfFirst{existing->
+                similarity(
+                    existing.title+" "+existing.summary,
+                    candidateText
+                )>=0.47
+            }
+
+            if(matchIndex<0){
+                merged+=candidate
+            }else{
+                val existing=merged[matchIndex]
+                val existingIsLocal=!existing.id.startsWith("websearch:")
+                val candidateIsLocal=!candidate.id.startsWith("websearch:")
+
+                merged[matchIndex]=when{
+                    existingIsLocal && !candidateIsLocal->
+                        if(existing.summary.isBlank()&&candidate.summary.isNotBlank())
+                            existing.copy(summary=candidate.summary)
+                        else existing
+
+                    candidateIsLocal && !existingIsLocal->
+                        if(candidate.summary.isBlank()&&existing.summary.isNotBlank())
+                            candidate.copy(summary=existing.summary)
+                        else candidate
+
+                    searchRank(candidate,now)>searchRank(existing,now)->
+                        candidate
+
+                    else->existing
+                }
+            }
+        }
+
+        return merged
+            .distinctBy{it.id}
+            .sortedByDescending{searchRank(it,now)}
+    }
+
+    private fun searchRank(event:EventEntity,now:Long):Double{
+        val agePenalty=kotlin.math.min(
+            30.0,
+            kotlin.math.max(
+                0.0,
+                ((now-event.updatedAt)/3600000.0)*0.55
+            )
+        )
+        return event.importance-agePenalty
+    }
+
+    private fun externalSearchImportance(
+        title:String,
+        summary:String,
+        publishedAt:Long?,
+        now:Long
+    ):Double{
+        val text=normalizeSearch("$title $summary")
+        var score=48.0
+
+        val high=listOf(
+            "deprem","yangın","savaş","saldırı","seçim","referandum",
+            "can kaybı","öldü","afet","kriz","faiz","anayasa","tahliye"
+        )
+        score+=high.count{text.contains(it)}*5.0
+
+        if(publishedAt!=null){
+            val ageHours=((now-publishedAt).coerceAtLeast(0L))/3600000.0
+            if(ageHours<=6)score+=7.0
+            else if(ageHours<=24)score+=4.0
+        }
+
+        return score.coerceIn(35.0,82.0)
     }
 
     fun resetSearch(){
@@ -292,9 +417,10 @@ class GundemViewModel(context:Context):ViewModel(){
         }
 
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
-            TabRow(
+            ScrollableTabRow(
                 selectedTabIndex=pagerState.currentPage,
                 modifier=Modifier.weight(1f),
+                edgePadding=4.dp,
                 containerColor=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.45f),
                 divider={}
             ){
@@ -302,15 +428,24 @@ class GundemViewModel(context:Context):ViewModel(){
                     Tab(
                         selected=pagerState.currentPage==index,
                         onClick={scope.launch{pagerState.animateScrollToPage(index)}},
+                        modifier=Modifier.widthIn(min=108.dp),
                         selectedContentColor=tabAccent(t),
                         unselectedContentColor=MaterialTheme.colorScheme.onSurfaceVariant,
                         text={
                             Row(
                                 verticalAlignment=Alignment.CenterVertically,
-                                horizontalArrangement=Arrangement.spacedBy(5.dp)
+                                horizontalArrangement=Arrangement.spacedBy(6.dp)
                             ){
-                                Icon(t.icon,contentDescription=null,modifier=Modifier.size(17.dp))
-                                Text(t.label)
+                                Icon(
+                                    t.icon,
+                                    contentDescription=null,
+                                    modifier=Modifier.size(17.dp)
+                                )
+                                Text(
+                                    t.label,
+                                    maxLines=1,
+                                    softWrap=false
+                                )
                             }
                         }
                     )

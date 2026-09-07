@@ -10,6 +10,9 @@ fun sanitizeNewsText(text:String):String =
             Regex("""\[object\s+Object\]""",RegexOption.IGNORE_CASE),
             " "
         )
+        .replace('\uFFFC',' ')
+        .replace('\uFFFD',' ')
+        .replace('\u200B',' ')
         .replace('\u00a0',' ')
         .replace(Regex("[ \\t]+")," ")
         .replace(Regex("\\s+([,.;:!?])"),"$1")

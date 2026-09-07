@@ -30,6 +30,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+      - name: Gündem kalibrasyon testlerini çalıştır
+        run: |
+          set -o pipefail
+          gradle :app:testDebugUnitTest --no-daemon 2>&1 | tee ../gundem-radari-test.log
       - name: Debug APK olustur
         run: |
           set -o pipefail
@@ -39,7 +43,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: GundemRadari-build-log
-          path: gundem-radari-build.log
+          path: |
+            gundem-radari-build.log
+            gundem-radari-test.log
           if-no-files-found: warn
       - name: APK'yi yükle
         if: success()
