@@ -65,7 +65,15 @@ private fun eventKind(text:String):String{
         t.contains("sel")||t.contains("heyelan")->"flood"
         t.contains("saldırı")||t.contains("füze")||t.contains("çatışma")->"attack"
         t.contains("faiz")||t.contains("enflasyon")->"economy"
-        t.contains("gemi kazası")||t.contains("uçak kazası")||t.contains("tren kazası")->"transport"
+        t.contains("gemi kazası")||
+        t.contains("gemi battı")||
+        t.contains("batan gemi")||
+        (t.contains("gemi")&&t.contains("batan"))||
+        t.contains("tekne battı")||
+        t.contains("feribot battı")||
+        t.contains("uçak kazası")||
+        t.contains("uçak düştü")||
+        t.contains("tren kazası")->"transport"
         else->"general"
     }
 }
