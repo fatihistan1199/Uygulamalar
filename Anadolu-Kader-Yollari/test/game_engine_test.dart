@@ -48,7 +48,7 @@ void main(){
     final due=s.delayedEffects.first.dueDay;
     e.advance(due-s.day);
     expect(s.delayedEffects,isEmpty);
-    expect(s.chronicle.any((x)=>x.contains('tahıl soruşturması')),isTrue);
+    expect(s.pendingEvents,contains('grain_followup'));
   });
 
   test('20 önemli NPC ve 4 fraksiyon başlangıçta bulunur',(){
