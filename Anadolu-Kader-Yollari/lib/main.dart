@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'game_engine.dart';
+import 'event_catalog.dart';
 
 void main(){WidgetsFlutterBinding.ensureInitialized();runApp(const KaderApp());}
 
@@ -32,24 +33,35 @@ class _GamePageState extends State<GamePage>{
   String background='Tüccar ailesi';
   GameState? state;
   GameEngine? engine;
+  EventCatalog? catalog;
   EventView? activeEvent;
   String? outcome;
   int tab=0;
   bool hasSave=false;
+  bool contentLoading=true;
+  String? contentError;
 
-  @override void initState(){super.initState();_checkSave();}
+  @override void initState(){super.initState();_bootstrap();}
   @override void dispose(){nameCtrl.dispose();seedCtrl.dispose();super.dispose();}
 
-  Future<void> _checkSave()async{
-    final p=await SharedPreferences.getInstance();
-    if(mounted)setState(()=>hasSave=p.containsKey(saveKey));
+  Future<void> _bootstrap()async{
+    try{
+      catalog=await EventCatalog.loadDefault();
+      final p=await SharedPreferences.getInstance();
+      hasSave=p.containsKey(saveKey);
+    }catch(e){
+      contentError='Olay kataloğu yüklenemedi: $e';
+    }
+    contentLoading=false;
+    if(mounted)setState((){});
   }
 
   void _newGame(){
     final parsed=int.tryParse(seedCtrl.text.trim());
     final seed=parsed??(DateTime.now().millisecondsSinceEpoch&0x7fffffff);
     state=GameEngine.newGame(seed:seed,name:nameCtrl.text.trim().isEmpty?'Hasan':nameCtrl.text.trim(),background:background);
-    engine=GameEngine(state!);activeEvent=null;outcome='Seed: $seed';tab=0;
+    if(catalog==null)return;
+    engine=GameEngine(state!,catalog!);activeEvent=null;outcome='Seed: $seed';tab=0;
     setState((){});_save();
   }
 
@@ -65,7 +77,8 @@ class _GamePageState extends State<GamePage>{
     if(raw==null)return;
     try{
       state=GameState.fromJson(Map<String,dynamic>.from(jsonDecode(raw) as Map));
-      engine=GameEngine(state!);nameCtrl.text=state!.playerName;background=state!.background;
+      if(catalog==null)throw StateError('Olay kataloğu hazır değil');
+      engine=GameEngine(state!,catalog!);nameCtrl.text=state!.playerName;background=state!.background;
       activeEvent=null;outcome='Kayıt yüklendi. Dünya ${state!.day}. günden devam ediyor.';tab=0;
       if(mounted)setState((){});
     }catch(_){
@@ -82,7 +95,6 @@ class _GamePageState extends State<GamePage>{
 
   void _choose(EventOption option){
     outcome=engine!.resolve(activeEvent!,option.id);
-    state!.chronicle.add('${state!.day}. gün — ${activeEvent!.title}: ${option.title}.');
     activeEvent=null;setState((){});_save();
   }
 
@@ -144,8 +156,11 @@ class _GamePageState extends State<GamePage>{
         const SizedBox(height:12),
         TextField(controller:seedCtrl,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Seed (boş bırakılabilir)',helperText:'Aynı seed aynı başlangıç dünyasını üretir.',border:OutlineInputBorder())),
         const SizedBox(height:16),
-        FilledButton(onPressed:_newGame,child:const Text('Yeni Oyun')),
-        OutlinedButton(onPressed:hasSave?_load:null,child:const Text('Devam Et')),
+        if(contentLoading)const Padding(padding:EdgeInsets.symmetric(vertical:8),child:LinearProgressIndicator()),
+        if(contentError!=null)Padding(padding:const EdgeInsets.only(bottom:8),child:Text(contentError!,textAlign:TextAlign.center)),
+        FilledButton(onPressed:catalog!=null?_newGame:null,child:const Text('Yeni Oyun')),
+        OutlinedButton(onPressed:catalog!=null&&hasSave?_load:null,child:const Text('Devam Et')),
+        if(catalog!=null)Padding(padding:const EdgeInsets.only(top:6),child:Text('${catalog!.events.length} olay modülü yüklendi.',textAlign:TextAlign.center,style:Theme.of(context).textTheme.bodySmall)),
         if(outcome!=null)Padding(padding:const EdgeInsets.only(top:10),child:Text(outcome!,textAlign:TextAlign.center)),
       ]),
     ))),
