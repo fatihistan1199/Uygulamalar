@@ -24,6 +24,16 @@ import kotlinx.coroutines.flow.Flow
 @Entity(tableName="scan_history") data class ScanHistoryEntity(
     @PrimaryKey(autoGenerate=true) val id:Long=0, val startedAt:Long, val finishedAt:Long?, val newItems:Int, val failedSources:Int)
 
+data class ResearchItemRow(
+    val sourceName:String,
+    val groupName:String,
+    val title:String,
+    val summary:String,
+    val publishedAt:Long?,
+    val firstSeenAt:Long,
+    val trust:Double
+)
+
 @Dao interface GundemDao {
     @Query("SELECT * FROM sources ORDER BY groupName,name") fun sources(): Flow<List<SourceEntity>>
     @Query("SELECT * FROM sources WHERE enabled=1 AND staged=0") suspend fun enabledSources(): List<SourceEntity>
@@ -42,13 +52,22 @@ import kotlinx.coroutines.flow.Flow
     @Query("SELECT * FROM events WHERE scope='turkey' AND noise < 50 ORDER BY importance DESC,updatedAt DESC LIMIT 60") fun turkeyFeed():Flow<List<EventEntity>>
     @Query("SELECT * FROM events WHERE scope='world' AND noise < 50 ORDER BY importance DESC,updatedAt DESC LIMIT 60") fun worldFeed():Flow<List<EventEntity>>
     @Query("SELECT * FROM events WHERE importance >= 55 AND firstSeenAt > :after AND noise < 50 ORDER BY importance DESC") fun missedFeed(after:Long):Flow<List<EventEntity>>
+    @Query("""
+        SELECT s.name AS sourceName, s.groupName AS groupName, r.title AS title, r.summary AS summary,
+               r.publishedAt AS publishedAt, r.firstSeenAt AS firstSeenAt, s.trust AS trust
+        FROM event_items ei
+        JOIN raw_items r ON r.url=ei.rawUrl
+        JOIN sources s ON s.id=r.sourceId
+        WHERE ei.eventId=:eventId
+        ORDER BY COALESCE(r.publishedAt,r.firstSeenAt) ASC
+    """) suspend fun researchItems(eventId:String):List<ResearchItemRow>
     @Insert suspend fun scan(row:ScanHistoryEntity)
     @Query("SELECT max(finishedAt) FROM scan_history") fun lastScan():Flow<Long?>
 }
 
 @Database(
     entities=[SourceEntity::class,RawItemEntity::class,EventEntity::class,EventItemEntity::class,EventVersionEntity::class,ScanHistoryEntity::class],
-    version=2,
+    version=3,
     exportSchema=false
 )
 abstract class AppDatabase:RoomDatabase(){
@@ -60,9 +79,17 @@ abstract class AppDatabase:RoomDatabase(){
                 db.execSQL("ALTER TABLE events ADD COLUMN publishedAt INTEGER")
             }
         }
+        private val MIGRATION_2_3=object:Migration(2,3){
+            override fun migrate(db:SupportSQLiteDatabase){
+                db.execSQL("DELETE FROM event_items")
+                db.execSQL("DELETE FROM event_versions")
+                db.execSQL("DELETE FROM events")
+                db.execSQL("DELETE FROM raw_items")
+            }
+        }
         fun get(context:Context)=INSTANCE?: synchronized(this){
             INSTANCE?:Room.databaseBuilder(context.applicationContext,AppDatabase::class.java,"gundem-radari.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2,MIGRATION_2_3)
                 .build()
                 .also{INSTANCE=it}
         }

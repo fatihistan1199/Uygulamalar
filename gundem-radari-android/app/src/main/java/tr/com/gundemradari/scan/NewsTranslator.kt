@@ -25,9 +25,14 @@ class NewsTranslator {
                 translator.downloadModelIfNeeded(DownloadConditions.Builder().build()).await()
                 ready=true
             }
-            val title=translator.translate(item.title).await().trim().ifBlank{item.title}
-            val summary=if(item.summary.isBlank()) "" else translator.translate(item.summary).await().trim().ifBlank{item.summary}
-            item.copy(title=title,summary=summary)
+            val preparedTitle=TurkishNewsPolisher.simplifyEnglish(item.title)
+            val preparedSummary=TurkishNewsPolisher.simplifyEnglish(item.summary)
+            val translatedTitle=translator.translate(preparedTitle).await().trim().ifBlank{item.title}
+            val translatedSummary=if(preparedSummary.isBlank()) "" else translator.translate(preparedSummary).await().trim().ifBlank{item.summary}
+            item.copy(
+                title=TurkishNewsPolisher.polish(item.title,translatedTitle,true),
+                summary=TurkishNewsPolisher.polish(item.summary,translatedSummary,false)
+            )
         }.getOrElse{item}
     }
 }
