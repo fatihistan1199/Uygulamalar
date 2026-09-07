@@ -214,8 +214,8 @@ fun likelySameSearchEvent(a:EventEntity,b:EventEntity):Boolean{
         (
             titleCommon>=2 &&
             (
-                titleOverlap>=0.42 ||
-                overall>=0.39
+                titleOverlap>=0.34 ||
+                overall>=0.30
             )
         ) || (
             titleCommon>=1 &&
