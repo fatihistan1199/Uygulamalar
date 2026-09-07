@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "events": [
     {
       "id": "grain",
@@ -285,15 +285,9 @@
         {
           "id": "mediate",
           "title": "Arabuluculuk et",
-          "hint": "Diplomasi becerisi gerektirir; başarısızlık iki tarafı da kızdırabilir.",
+          "hint": "Tarafları uzlaştırmayı deneyebilirsin.",
           "resultText": "Tarafları geçici bir tahıl dağıtım uzlaşmasına ikna ettin.",
-          "requirements": [
-            {
-              "type": "skill_at_least",
-              "skill": "diplomacy",
-              "value": 32
-            }
-          ],
+          "requirements": [],
           "effects": [
             {
               "type": "city_stat",
@@ -325,7 +319,70 @@
               "key": "grain_chain_result",
               "value": "compromise"
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "rhetoric",
+            "skill": "diplomacy",
+            "difficulty": 38,
+            "criticalSuccessText": "Tarafları beklenmedik ölçüde sağlam bir uzlaşmada buluşturdun; anlaşma şehirde örnek gösteriliyor.",
+            "partialText": "Taraflar geçici ve kırılgan bir ateşkese razı oldu.",
+            "failureText": "Arabuluculuk sonuç vermedi; iki taraf da seni diğerine fazla yakın buldu.",
+            "criticalFailureText": "Sözlerin tartışmayı daha da sertleştirdi; iki çevre de sana kuşkuyla bakıyor.",
+            "partialEffects": [
+              {
+                "type": "city_stat",
+                "stat": "food",
+                "amount": 3
+              },
+              {
+                "type": "city_stat",
+                "stat": "order",
+                "amount": 2
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "ahi",
+                "amount": 1
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "tuccar",
+                "amount": 1
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "tension",
+                "amount": 4
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "ahi",
+                "amount": -2
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "tuccar",
+                "amount": -2
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "tension",
+                "amount": 8
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "ahi",
+                "amount": -4
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "tuccar",
+                "amount": -4
+              }
+            ]
+          }
         }
       ],
       "scheduledOnly": true
@@ -434,15 +491,9 @@
         {
           "id": "exploit",
           "title": "Fiyat artışından yararlan",
-          "hint": "Kâr ihtimali var; itibar riski de var.",
+          "hint": "Belirsizliği ticari fırsata çevirmeyi deneyebilirsin.",
           "resultText": "Belirsizliği ticari fırsata çevirdin.",
-          "requirements": [
-            {
-              "type": "skill_at_least",
-              "skill": "trade",
-              "value": 35
-            }
-          ],
+          "requirements": [],
           "effects": [
             {
               "type": "money",
@@ -458,7 +509,53 @@
               "skill": "trade",
               "amount": 1
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "intuition",
+            "skill": "trade",
+            "difficulty": 40,
+            "criticalSuccessText": "Piyasadaki paniği herkesten önce doğru okudun ve önemli bir kazanç sağladın.",
+            "partialText": "Bir miktar kazandın ama beklediğin fırsat tam oluşmadı.",
+            "failureText": "Piyasa beklediğin yönde hareket etmedi; zarar ettin.",
+            "criticalFailureText": "Söylentiye dayanarak yaptığın hamle ters tepti ve itibarını da zedeledi.",
+            "partialEffects": [
+              {
+                "type": "money",
+                "amount": 5
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "ahi",
+                "amount": -1
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "money",
+                "amount": -6
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "ahi",
+                "amount": -2
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "money",
+                "amount": -10
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "ahi",
+                "amount": -5
+              },
+              {
+                "type": "tension",
+                "amount": 2
+              }
+            ]
+          }
         },
         {
           "id": "report",
@@ -557,15 +654,9 @@
         {
           "id": "mediate",
           "title": "Arabuluculuk et",
-          "hint": "Diplomasi 30 gerektirir.",
+          "hint": "İki tarafı yatıştırmayı deneyebilirsin.",
           "resultText": "Taraflara geçici bir uzlaşma zemini sundun.",
-          "requirements": [
-            {
-              "type": "skill_at_least",
-              "skill": "diplomacy",
-              "value": 30
-            }
-          ],
+          "requirements": [],
           "effects": [
             {
               "type": "faction_reputation",
@@ -586,7 +677,54 @@
               "skill": "diplomacy",
               "amount": 1
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "rhetoric",
+            "skill": "diplomacy",
+            "difficulty": 36,
+            "criticalSuccessText": "Tarafları yalnız susturmakla kalmadın, geçici bir ortak zeminde buluşturdun.",
+            "partialText": "Tartışma şimdilik dağıldı; anlaşmazlık çözülmedi.",
+            "failureText": "Arabuluculuğun dinlenmedi ve tartışma büyüdü.",
+            "criticalFailureText": "İki taraf da sözlerini kendisine karşı yorumladı; gerilim keskin biçimde arttı.",
+            "partialEffects": [
+              {
+                "type": "tension",
+                "amount": -2
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "ahi",
+                "amount": 1
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "yonetim",
+                "amount": 1
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "tension",
+                "amount": 5
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "tension",
+                "amount": 8
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "ahi",
+                "amount": -3
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "yonetim",
+                "amount": -3
+              }
+            ]
+          }
         },
         {
           "id": "leave",
@@ -689,15 +827,9 @@
         {
           "id": "question",
           "title": "Hikâyelerini sınayarak dinle",
-          "hint": "Sezgi ve yerel kültür yardımcı olur.",
+          "hint": "Anlattıklarındaki tutarlılığı sınamayı deneyebilirsin.",
           "resultText": "Ailelerin anlattıklarında çelişkiler buldun; ama bunun korkudan mı yalandan mı kaynaklandığı kesin değil.",
-          "requirements": [
-            {
-              "type": "attribute_at_least",
-              "attribute": "intuition",
-              "value": 42
-            }
-          ],
+          "requirements": [],
           "effects": [
             {
               "type": "knowledge",
@@ -711,7 +843,32 @@
               "skill": "localCulture",
               "amount": 1
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "intuition",
+            "skill": "localCulture",
+            "difficulty": 37,
+            "criticalSuccessText": "Sorularınla anlatının hangi kısımlarının doğru, hangilerinin saklandığını büyük ölçüde ayırdın.",
+            "partialText": "Bazı çelişkiler yakaladın ama ne anlama geldiklerinden emin değilsin.",
+            "failureText": "Soruların güvenilir bir sonuca ulaştırmadı.",
+            "criticalFailureText": "Yanlış bir ayrıntıya takıldın ve grubun niyetini hatalı yorumladın.",
+            "partialEffects": [
+              {
+                "type": "knowledge",
+                "id": "refugee_story_partial",
+                "text": "Göçmen grubun anlatısında açıklanamayan bazı boşluklar var.",
+                "source": "Kendi gözlemin",
+                "reliability": 52
+              }
+            ],
+            "failureEffects": [],
+            "criticalFailureEffects": [
+              {
+                "type": "tension",
+                "amount": 2
+              }
+            ]
+          }
         }
       ]
     },
@@ -732,15 +889,9 @@
         {
           "id": "treat",
           "title": "Muayene et",
-          "hint": "Tıp 25 gerektirir; kendin de risk alırsın.",
+          "hint": "Muayene edip tedavi etmeyi deneyebilirsin; sonuç kesin değildir.",
           "resultText": "Yolcuyu muayene ettin ve hanın onu ayrı bir odada tutmasını sağladın.",
-          "requirements": [
-            {
-              "type": "skill_at_least",
-              "skill": "medicine",
-              "value": 25
-            }
-          ],
+          "requirements": [],
           "effects": [
             {
               "type": "skill",
@@ -756,7 +907,49 @@
               "type": "tension",
               "amount": -2
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "intellect",
+            "skill": "medicine",
+            "difficulty": 39,
+            "criticalSuccessText": "Belirtileri doğru okuyup etkili bir bakım uyguladın; yolcu hızla toparlandı.",
+            "partialText": "Durumunu kötüleştirmedin ama kesin bir teşhis de koyamadın.",
+            "failureText": "Tedavi beklenen sonucu vermedi; çevrede kaygı arttı.",
+            "criticalFailureText": "Yanlış müdahale yolcunun durumunu ağırlaştırdı ve sen de hastalık riski aldın.",
+            "partialEffects": [
+              {
+                "type": "faction_reputation",
+                "faction": "medrese",
+                "amount": 1
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "tension",
+                "amount": 2
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "medrese",
+                "amount": -1
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "health",
+                "amount": -6
+              },
+              {
+                "type": "tension",
+                "amount": 4
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "medrese",
+                "amount": -2
+              }
+            ]
+          }
         },
         {
           "id": "isolate",
@@ -820,15 +1013,9 @@
         {
           "id": "open",
           "title": "Mührü bozmadan açmayı dene",
-          "hint": "Casusluk 25 gerektirir.",
+          "hint": "Mührü bozmadan içeriği öğrenmeyi deneyebilirsin.",
           "resultText": "Mektuptaki isimleri öğrendin; fakat metnin bağlamını hâlâ bilmiyorsun.",
-          "requirements": [
-            {
-              "type": "skill_at_least",
-              "skill": "espionage",
-              "value": 25
-            }
-          ],
+          "requirements": [],
           "effects": [
             {
               "type": "knowledge",
@@ -846,7 +1033,46 @@
               "type": "tension",
               "amount": 2
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "agility",
+            "skill": "espionage",
+            "difficulty": 44,
+            "criticalSuccessText": "Mührü iz bırakmadan açıp kapattın ve yazışmanın kritik kısmını öğrendin.",
+            "partialText": "Mektuptan birkaç isim ve ifade seçebildin; mühürde hafif bir iz kaldı.",
+            "failureText": "Mektubu açamadın; daha fazla zorlarsan iz bırakacağını fark ettin.",
+            "criticalFailureText": "Mühür belirgin biçimde zarar gördü. Mektubun kurcalandığı anlaşılabilir.",
+            "partialEffects": [
+              {
+                "type": "knowledge",
+                "id": "sealed_letter_partial",
+                "text": "Mektupta bazı tüccar adları geçiyor fakat bağlamı belirsiz.",
+                "source": "Mühürlü mektup",
+                "reliability": 58
+              },
+              {
+                "type": "tension",
+                "amount": 1
+              }
+            ],
+            "failureEffects": [],
+            "criticalFailureEffects": [
+              {
+                "type": "faction_reputation",
+                "faction": "yonetim",
+                "amount": -4
+              },
+              {
+                "type": "tension",
+                "amount": 4
+              },
+              {
+                "type": "set_flag",
+                "key": "letter_tampered",
+                "value": true
+              }
+            ]
+          }
         },
         {
           "id": "destroy",
@@ -942,20 +1168,9 @@
         {
           "id": "case_by_case",
           "title": "Ürüne göre farklı kural öner",
-          "hint": "Ticaret 35 ve hukuk 25 gerektirir.",
+          "hint": "Tek kural yerine dengeli bir çözüm önermeyi deneyebilirsin.",
           "resultText": "Tek kural yerine ürüne göre farklı sınırlar önerdin.",
-          "requirements": [
-            {
-              "type": "skill_at_least",
-              "skill": "trade",
-              "value": 35
-            },
-            {
-              "type": "skill_at_least",
-              "skill": "law",
-              "value": 25
-            }
-          ],
+          "requirements": [],
           "effects": [
             {
               "type": "faction_reputation",
@@ -977,7 +1192,58 @@
               "skill": "law",
               "amount": 1
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "intellect",
+            "skill": "law",
+            "secondarySkill": "trade",
+            "difficulty": 40,
+            "criticalSuccessText": "Önerin hem loncanın hem tüccarların çıkarlarını beklenmedik ölçüde iyi dengeledi.",
+            "partialText": "Bazı ürünlerde uzlaşma sağlandı; tartışmanın geri kalanı açık kaldı.",
+            "failureText": "Önerin karmaşık bulundu ve iki taraf da geri çekildi.",
+            "criticalFailureText": "Öneri iki çevre tarafından da kendi çıkarlarına aykırı görüldü.",
+            "partialEffects": [
+              {
+                "type": "faction_reputation",
+                "faction": "ahi",
+                "amount": 1
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "tuccar",
+                "amount": 1
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "faction_reputation",
+                "faction": "ahi",
+                "amount": -1
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "tuccar",
+                "amount": -1
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "faction_reputation",
+                "faction": "ahi",
+                "amount": -3
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "tuccar",
+                "amount": -3
+              },
+              {
+                "type": "city_stat",
+                "stat": "order",
+                "amount": -1
+              }
+            ]
+          }
         }
       ]
     },
@@ -1046,15 +1312,9 @@
         {
           "id": "argue",
           "title": "Usulüne itiraz et",
-          "hint": "Hukuk 30 gerektirir.",
+          "hint": "Uygulamanın usule aykırı olduğunu savunmayı deneyebilirsin.",
           "resultText": "Kuralların uygulanışına itiraz edip gecikmeyi azalttın.",
-          "requirements": [
-            {
-              "type": "skill_at_least",
-              "skill": "law",
-              "value": 30
-            }
-          ],
+          "requirements": [],
           "effects": [
             {
               "type": "skill",
@@ -1071,7 +1331,48 @@
               "stat": "trade",
               "amount": 1
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "rhetoric",
+            "skill": "law",
+            "difficulty": 40,
+            "criticalSuccessText": "İtirazın görevli tarafından kabul edildi; kontrol düzeni bile gözden geçirilecek.",
+            "partialText": "Sıranı biraz hızlandırdın fakat tartışma zaman kaybettirdi.",
+            "failureText": "İtirazın reddedildi ve beklemeye devam ettin.",
+            "criticalFailureText": "Tartışma görevlileri kızdırdı; daha ayrıntılı bir kontrole alındın.",
+            "partialEffects": [
+              {
+                "type": "advance_days",
+                "amount": 1
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "advance_days",
+                "amount": 1
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "yonetim",
+                "amount": -1
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "advance_days",
+                "amount": 2
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "yonetim",
+                "amount": -3
+              },
+              {
+                "type": "tension",
+                "amount": 2
+              }
+            ]
+          }
         }
       ]
     },
@@ -1183,15 +1484,9 @@
         {
           "id": "verify",
           "title": "İzi kontrol et",
-          "hint": "İz sürme 25 gerektirir.",
+          "hint": "İhbarı izlerden doğrulamayı deneyebilirsin.",
           "resultText": "Geçitte yakın zamanda kalabalık bir grubun geçtiğine dair izler buldun.",
-          "requirements": [
-            {
-              "type": "skill_at_least",
-              "skill": "tracking",
-              "value": 25
-            }
-          ],
+          "requirements": [],
           "effects": [
             {
               "type": "knowledge",
@@ -1205,7 +1500,36 @@
               "skill": "tracking",
               "amount": 2
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "intuition",
+            "skill": "tracking",
+            "difficulty": 36,
+            "criticalSuccessText": "İzlerden grubun sayısını, yönünü ve yakın zamanda geçtiğini güvenle çıkardın.",
+            "partialText": "Kalabalık bir grubun izlerini buldun ama kim olduklarını anlayamadın.",
+            "failureText": "İzleri güvenilir biçimde okuyamadın.",
+            "criticalFailureText": "Eski izleri yeni sanarak yanlış güzergâh değerlendirmesi yaptın.",
+            "partialEffects": [
+              {
+                "type": "knowledge",
+                "id": "bandit_tracks_partial",
+                "text": "Geçitte kalabalık bir grubun izleri var; ne kadar yeni oldukları belirsiz.",
+                "source": "Kendi gözlemin",
+                "reliability": 55
+              }
+            ],
+            "failureEffects": [],
+            "criticalFailureEffects": [
+              {
+                "type": "advance_days",
+                "amount": 1
+              },
+              {
+                "type": "tension",
+                "amount": 2
+              }
+            ]
+          }
         },
         {
           "id": "ignore",
@@ -1268,15 +1592,9 @@
         {
           "id": "goods",
           "title": "Depoları kurtarmaya çalış",
-          "hint": "Ekonomik kaybı azaltır; tehlikelidir.",
+          "hint": "Depolara girip malları kurtarmayı deneyebilirsin; tehlike yüksek.",
           "resultText": "Depolardaki malların bir kısmını kurtardın, fakat bu tercih tepki çekti.",
-          "requirements": [
-            {
-              "type": "attribute_at_least",
-              "attribute": "strength",
-              "value": 44
-            }
-          ],
+          "requirements": [],
           "effects": [
             {
               "type": "city_stat",
@@ -1297,20 +1615,70 @@
               "faction": "medrese",
               "amount": -2
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "strength",
+            "skill": "military",
+            "difficulty": 43,
+            "criticalSuccessText": "Alevlerin arasından önemli miktarda mal kurtardın ve ciddi yara almadan çıktın.",
+            "partialText": "Bazı malları çıkardın fakat dumandan ve sıcaktan zarar gördün.",
+            "failureText": "Depolara ulaşamadın ve yangın büyürken yaralandın.",
+            "criticalFailureText": "İçeride mahsur kalmaya ramak kala ağır yaralandın; malların çoğu da kaybedildi.",
+            "partialEffects": [
+              {
+                "type": "city_stat",
+                "stat": "trade",
+                "amount": -5
+              },
+              {
+                "type": "health",
+                "amount": -14
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "tuccar",
+                "amount": 2
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "city_stat",
+                "stat": "trade",
+                "amount": -8
+              },
+              {
+                "type": "health",
+                "amount": -20
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "ahi",
+                "amount": -1
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "city_stat",
+                "stat": "trade",
+                "amount": -10
+              },
+              {
+                "type": "health",
+                "amount": -32
+              },
+              {
+                "type": "tension",
+                "amount": 5
+              }
+            ]
+          }
         },
         {
           "id": "organize",
           "title": "Tahliyeyi organize et",
-          "hint": "Liderlik 30 gerektirir.",
+          "hint": "Kalabalığı ve muhafızları düzenlemeyi deneyebilirsin.",
           "resultText": "Esnaf ve muhafızları iki gruba ayırıp tahliye ile mal kurtarmayı birlikte yürüttün.",
-          "requirements": [
-            {
-              "type": "skill_at_least",
-              "skill": "leadership",
-              "value": 30
-            }
-          ],
+          "requirements": [],
           "effects": [
             {
               "type": "city_stat",
@@ -1337,7 +1705,56 @@
               "faction": "yonetim",
               "amount": 2
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "rhetoric",
+            "skill": "leadership",
+            "difficulty": 39,
+            "criticalSuccessText": "Emir zinciri hızla kuruldu; hem insanlar hem mallar beklenenden iyi korundu.",
+            "partialText": "Tahliye işledi ama mal kaybı yüksek kaldı.",
+            "failureText": "Talimatların karıştı ve tahliye düzensiz ilerledi.",
+            "criticalFailureText": "Çelişkili emirler paniği artırdı ve yangının etkisi büyüdü.",
+            "partialEffects": [
+              {
+                "type": "city_stat",
+                "stat": "trade",
+                "amount": -6
+              },
+              {
+                "type": "city_stat",
+                "stat": "order",
+                "amount": 2
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "city_stat",
+                "stat": "trade",
+                "amount": -8
+              },
+              {
+                "type": "city_stat",
+                "stat": "order",
+                "amount": -2
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "city_stat",
+                "stat": "trade",
+                "amount": -10
+              },
+              {
+                "type": "city_stat",
+                "stat": "order",
+                "amount": -5
+              },
+              {
+                "type": "tension",
+                "amount": 5
+              }
+            ]
+          }
         }
       ]
     },
@@ -1451,15 +1868,9 @@
         {
           "id": "negotiate",
           "title": "Şartları konuş",
-          "hint": "Diplomasi 35 gerektirir; evlilik olur ama mali yükü azaltabilirsin.",
+          "hint": "Evlilik şartlarını daha dengeli hale getirmeyi deneyebilirsin.",
           "resultText": "Şartları pazarlıkla yumuşattın ve evliliği kabul ettin.",
-          "requirements": [
-            {
-              "type": "skill_at_least",
-              "skill": "diplomacy",
-              "value": 35
-            }
-          ],
+          "requirements": [],
           "effects": [
             {
               "type": "family_add_spouse"
@@ -1486,7 +1897,54 @@
               "minDays": 300,
               "maxDays": 540
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "rhetoric",
+            "skill": "diplomacy",
+            "difficulty": 38,
+            "criticalSuccessText": "Şartları iki haneyi de memnun edecek biçimde düzenledin ve evlilik güçlü bir başlangıç yaptı.",
+            "partialText": "Evlilik gerçekleşti ama pazarlık beklediğinden daha pahalıya mal oldu.",
+            "failureText": "Pazarlık sonuç vermedi; teklif bu kez için kapandı.",
+            "criticalFailureText": "Sözlerin karşı tarafı gücendirdi; teklif kapandı ve aile içinde de rahatsızlık oluştu.",
+            "partialEffects": [
+              {
+                "type": "family_add_spouse"
+              },
+              {
+                "type": "money",
+                "amount": -8
+              },
+              {
+                "type": "family_relation",
+                "role": "spouse",
+                "trust": 2,
+                "affection": 4
+              },
+              {
+                "type": "schedule_event",
+                "eventId": "family_child_birth",
+                "minDays": 320,
+                "maxDays": 560
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "family_relation",
+                "role": "parent",
+                "trust": -2,
+                "suspicion": 2
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "family_relation",
+                "role": "parent",
+                "trust": -5,
+                "respect": -3,
+                "suspicion": 4
+              }
+            ]
+          }
         },
         {
           "id": "decline",
@@ -1666,14 +2124,9 @@
         {
           "id": "mediate",
           "title": "Alacaklıyla pazarlık et",
-          "hint": "Diplomasi 30 gerektirir; daha düşük ödeme ile sorunu çözebilirsin.",
+          "hint": "Alacaklıyla daha iyi şartlar için konuşmayı deneyebilirsin.",
           "resultText": "Alacaklıyla konuşup borcu yeniden yapılandırdın. {{sibling}} sana minnettar.",
           "requirements": [
-            {
-              "type": "skill_at_least",
-              "skill": "diplomacy",
-              "value": 30
-            },
             {
               "type": "money_at_least",
               "value": 5
@@ -1696,7 +2149,50 @@
               "respect": 5,
               "debt": 6
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "rhetoric",
+            "skill": "diplomacy",
+            "difficulty": 36,
+            "criticalSuccessText": "Alacaklıyı önemli ölçüde geri adım atmaya ikna ettin; kardeşinin yükü hafifledi.",
+            "partialText": "Borcu biraz hafiflettin ama düşündüğünden fazla ödeme gerekti.",
+            "failureText": "Alacaklı şartları değiştirmedi; kardeşin hayal kırıklığına uğradı.",
+            "criticalFailureText": "Görüşme sertleşti ve alacaklı daha katı davranmaya başladı.",
+            "partialEffects": [
+              {
+                "type": "money",
+                "amount": -8
+              },
+              {
+                "type": "family_relation",
+                "role": "sibling",
+                "trust": 3,
+                "respect": 2,
+                "debt": 3
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "family_relation",
+                "role": "sibling",
+                "trust": -3,
+                "suspicion": 2
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "family_relation",
+                "role": "sibling",
+                "trust": -7,
+                "respect": -3,
+                "suspicion": 5
+              },
+              {
+                "type": "tension",
+                "amount": 2
+              }
+            ]
+          }
         }
       ]
     },
@@ -1908,15 +2404,9 @@
         {
           "id": "legal",
           "title": "Kadının hükmüne başvur",
-          "hint": "Hukuk 35 gerektirir; sonucu kişisel pazarlık yerine kurala bağlarsın.",
+          "hint": "Paylaşımı hukukî gerekçelerle savunmayı deneyebilirsin.",
           "resultText": "Paylaşımı hukukî hükme bağladın. {{sibling}} karardan tam memnun olmasa da seni keyfî davranmakla suçlayamıyor.",
-          "requirements": [
-            {
-              "type": "skill_at_least",
-              "skill": "law",
-              "value": 35
-            }
-          ],
+          "requirements": [],
           "effects": [
             {
               "type": "money",
@@ -1939,7 +2429,161 @@
               "faction": "medrese",
               "amount": 2
             }
-          ]
+          ],
+          "challenge": {
+            "attribute": "intellect",
+            "skill": "law",
+            "difficulty": 40,
+            "criticalSuccessText": "Hukukî gerekçen açık ve ikna edici bulundu; paylaşım büyük itiraz doğurmadan sonuçlandı.",
+            "partialText": "Hüküm çıktı ama kardeşin bazı noktaları haksız bulmaya devam ediyor.",
+            "failureText": "Hukukî savunman beklediğin sonucu vermedi ve payın azaldı.",
+            "criticalFailureText": "Savunmandaki açıklar aleyhine kullanıldı; hem pay hem aile güveni zarar gördü.",
+            "partialEffects": [
+              {
+                "type": "money",
+                "amount": 10
+              },
+              {
+                "type": "family_relation",
+                "role": "sibling",
+                "respect": 2,
+                "trust": -1
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "money",
+                "amount": 7
+              },
+              {
+                "type": "family_relation",
+                "role": "sibling",
+                "trust": -4,
+                "suspicion": 3
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "money",
+                "amount": 4
+              },
+              {
+                "type": "family_relation",
+                "role": "sibling",
+                "trust": -8,
+                "respect": -4,
+                "suspicion": 6
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "warehouse_shadow",
+      "category": "espionage",
+      "title": "Ambarın Gölgeleri",
+      "body": "Gece vakti bir tahıl ambarının çevresinde şüpheli bir hareket izlerken kapı açılıyor. İçeri girenlerin seni görmesini istemiyorsun.",
+      "weight": 34,
+      "major": false,
+      "cooldownDays": 28,
+      "conditions": [
+        {
+          "type": "city_stat_above",
+          "stat": "trade",
+          "value": 65
+        }
+      ],
+      "tags": [
+        "espionage",
+        "stealth",
+        "risk"
+      ],
+      "choices": [
+        {
+          "id": "hide",
+          "title": "Gölgede saklan",
+          "hint": "Sessizce gizlenmeyi dene.",
+          "resultText": "Gelenler seni fark etmeden konuşmalarını dinledin.",
+          "effects": [
+            {
+              "type": "knowledge",
+              "id": "warehouse_talk",
+              "text": "Bazı tüccarlar gece vakti kayıt dışı mal hareketi konuşuyor.",
+              "source": "Ambarda kulak misafiri olduğun konuşma",
+              "reliability": 83
+            }
+          ],
+          "requirements": [],
+          "challenge": {
+            "attribute": "agility",
+            "skill": "espionage",
+            "difficulty": 42,
+            "criticalSuccessText": "Öyle iyi saklandın ki konuşmanın tamamını dinleyip çıkış yolunu da fark edilmeden gördün.",
+            "partialText": "Seni tam göremediler ama birinin orada olduğundan şüphelendiler; konuşmanın yalnız bir bölümünü duydun.",
+            "failureText": "Saklandığın yer fark edildi ve ambarı terk etmek zorunda kaldın.",
+            "criticalFailureText": "Doğrudan yakalandın; kim olduğun ve neden orada bulunduğun sorgulandı.",
+            "partialEffects": [
+              {
+                "type": "knowledge",
+                "id": "warehouse_talk_partial",
+                "text": "Ambarda kayıt dışı bir iş konuşuluyor olabilir.",
+                "source": "Yarım duyulan konuşma",
+                "reliability": 52
+              },
+              {
+                "type": "tension",
+                "amount": 2
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "tension",
+                "amount": 4
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "tuccar",
+                "amount": -2
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "health",
+                "amount": -8
+              },
+              {
+                "type": "tension",
+                "amount": 7
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "tuccar",
+                "amount": -5
+              }
+            ]
+          }
+        },
+        {
+          "id": "withdraw",
+          "title": "Sessizce uzaklaş",
+          "hint": "Bilgiyi kaçırırsın ama riski azaltırsın.",
+          "resultText": "Kimse seni fark etmeden bölgeden ayrıldın.",
+          "effects": [],
+          "requirements": []
+        },
+        {
+          "id": "approach",
+          "title": "Açıkça içeri gir",
+          "hint": "Gizlenmek yerine kim olduğunu belli et.",
+          "resultText": "İçeri girince konuşma kesildi. Seni sıradan bir meraklı gibi karşılamaya çalıştılar.",
+          "effects": [
+            {
+              "type": "tension",
+              "amount": 1
+            }
+          ],
+          "requirements": []
         }
       ]
     }
