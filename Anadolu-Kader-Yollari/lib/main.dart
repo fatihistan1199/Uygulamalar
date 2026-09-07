@@ -174,11 +174,13 @@ class _GamePageState extends State<GamePage>{
         Text('Gerilim ${state!.tension}'),
       ]),
     ]))),
-    if(activeEvent!=null)_eventCard(context)else...[
+    _characterCard(context),
+    if(!state!.alive)_successorPanel(context)else if(activeEvent!=null)_eventCard(context)else...[
       if(outcome!=null)Card(child:Padding(padding:const EdgeInsets.all(14),child:Text(outcome!))),
       _cityCard(context),
       FilledButton.icon(onPressed:_seek,icon:const Icon(Icons.forum_outlined),label:const Text('Şehirde dolaş / bilgi ara')),
       OutlinedButton.icon(onPressed:_marketSheet,icon:const Icon(Icons.storefront_outlined),label:const Text('Pazara git')),
+      OutlinedButton.icon(onPressed:_conflictSheet,icon:const Icon(Icons.shield_outlined),label:const Text('Riskli yol görevine katıl')),
       OutlinedButton.icon(onPressed:_travel,icon:const Icon(Icons.map_outlined),label:const Text('Seyahat et')),
       OutlinedButton.icon(onPressed:()=>_advance(7),icon:const Icon(Icons.calendar_month),label:const Text('Bir hafta geçir')),
       if(state!.delayedEffects.isNotEmpty)Padding(
@@ -204,6 +206,88 @@ class _GamePageState extends State<GamePage>{
     ])));
   }
 
+
+
+  Widget _characterCard(BuildContext context)=>Card(child:ExpansionTile(
+    leading:CircleAvatar(child:Text('${state!.generation}')),
+    title:Text('${state!.playerName} • ${state!.age} yaş'),
+    subtitle:Text('Sağlık ${state!.health}/100 • Nesil ${state!.generation}'),
+    children:[Padding(padding:const EdgeInsets.fromLTRB(16,0,16,14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      const Text('Nitelikler',style:TextStyle(fontWeight:FontWeight.bold)),
+      Wrap(spacing:6,runSpacing:4,children:state!.attributes.entries.map((e)=>Chip(label:Text('${GameEngine.attributeNames[e.key]} ${e.value}'))).toList()),
+      const SizedBox(height:8),
+      const Text('Beceriler',style:TextStyle(fontWeight:FontWeight.bold)),
+      Wrap(spacing:6,runSpacing:4,children:state!.skills.entries.map((e)=>Chip(label:Text('${GameEngine.skillNames[e.key]} ${e.value}'))).toList()),
+      if(state!.injuries.isNotEmpty)...[
+        const Divider(),const Text('Yaralanmalar',style:TextStyle(fontWeight:FontWeight.bold)),
+        ...state!.injuries.reversed.map((i)=>ListTile(
+          dense:true,contentPadding:EdgeInsets.zero,
+          leading:Icon(i.permanent?Icons.warning_amber:Icons.healing),
+          title:Text(i.name),
+          subtitle:Text('Şiddet ${i.severity}/100 • ${i.acquiredDay}. gün${i.permanent?' • kalıcı iz':''}'),
+        )),
+      ],
+      if(state!.lineage.isNotEmpty)...[
+        const Divider(),Text('Önceki nesiller: ${state!.lineage.join(' → ')}'),
+      ],
+    ]))],
+  ));
+
+  Widget _successorPanel(BuildContext context)=>Card(child:Padding(
+    padding:const EdgeInsets.all(18),
+    child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      const Icon(Icons.account_tree_outlined,size:54),
+      const SizedBox(height:8),
+      Text('${state!.playerName} öldü',textAlign:TextAlign.center,style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
+      Text('Sebep: ${state!.deathCause}',textAlign:TextAlign.center),
+      const SizedBox(height:6),
+      const Text('Dünya sıfırlanmadı. Şehirler, NPC hafızaları, fraksiyon güçleri ve ekonomik durum aynı kaldı.',textAlign:TextAlign.center),
+      const SizedBox(height:14),
+      ...engine!.successorOptions().map((name)=>Padding(
+        padding:const EdgeInsets.only(bottom:7),
+        child:FilledButton.tonal(onPressed:(){
+          outcome=engine!.assumeSuccessor(name);setState((){});_save();
+        },child:Text('$name ile devam et')),
+      )),
+    ]),
+  ));
+
+  Future<void> _conflictSheet()async{
+    await showModalBottomSheet<void>(
+      context:context,
+      builder:(sheetContext)=>SafeArea(child:Padding(
+        padding:const EdgeInsets.all(16),
+        child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+          Text('Yol Çatışması',style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
+          const SizedBox(height:4),
+          const Text('Kuvvet tek belirleyici değildir. Taktik; nitelik, beceri, şehir güvenliği ve eşkıyalıkla birlikte çözülür.'),
+          const SizedBox(height:12),
+          _conflictButton(sheetContext,'defend','Tedbirli savun','İrade + Askerlik'),
+          _conflictButton(sheetContext,'assault','Hızlı saldır','Kuvvet + Askerlik'),
+          _conflictButton(sheetContext,'flee','Geri çekil','Çeviklik + İz sürme'),
+          _conflictButton(sheetContext,'parley','Konuşarak çöz','Hitabet + Diplomasi'),
+        ]),
+      )),
+    );
+  }
+
+  Widget _conflictButton(BuildContext sheetContext,String tactic,String title,String detail)=>Padding(
+    padding:const EdgeInsets.only(bottom:7),
+    child:OutlinedButton(
+      onPressed:(){
+        final result=engine!.resolveConflict(tactic);
+        outcome=result.summary;
+        Navigator.pop(sheetContext);
+        setState((){});_save();
+      },
+      child:Align(alignment:Alignment.centerLeft,child:Padding(
+        padding:const EdgeInsets.symmetric(vertical:5),
+        child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Text(title,style:const TextStyle(fontWeight:FontWeight.bold)),Text(detail,style:Theme.of(context).textTheme.bodySmall),
+        ]),
+      )),
+    ),
+  );
 
   Future<void> _marketSheet()async{
     await showModalBottomSheet<void>(
