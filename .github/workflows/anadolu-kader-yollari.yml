@@ -34,5 +34,5 @@ jobs:
       - name: APK artefaktını yükle
         uses: actions/upload-artifact@v4
         with:
-          name: Anadolu-Kader-Yollari-v0.4-debug
+          name: Anadolu-Kader-Yollari-v0.5-debug
           path: Anadolu-Kader-Yollari/build/app/outputs/flutter-apk/app-debug.apk
