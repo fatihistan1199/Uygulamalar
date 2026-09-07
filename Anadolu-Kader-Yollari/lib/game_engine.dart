@@ -933,7 +933,8 @@ class GameEngine {
       for(final effect in outcomeEffects)_applyEventEffect(Map<String,dynamic>.from(effect as Map),def.id);
       if(rolled.succeeded){
         final skill=challenge['skill'] as String?;
-        if(skill!=null)state.skills[skill]=clamp100((state.skills[skill]??0)+1);
+        final alreadyProgresses=skill!=null&&choice.effects.any((e)=>e['type']=='skill'&&e['skill']==skill);
+        if(skill!=null&&!alreadyProgresses)state.skills[skill]=clamp100((state.skills[skill]??0)+1);
       }
       if(alternativeText!=null)resultText=_renderText(alternativeText);
     }
