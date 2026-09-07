@@ -129,11 +129,12 @@ class _GamePageState extends State<GamePage>{
         destinations:const[
           NavigationDestination(icon:Icon(Icons.auto_stories_outlined),selectedIcon:Icon(Icons.auto_stories),label:'Oyun'),
           NavigationDestination(icon:Icon(Icons.groups_outlined),selectedIcon:Icon(Icons.groups),label:'Kişiler'),
+          NavigationDestination(icon:Icon(Icons.account_tree_outlined),selectedIcon:Icon(Icons.account_tree),label:'Aile'),
           NavigationDestination(icon:Icon(Icons.menu_book_outlined),selectedIcon:Icon(Icons.menu_book),label:'Bilgi'),
           NavigationDestination(icon:Icon(Icons.account_balance_outlined),selectedIcon:Icon(Icons.account_balance),label:'Çevreler'),
         ],
       ),
-      body:SafeArea(child:IndexedStack(index:tab,children:[_gameTab(context),_peopleTab(context),_knowledgeTab(context),_factionsTab(context)])),
+      body:SafeArea(child:IndexedStack(index:tab,children:[_gameTab(context),_peopleTab(context),_familyTab(context),_knowledgeTab(context),_factionsTab(context)])),
     );
   }
 
@@ -370,9 +371,10 @@ class _GamePageState extends State<GamePage>{
       ...people.map((n)=>Card(child:ExpansionTile(
         leading:CircleAvatar(child:Text(n.name.characters.first)),
         title:Text(n.name),
-        subtitle:Text('${n.profession} • ${state!.cities[n.cityId]!.name} • ${state!.factions[n.factionId]!.name}'),
+        subtitle:Text('${n.profession} • ${n.age} yaş • ${state!.cities[n.cityId]!.name} • ${state!.factions[n.factionId]!.name}'),
         children:[Padding(padding:const EdgeInsets.fromLTRB(16,0,16,14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text('Hedef: ${n.goal}',style:const TextStyle(fontStyle:FontStyle.italic)),
+          if(n.spouseId!=null)Text('Eşi: ${state!.npcs[n.spouseId]?.name??'bilinmiyor'} • Çocuk: ${n.childIds.length}'),
           const SizedBox(height:8),
           Wrap(spacing:6,runSpacing:4,children:[
             Chip(label:Text('Güven ${n.relation.trust}')),Chip(label:Text('Saygı ${n.relation.respect}')),Chip(label:Text('Korku ${n.relation.fear}')),
@@ -399,6 +401,24 @@ class _GamePageState extends State<GamePage>{
       trailing:Text('%${k.reliability}',style:const TextStyle(fontWeight:FontWeight.bold)),
     ))),
   ]);
+
+  Widget _familyTab(BuildContext context){
+    final members=state!.family.values.toList()..sort((a,b)=>a.id.compareTo(b.id));
+    return ListView(padding:const EdgeInsets.all(12),children:[
+      Text('Aile ve Soy',style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
+      const Text('Akrabalık, yaşlar ve uygun halefler dünyayla birlikte kaydedilir. NPC aileleri ise Kişiler sayfasında yaşar.'),
+      const SizedBox(height:8),
+      ...members.map((m){
+        final parents=m.parentIds.map((id)=>state!.family[id]?.name??id).join(', ');
+        final children=m.childIds.map((id)=>state!.family[id]?.name??id).join(', ');
+        return Card(child:ListTile(
+          leading:CircleAvatar(child:Icon(m.id==state!.playerFamilyId?Icons.person:Icons.account_tree_outlined)),
+          title:Text('${m.name}${m.id==state!.playerFamilyId?' (oynanan kişi)':''}'),
+          subtitle:Text('${m.age} yaş • ${m.alive?'hayatta':'vefat etti'}${parents.isEmpty?'':'\nEbeveyn: $parents'}${children.isEmpty?'':'\nÇocuk: $children'}'),
+        ));
+      }),
+    ]);
+  }
 
   Widget _factionsTab(BuildContext context)=>ListView(padding:const EdgeInsets.all(12),children:[
     Text('Toplumsal Çevreler',style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),

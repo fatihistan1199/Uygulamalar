@@ -157,6 +157,38 @@ void main(){
     expect(s.lineage,contains('Hasan'));
   });
 
+  test('aile soy ağı save load ile bütün bağlarını korur',(){
+    final s=GameEngine.newGame(seed:812,name:'Hasan',background:'Köylü ailesi');
+    expect(s.family['player']!.parentIds,containsAll(['parent_1','parent_2']));
+    expect(s.family['parent_1']!.childIds,contains('player'));
+    final restored=GameState.fromJson(Map<String,dynamic>.from(jsonDecode(jsonEncode(s.toJson()))));
+    expect(restored.playerFamilyId,'player');
+    expect(restored.family['player']!.name,'Hasan');
+    expect(restored.family['sibling_1']!.parentIds,contains('parent_1'));
+  });
+
+  test('NPC-NPC ilişkileri ve yaşayan nesil deterministiktir',(){
+    final a=GameEngine.newGame(seed:1922,name:'Hasan',background:'Tüccar ailesi');
+    final b=GameEngine.newGame(seed:1922,name:'Hasan',background:'Tüccar ailesi');
+    final ea=GameEngine(a,catalog),eb=GameEngine(b,catalog);
+    expect(a.npcs['mahmud']!.npcRelations['selma']!.affection,62);
+    ea.advance(720);eb.advance(720);
+    expect(jsonEncode(a.toJson()),jsonEncode(b.toJson()));
+    expect(a.age,24);
+    expect(a.npcs['mahmud']!.age,greaterThanOrEqualTo(26));
+  });
+
+  test('halef öncelikle kaydedilmiş aile üyesinden seçilir',(){
+    final s=GameEngine.newGame(seed:813,name:'Hasan',background:'Medrese öğrencisi');
+    final e=GameEngine(s,catalog);
+    e.forceDamageForTest(200,cause:'Test ölümü');
+    final candidate=e.successorOptions().first;
+    expect(s.family.values.any((m)=>m.name==candidate&&m.alive),isTrue);
+    e.assumeSuccessor(candidate);
+    expect(s.playerFamilyId,isNot('player'));
+    expect(s.family[s.playerFamilyId]!.name,candidate);
+  });
+
 
   test('haricî olay kataloğu yüklenir ve çekirdek olayları içerir',(){
     expect(catalog.events.length,greaterThanOrEqualTo(14));
