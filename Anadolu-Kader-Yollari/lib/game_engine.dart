@@ -235,7 +235,14 @@ class GameEngine {
       family[b]!.relations[a]=RelationState(trust:trust,affection:affection,respect:respect);
     }
     linkFamily('player','parent_1',trust:72,affection:68,respect:66);linkFamily('player','parent_2',trust:75,affection:72,respect:64);linkFamily('player','sibling_1',trust:61,affection:58,respect:48);linkFamily('parent_1','parent_2',trust:70,affection:66,respect:61);linkFamily('sibling_1','parent_1',trust:68,affection:65,respect:60);linkFamily('sibling_1','parent_2',trust:72,affection:70,respect:59);
-    return GameState(version:7,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999,attributes:attrs,skills:skills,health:100,age:22,generation:1,alive:true,injuries:[],lineage:[],eventFlags:{},pendingEvents:[],eventLastDay:{},family:family,playerFamilyId:'player',nextLifeId:1,playerGender:gender);
+    final worldFacts=<String,bool>{
+      'tax_plan':seed%3==0,
+      'mahmud_stockpiling':false,
+      'ahi_countermove':false,
+      'road_bandit_network':seed%5==0,
+      'epidemic_prepared':false,
+    };
+    return GameState(version:9,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999,attributes:attrs,skills:skills,health:100,age:22,generation:1,alive:true,injuries:[],lineage:[],eventFlags:{},pendingEvents:[],eventLastDay:{},family:family,playerFamilyId:'player',nextLifeId:1,playerGender:gender,worldFacts:worldFacts,recentEventIds:[]);
   }
 
   void _sync()=>state.rngState=_rng.state;
@@ -251,7 +258,16 @@ class GameEngine {
     if(state.day%7!=0)return;
     final actors=state.npcs.values.where((n)=>n.alive&&n.age>=16).toList()..sort((a,b)=>a.id.compareTo(b.id));
     if(actors.isEmpty)return;
-    final acting=actors[_rng.nextInt(actors.length)];
+    _applyNpcGoalAction(actors[_rng.nextInt(actors.length)]);
+  }
+
+  void runNpcGoalForTest(String npcId){
+    final npc=state.npcs[npcId];
+    if(npc!=null&&npc.alive)_applyNpcGoalAction(npc);
+    _sync();
+  }
+
+  void _applyNpcGoalAction(NpcState acting){
     final faction=state.factions[acting.factionId]!;
     final city=state.cities[acting.cityId]!;
     switch(acting.factionId){
@@ -272,19 +288,55 @@ class GameEngine {
         if(_rng.nextInt(100)<38)city.prosperity=clamp100(city.prosperity+1);
         faction.power=clamp100(faction.power+(_rng.nextInt(100)<42?1:0));
     }
-    if(acting.id=='mahmud'&&city.id=='kayseri'&&city.food<60){
-      city.stock['grain']=math.max(5,(city.stock['grain']??50)-2);
-      city.trade=clamp100(city.trade+1);
-      state.tension=clamp100(state.tension+1);
+
+    switch(acting.id){
+      case 'mahmud':
+        if(city.id=='kayseri'&&city.food<60){
+          city.stock['grain']=math.max(5,(city.stock['grain']??50)-3);
+          city.trade=clamp100(city.trade+1);
+          state.tension=clamp100(state.tension+2);
+          state.worldFacts['mahmud_stockpiling']=true;
+          state.eventFlags['mahmud_stockpiling']=true;
+          state.eventFlags['mahmud_stockpile_day']=state.day;
+        }
+      case 'yusuf':
+        if(city.id=='kayseri'&&state.worldFacts['mahmud_stockpiling']==true){
+          state.worldFacts['ahi_countermove']=true;
+          state.eventFlags['ahi_countermove']=true;
+          state.factions['ahi']!.power=clamp100(state.factions['ahi']!.power+2);
+          city.order=clamp100(city.order-1);
+          state.tension=clamp100(state.tension+2);
+        }
+      case 'sinan':
+        state.worldFacts['tax_plan']=true;
+        state.eventFlags['tax_policy_active']=true;
+        state.tension=clamp100(state.tension+2);
+        city.prosperity=clamp100(city.prosperity-1);
+      case 'meryem':
+        state.worldFacts['epidemic_prepared']=true;
+        state.eventFlags['epidemic_prepared']=true;
+        city.order=clamp100(city.order+1);
+      case 'yakup':
+        city.security=clamp100(city.security+2);
+        city.banditry=clamp100(city.banditry-2);
+      case 'hamza':
+        city.trade=clamp100(city.trade+2);
+        city.prosperity=clamp100(city.prosperity+1);
+      case 'davud':
+        city.trade=clamp100(city.trade+1);
+        state.tension=clamp100(state.tension+1);
+      default:
+        if(acting.goal.contains('güvenli')||acting.goal.contains('güvenliğini')){
+          city.security=clamp100(city.security+1);
+          city.banditry=clamp100(city.banditry-1);
+        }
+        if(acting.goal.contains('vergi')){
+          state.worldFacts['tax_plan']=true;
+          state.tension=clamp100(state.tension+1);
+          city.prosperity=clamp100(city.prosperity-1);
+        }
     }
-    if(acting.goal.contains('güvenli')||acting.goal.contains('güvenliğini')){
-      city.security=clamp100(city.security+1);
-      city.banditry=clamp100(city.banditry-1);
-    }
-    if(acting.goal.contains('vergi')){
-      state.tension=clamp100(state.tension+1);
-      city.prosperity=clamp100(city.prosperity-1);
-    }
+    state.eventFlags['npc_goal_'+acting.id+'_last_day']=state.day;
     if(state.day%28==0){
       state.chronicle.add('${state.day}. gün — ${acting.name}, ${city.name} içinde kendi hedefleri doğrultusunda hareket etti.');
     }
