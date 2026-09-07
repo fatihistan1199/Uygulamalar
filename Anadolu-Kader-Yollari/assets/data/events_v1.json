@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "events": [
     {
       "id": "grain",
@@ -413,7 +413,8 @@
               "text": "Yakında yeni bir vergi konulacağı söyleniyor.",
               "source": "Handaki yolcular",
               "minReliability": 24,
-              "maxReliability": 66
+              "maxReliability": 66,
+              "factId": "tax_plan"
             },
             {
               "type": "schedule_event",
@@ -439,7 +440,8 @@
               "text": "Vergi düzenlemesi ihtimali bazı kâtipler arasında da konuşuluyor.",
               "source": "Yerel kâtip çevresi",
               "minReliability": 64,
-              "maxReliability": 88
+              "maxReliability": 88,
+              "factId": "tax_plan"
             },
             {
               "type": "skill",
@@ -2584,6 +2586,410 @@
             }
           ],
           "requirements": []
+        }
+      ]
+    },
+    {
+      "id": "tax_rumor_verification",
+      "category": "knowledge",
+      "title": "Vergi Söylentisinin Peşinde",
+      "body": "{{rumor_source}} kaynaklı “{{rumor}}” bilgisini bağımsız bir kaynaktan sınama fırsatı buldun.",
+      "weight": 58,
+      "major": false,
+      "cooldownDays": 14,
+      "conditions": [
+        {
+          "type": "knowledge_fact_unverified",
+          "factId": "tax_plan"
+        }
+      ],
+      "tags": [
+        "knowledge",
+        "rumor",
+        "recovery"
+      ],
+      "choices": [
+        {
+          "id": "cross_check",
+          "title": "Kâtip ve esnaf anlatılarını karşılaştır",
+          "hint": "Kaynakları karşılaştırarak söylentiyi sınamayı dene.",
+          "resultText": "Kaynakları karşılaştırdın. {{verification_result}}",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "knowledge_verify_recent",
+              "factId": "tax_plan"
+            }
+          ],
+          "challenge": {
+            "attribute": "intuition",
+            "skill": "localCulture",
+            "difficulty": 36,
+            "criticalSuccessText": "Birbirinden bağımsız ayrıntıları birleştirdin. {{verification_result}}",
+            "successText": "Kaynakları karşılaştırdın. {{verification_result}}",
+            "partialText": "Bazı ayrıntılar birbirini destekliyor; yine de kesin hüküm veremiyorsun.",
+            "failureText": "Kaynaklar birbirini doğrulamadı ve bilgi daha da bulanıklaştı.",
+            "criticalFailureText": "Yanlış bir bağlantı kurdun; söylentiyi olduğundan daha güvenilir sanma riski doğdu.",
+            "partialEffects": [
+              {
+                "type": "knowledge_adjust_recent",
+                "factId": "tax_plan",
+                "amount": 12
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "knowledge_adjust_recent",
+                "factId": "tax_plan",
+                "amount": -6
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "knowledge_adjust_recent",
+                "factId": "tax_plan",
+                "amount": -12
+              },
+              {
+                "type": "tension",
+                "amount": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "official",
+          "title": "Resmî yazışma izini ara",
+          "hint": "Daha zor ama daha güçlü bir doğrulama yolu.",
+          "resultText": "Yazışma izini takip ettin. {{verification_result}}",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "knowledge_verify_recent",
+              "factId": "tax_plan"
+            }
+          ],
+          "challenge": {
+            "attribute": "intellect",
+            "skill": "law",
+            "difficulty": 43,
+            "criticalSuccessText": "Yazışmanın kaynağına kadar ulaştın. {{verification_result}}",
+            "successText": "Yazışma izini takip ettin. {{verification_result}}",
+            "partialText": "Bazı hazırlık işaretleri buldun fakat kararın kesinleştiğini gösteren belge yok.",
+            "failureText": "Resmî kayıtlarda söylentiyi doğrulayacak bir iz bulamadın.",
+            "criticalFailureText": "Yanlış kişilere soru sordun; merakın yönetim çevresinde dikkat çekti.",
+            "partialEffects": [
+              {
+                "type": "knowledge_adjust_recent",
+                "factId": "tax_plan",
+                "amount": 18
+              }
+            ],
+            "failureEffects": [],
+            "criticalFailureEffects": [
+              {
+                "type": "faction_reputation",
+                "faction": "yonetim",
+                "amount": -2
+              },
+              {
+                "type": "tension",
+                "amount": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "leave",
+          "title": "Şimdilik peşini bırak",
+          "hint": "Bilgi doğrulanmamış olarak kalır.",
+          "resultText": "Söylentiyi kesin bilgi saymadan beklemeye karar verdin.",
+          "requirements": [],
+          "effects": []
+        }
+      ]
+    },
+    {
+      "id": "kayseri_network_pressure",
+      "category": "economy",
+      "title": "Kayseri’de Ambar Ağları",
+      "body": "Mahmud’un çevresindeki zahire hareketi belirginleşiyor. Ahiler de aynı günlerde dükkân sahipleriyle daha sık toplantı yapmaya başladı.",
+      "weight": 76,
+      "major": false,
+      "cooldownDays": 999,
+      "conditions": [
+        {
+          "type": "city_is",
+          "value": "kayseri"
+        },
+        {
+          "type": "flag_equals",
+          "key": "mahmud_stockpiling",
+          "value": true
+        },
+        {
+          "type": "flag_not_set",
+          "key": "kayseri_network_seen"
+        }
+      ],
+      "tags": [
+        "economy",
+        "faction",
+        "rumor",
+        "npc_goal"
+      ],
+      "choices": [
+        {
+          "id": "merchant",
+          "title": "Tüccar çevresini dinle",
+          "hint": "Mahmud’un anlatısını öğrenirsin; kesin gerçek olmayabilir.",
+          "resultText": "Tüccarlar stokların yol güvenliği için tutulduğunu savunuyor.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "knowledge",
+              "id": "mahmud_stock_claim",
+              "text": "Mahmud’un çevresinde olağan dışı tahıl stoku tutuluyor.",
+              "source": "Kayseri tüccar çevresi",
+              "reliability": 66,
+              "factId": "mahmud_stockpiling"
+            },
+            {
+              "type": "npc_relation",
+              "npc": "mahmud",
+              "trust": 3,
+              "respect": 1,
+              "memory": "Ambar hareketi sırasında tüccar çevresini dinledi",
+              "importance": 28
+            },
+            {
+              "type": "set_flag",
+              "key": "kayseri_network_seen",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "ahi",
+          "title": "Ahi Yusuf’a sor",
+          "hint": "Ahi çevresinin yorumunu öğrenirsin.",
+          "resultText": "Yusuf, stokların şehir üzerindeki baskıyı artırdığını söylüyor.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "knowledge",
+              "id": "mahmud_stock_ahi",
+              "text": "Mahmud’un çevresinde olağan dışı tahıl stoku tutuluyor.",
+              "source": "Ahi Yusuf",
+              "reliability": 74,
+              "factId": "mahmud_stockpiling"
+            },
+            {
+              "type": "npc_relation",
+              "npc": "yusuf",
+              "trust": 4,
+              "respect": 2,
+              "memory": "Ambar meselesinde görüşümü sordu",
+              "importance": 31
+            },
+            {
+              "type": "set_flag",
+              "key": "kayseri_network_seen",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "inspect",
+          "title": "Ambar hareketini kendin incele",
+          "hint": "Gözleme dayanarak söylentiyi sınamayı deneyebilirsin.",
+          "resultText": "İncelemenin ardından: {{verification_result}}",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "knowledge",
+              "id": "mahmud_stock_observation",
+              "text": "Mahmud’un çevresinde olağan dışı tahıl stoku tutuluyor.",
+              "source": "Kendi gözlemin",
+              "reliability": 68,
+              "factId": "mahmud_stockpiling"
+            },
+            {
+              "type": "knowledge_verify_recent",
+              "factId": "mahmud_stockpiling"
+            },
+            {
+              "type": "set_flag",
+              "key": "kayseri_network_seen",
+              "value": true
+            }
+          ],
+          "challenge": {
+            "attribute": "intuition",
+            "skill": "tracking",
+            "difficulty": 38,
+            "criticalSuccessText": "Ambar giriş çıkışlarını ayrıntılı biçimde izledin. {{verification_result}}",
+            "successText": "İncelemenin ardından: {{verification_result}}",
+            "partialText": "Olağan dışı hareket gördün ama bunun stokçuluk olduğunu kesinleştiremedin.",
+            "failureText": "Gözlemin güvenilir bir sonuca ulaşmadı.",
+            "criticalFailureText": "Takip edildiğin fark edildi; ambar çevresinden uzaklaştırıldın.",
+            "partialEffects": [
+              {
+                "type": "knowledge",
+                "id": "mahmud_stock_partial",
+                "text": "Mahmud’un ambar çevresinde alışılmadık hareket var.",
+                "source": "Kendi gözlemin",
+                "reliability": 54,
+                "factId": "mahmud_stockpiling"
+              },
+              {
+                "type": "set_flag",
+                "key": "kayseri_network_seen",
+                "value": true
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "set_flag",
+                "key": "kayseri_network_seen",
+                "value": true
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "set_flag",
+                "key": "kayseri_network_seen",
+                "value": true
+              },
+              {
+                "type": "npc_relation",
+                "npc": "mahmud",
+                "suspicion": 5,
+                "trust": -2,
+                "memory": "Ambarlarımı gizlice izlemeye çalıştı",
+                "importance": 38
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "ahi_countermove_ripple",
+      "category": "politics",
+      "title": "Ahilerin Karşı Hamlesi",
+      "body": "Kayseri’de Ahi Yusuf’un çevresi, zahire ticaretinin denetlenmesi için dükkân sahiplerini ortak tavır almaya çağırıyor. Bu hareket Mahmud’un kurduğu ticari ağı doğrudan zorluyor.",
+      "weight": 72,
+      "major": false,
+      "cooldownDays": 999,
+      "conditions": [
+        {
+          "type": "city_is",
+          "value": "kayseri"
+        },
+        {
+          "type": "flag_equals",
+          "key": "ahi_countermove",
+          "value": true
+        },
+        {
+          "type": "flag_not_set",
+          "key": "ahi_countermove_seen"
+        }
+      ],
+      "tags": [
+        "faction",
+        "politics",
+        "npc_goal",
+        "consequence"
+      ],
+      "choices": [
+        {
+          "id": "observe",
+          "title": "Toplantıları yalnız gözle",
+          "hint": "Taraf seçmeden ağların nasıl hareket ettiğini görürsün.",
+          "resultText": "Ahilerin kararları dükkân sahipleri arasında hızla yayılıyor.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "knowledge",
+              "id": "ahi_countermove_fact",
+              "text": "Ahiler zahire ticaretine karşı ortak denetim baskısı kuruyor.",
+              "source": "Kayseri esnaf toplantıları",
+              "reliability": 88,
+              "factId": "ahi_countermove"
+            },
+            {
+              "type": "set_flag",
+              "key": "ahi_countermove_seen",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "support",
+          "title": "Yusuf’un çağrısını destekle",
+          "hint": "Ahi çevresiyle bağını güçlendirir; tüccarlar bunu hatırlayabilir.",
+          "resultText": "Yusuf’un çağrısına açık destek verdin.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "faction_reputation",
+              "faction": "ahi",
+              "amount": 4
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "tuccar",
+              "amount": -3
+            },
+            {
+              "type": "npc_relation",
+              "npc": "yusuf",
+              "trust": 6,
+              "respect": 4,
+              "memory": "Ticari denetim çağrımı destekledi",
+              "importance": 48
+            },
+            {
+              "type": "set_flag",
+              "key": "ahi_countermove_seen",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "warn_mahmud",
+          "title": "Mahmud’u önceden haberdar et",
+          "hint": "Tüccar ağı sana borçlanabilir; Ahiler öğrenirse güven kaybedebilirsin.",
+          "resultText": "Mahmud karşı hamleyi önceden öğrendi ve hazırlık yapmaya başladı.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "mahmud",
+              "trust": 7,
+              "debt": 5,
+              "memory": "Ahilerin karşı hamlesini bana önceden bildirdi",
+              "importance": 55
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "tuccar",
+              "amount": 3
+            },
+            {
+              "type": "set_flag",
+              "key": "ahi_countermove_seen",
+              "value": true
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "grain_followup",
+              "minDays": 12,
+              "maxDays": 24
+            }
+          ]
         }
       ]
     }
