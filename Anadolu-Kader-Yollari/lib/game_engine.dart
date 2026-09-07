@@ -296,7 +296,7 @@ class GameEngine {
     if(state.health<=0)_die(cause);
   }
 
-  void forceDamageForTest(int damage,{String cause='Ağır yaralanma'})=>_applyDamage(damage,cause:cause);
+  void forceDamageForTest(int damage,{String cause='Ağır yaralanma'}){final injury=damage>=14?_makeInjury(damage):null;_applyDamage(damage,cause:cause,injury:injury);_sync();}
 
   void _die(String cause){
     if(!state.alive)return;
