@@ -198,16 +198,19 @@ void main(){
     expect(catalog['grain_followup']?.chainId,'kayseri_grain');
   });
 
-  test('seçenek gereksinimleri veri üzerinden filtrelenir',(){
+  test('gizli beceri yetersizliği seçeneği kilitlemez, yalnız şansı değiştirir',(){
     final s=GameEngine.newGame(seed:909,name:'Hasan',background:'Köylü ailesi');
     final e=GameEngine(s,catalog);
     s.pendingEvents.add('lost_letter');
     final first=e.pickEvent();
     expect(first.id,'lost_letter');
-    expect(first.options.any((o)=>o.id=='open'),isFalse);
-    s.skills['espionage']=30;
+    final weak=first.options.firstWhere((o)=>o.id=='open');
+    expect(weak.hint,contains('Başarı şansı'));
+    expect(weak.hint,contains('Çok zor'));
+    s.skills['espionage']=60;
     final second=e.pickEvent();
-    expect(second.options.any((o)=>o.id=='open'),isTrue);
+    final strong=second.options.firstWhere((o)=>o.id=='open');
+    expect(strong.hint,contains('Dengeli'));
   });
 
   test('veri odaklı olay zinciri gecikerek devam eder',(){
@@ -306,6 +309,62 @@ void main(){
     e.assumeSuccessor('Zehra');
     expect(s.playerGender,'female');
     expect(s.family[s.playerFamilyId]!.gender,'female');
+  });
+
+
+  test('10 güce karşı 20 güçte düşük ama sıfır olmayan kazanma şansı vardır',(){
+    final s=GameEngine.newGame(seed:7,name:'Hasan',background:'Köylü ailesi');
+    final e=GameEngine(s,catalog);
+    s.attributes['strength']=10;
+    s.skills['military']=20;
+    final chance=e.actionChance(attribute:'strength',skill:'military',opponentAttribute:20,opponentSkill:20);
+    expect(chance,greaterThanOrEqualTo(5));
+    expect(chance,lessThan(50));
+    final result=e.rollAction(attribute:'strength',skill:'military',opponentAttribute:20,opponentSkill:20);
+    expect(result.chance,chance);
+    expect(result.succeeded,isTrue);
+  });
+
+  test('aynı kayıt durumu aynı riskli seçimde aynı zarı üretir',(){
+    final a=GameEngine.newGame(seed:1502,name:'Hasan',background:'Köylü ailesi');
+    final b=GameState.fromJson(Map<String,dynamic>.from(jsonDecode(jsonEncode(a.toJson()))));
+    final ea=GameEngine(a,catalog),eb=GameEngine(b,catalog);
+    a.pendingEvents.add('warehouse_shadow');b.pendingEvents.add('warehouse_shadow');
+    final va=ea.pickEvent(),vb=eb.pickEvent();
+    expect(va.id,'warehouse_shadow');expect(vb.id,'warehouse_shadow');
+    final ra=ea.resolve(va,'hide');
+    final rb=eb.resolve(vb,'hide');
+    expect(ra,rb);
+    expect(jsonEncode(a.toJson()),jsonEncode(b.toJson()));
+  });
+
+  test('saklanma seçeneği düşük casuslukta da görünür ve zarla çözülür',(){
+    final s=GameEngine.newGame(seed:1503,name:'Hasan',background:'Köylü ailesi');
+    final e=GameEngine(s,catalog);
+    s.skills['espionage']=1;s.attributes['agility']=15;
+    s.pendingEvents.add('warehouse_shadow');
+    final event=e.pickEvent();
+    final hide=event.options.firstWhere((o)=>o.id=='hide');
+    expect(hide.hint,contains('Başarı şansı'));
+    final result=e.resolve(event,'hide');
+    expect(result,startsWith('Zar '));
+  });
+
+  test('NPC hedefleri oyuncudan bağımsız somut dünya eylemleri üretir',(){
+    final s=GameEngine.newGame(seed:1504,name:'Hasan',background:'Tüccar ailesi');
+    final e=GameEngine(s,catalog);
+    e.advance(28);
+    expect(s.chronicle.any((x)=>x.contains('kendi hedefleri doğrultusunda hareket etti')),isTrue);
+  });
+
+  test('güçlü NPC deneyimi gecikmeli sosyal yayılım kuyruğu oluşturur',(){
+    final s=GameEngine.newGame(seed:1505,name:'Hasan',background:'Tüccar ailesi');
+    final e=GameEngine(s,catalog);
+    s.currentCityId='kayseri';
+    s.pendingEvents.add('grain');
+    final event=e.pickEvent();
+    e.resolve(event,'talk');
+    expect(s.delayedEffects.any((x)=>x.type=='social_reputation'&&x.payload['sourceNpc']=='mahmud'),isTrue);
   });
 
 }
