@@ -31,8 +31,18 @@ jobs:
         with:
           gradle-version: '8.10.2'
       - name: Debug APK olustur
-        run: gradle :app:assembleDebug --no-daemon
-      - name: APK'yi yukle
+        run: |
+          set -o pipefail
+          gradle :app:assembleDebug --no-daemon 2>&1 | tee ../gundem-radari-build.log
+      - name: Derleme günlüğünü yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GundemRadari-build-log
+          path: gundem-radari-build.log
+          if-no-files-found: warn
+      - name: APK'yi yükle
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: GundemRadari-debug-apk
