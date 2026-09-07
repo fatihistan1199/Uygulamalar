@@ -1,19 +1,31 @@
 [
-  {"id":"trt_haber","name":"TRT Haber","group":"turkey","endpoint":"https://www.trthaber.com/manset_articles.rss","kind":"rss","trust":0.78,"enabled":true,"staged":false,"note":"Manşet RSS"},
-  {"id":"bbc_world","name":"BBC World","group":"world","endpoint":"https://feeds.bbci.co.uk/news/world/rss.xml","kind":"rss","trust":0.84,"enabled":true,"staged":false,"note":"World RSS"},
-  {"id":"al_jazeera","name":"Al Jazeera","group":"world","endpoint":"https://www.aljazeera.com/xml/rss/all.xml","kind":"rss","trust":0.76,"enabled":true,"staged":false,"note":"All news RSS"},
-  {"id":"gdacs","name":"GDACS","group":"official","endpoint":"https://www.gdacs.org/xml/rss.xml","kind":"rss","trust":0.95,"enabled":true,"staged":false,"note":"Global disaster RSS"},
-  {"id":"usgs","name":"USGS","group":"official","endpoint":"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.atom","kind":"rss","trust":1.0,"enabled":true,"staged":false,"note":"Son bir saat depremleri"},
-  {"id":"afad","name":"AFAD","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"Doğrulanmış otomatik uç bulunmadı."},
-  {"id":"haberturk","name":"Habertürk","group":"turkey","endpoint":"","kind":"staged","trust":0.68,"enabled":false,"staged":true,"note":"Doğrulanmış RSS uç bulunmadı."},
-  {"id":"sozcu","name":"Sözcü","group":"turkey","endpoint":"","kind":"staged","trust":0.62,"enabled":false,"staged":true,"note":"Doğrulanmış RSS uç bulunmadı."},
-  {"id":"dw_turkce","name":"DW Türkçe","group":"turkey","endpoint":"","kind":"staged","trust":0.75,"enabled":false,"staged":true,"note":"Doğrulanmış Türkçe RSS uç bulunmadı."},
-  {"id":"euronews_tr","name":"Euronews Türkçe","group":"turkey","endpoint":"","kind":"staged","trust":0.72,"enabled":false,"staged":true,"note":"Doğrulanmış Türkçe RSS uç bulunmadı."},
-  {"id":"tcmb","name":"TCMB","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"Doğrulanmış otomatik uç bulunmadı."},
-  {"id":"meb","name":"MEB","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"Doğrulanmış otomatik uç bulunmadı."},
-  {"id":"icisleri","name":"İçişleri Bakanlığı","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"Doğrulanmış otomatik uç bulunmadı."},
-  {"id":"spk","name":"SPK","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"Doğrulanmış otomatik uç bulunmadı."},
-  {"id":"who","name":"WHO","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"Doğrulanmış RSS uç bulunmadı."},
-  {"id":"gdelt","name":"GDELT","group":"world","endpoint":"","kind":"staged","trust":0.7,"enabled":false,"staged":true,"note":"Yanıt zaman aşımı nedeniyle staged durumda."},
-  {"id":"eksi_gundem","name":"Ekşi Gündem","group":"social","endpoint":"","kind":"staged","trust":0.25,"enabled":false,"staged":true,"note":"Erişim koruması aşılmadan otomatik tarama yapılamaz."}
+  {"id":"trt_haber","name":"TRT Haber","group":"turkey","endpoint":"https://www.trthaber.com/manset_articles.rss","kind":"rss","trust":0.78,"enabled":true,"staged":false,"note":"Resmî manşet RSS"},
+  {"id":"cnn_turk","name":"CNN Türk","group":"turkey","endpoint":"https://www.cnnturk.com/feed/rss/all/news","kind":"rss","trust":0.72,"enabled":true,"staged":false,"note":"Genel haber RSS"},
+  {"id":"ntv","name":"NTV","group":"turkey","endpoint":"https://www.ntv.com.tr/son-dakika.rss","kind":"rss","trust":0.74,"enabled":true,"staged":false,"note":"Son dakika RSS"},
+  {"id":"haberturk","name":"Habertürk","group":"turkey","endpoint":"https://www.haberturk.com/rss","kind":"rss","trust":0.68,"enabled":true,"staged":false,"note":"Resmî tüm haberler RSS"},
+  {"id":"sozcu","name":"Sözcü","group":"turkey","endpoint":"https://www.sozcu.com.tr/feeds-haberler","kind":"rss","trust":0.62,"enabled":true,"staged":false,"note":"Resmî haberler RSS"},
+  {"id":"bbc_turkce","name":"BBC News Türkçe","group":"turkey","endpoint":"https://feeds.bbci.co.uk/turkce/rss.xml","kind":"rss","trust":0.84,"enabled":true,"staged":false,"note":"Türkçe RSS"},
+  {"id":"dw_turkce","name":"DW Türkçe","group":"turkey","endpoint":"https://rss.dw.com/rdf/rss-tur-all","kind":"rss","trust":0.75,"enabled":true,"staged":false,"note":"Türkçe RSS"},
+  {"id":"euronews_tr","name":"Euronews Türkçe","group":"turkey","endpoint":"https://tr.euronews.com/rss?format=mrss&level=theme&name=news","kind":"rss","trust":0.72,"enabled":true,"staged":false,"note":"Resmî Türkçe MRSS"},
+  {"id":"birgun","name":"BirGün","group":"turkey","endpoint":"https://www.birgun.net/rss/home","kind":"rss","trust":0.62,"enabled":true,"staged":false,"note":"Resmî tüm içerikler RSS"},
+
+  {"id":"bbc_world","name":"BBC World","group":"world","endpoint":"https://feeds.bbci.co.uk/news/world/rss.xml","kind":"rss","trust":0.84,"enabled":true,"staged":false,"note":"World RSS · Türkçeye çevrilir"},
+  {"id":"al_jazeera","name":"Al Jazeera","group":"world","endpoint":"https://www.aljazeera.com/xml/rss/all.xml","kind":"rss","trust":0.76,"enabled":true,"staged":false,"note":"All news RSS · Türkçeye çevrilir"},
+  {"id":"cnn_world","name":"CNN World","group":"world","endpoint":"https://rss.cnn.com/rss/edition_world.rss","kind":"rss","trust":0.76,"enabled":true,"staged":false,"note":"World RSS · Türkçeye çevrilir"},
+
+  {"id":"gdacs","name":"GDACS","group":"official","endpoint":"https://www.gdacs.org/xml/rss.xml","kind":"rss","trust":0.95,"enabled":true,"staged":false,"note":"Küresel afet RSS · Türkçeye çevrilir"},
+  {"id":"usgs","name":"USGS","group":"official","endpoint":"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.atom","kind":"rss","trust":1.0,"enabled":true,"staged":false,"note":"Son bir saat depremleri · Türkçeye çevrilir"},
+
+  {"id":"ibrahim_haskologlu","name":"İbrahim Haskoloğlu","group":"social","endpoint":"https://t.me/s/ibrahimhaskologlu","kind":"telegram","trust":0.45,"enabled":true,"staged":false,"note":"Telegram erken haber sinyali · tek başına doğrulama sayılmaz"},
+
+  {"id":"kanald_ana_haber","name":"Kanal D Ana Haber","group":"turkey","endpoint":"https://www.kanald.com.tr/kanal-d-ana-haber","kind":"staged","trust":0.68,"enabled":false,"staged":true,"note":"Güvenilir RSS/tarih akışı bulunmadığı için henüz taranmıyor"},
+  {"id":"cumhuriyet","name":"Cumhuriyet","group":"turkey","endpoint":"","kind":"staged","trust":0.66,"enabled":false,"staged":true,"note":"Güncel RSS uç noktası uygulama içinde doğrulanmadan açılmayacak"},
+  {"id":"afad","name":"AFAD","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"JSON API adaptörü sonraki adım"},
+  {"id":"tcmb","name":"TCMB","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"RSS adaptörü sonraki adım"},
+  {"id":"meb","name":"MEB","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"HTML adaptörü sonraki adım"},
+  {"id":"icisleri","name":"İçişleri Bakanlığı","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"HTML adaptörü sonraki adım"},
+  {"id":"spk","name":"SPK","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"HTML adaptörü sonraki adım"},
+  {"id":"who","name":"WHO","group":"official","endpoint":"","kind":"staged","trust":1.0,"enabled":false,"staged":true,"note":"Hastalık salgını adaptörü sonraki adım"},
+  {"id":"gdelt","name":"GDELT","group":"world","endpoint":"","kind":"staged","trust":0.70,"enabled":false,"staged":true,"note":"API adaptörü sonraki adım"},
+  {"id":"eksi_gundem","name":"Ekşi Gündem","group":"social","endpoint":"","kind":"staged","trust":0.25,"enabled":false,"staged":true,"note":"Erişim koruması aşılmadan otomatik tarama yapılmayacak"}
 ]
