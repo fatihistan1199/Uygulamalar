@@ -886,16 +886,70 @@ class GameEngine {
       if(candidate.id==choiceId){choice=candidate;break;}
     }
     if(choice==null)return 'Seçenek bulunamadı.';
-    if(!_conditionsMet(choice.requirements))return 'Bu seçenek için gereken şartları artık karşılamıyorsun.';
+    if(!_choiceRequirementsMet(choice.requirements))return 'Bu seçenek için gereken somut şartları artık karşılamıyorsun.';
 
     if(def.major)state.lastMajorEventDay=state.day;
     state.eventLastDay[def.id]=state.day;
     state.pendingEvents.remove(def.id);
 
-    for(final effect in choice.effects)_applyEventEffect(effect,def.id);
-    state.chronicle.add('${state.day}. gün — ${_renderText(def.title)}: ${_renderText(choice.title)}.');
+    ActionRollResult? rolled;
+    var resultText=_renderText(choice.resultText);
+    if(choice.challenge==null){
+      for(final effect in choice.effects)_applyEventEffect(effect,def.id);
+    }else{
+      final challenge=choice.challenge!;
+      for(final effect in ((challenge['alwaysEffects'] as List?)??const[])){
+        _applyEventEffect(Map<String,dynamic>.from(effect as Map),def.id);
+      }
+      rolled=rollAction(
+        attribute:challenge['attribute'] as String? ?? 'willpower',
+        skill:challenge['skill'] as String? ?? 'localCulture',
+        difficulty:(challenge['difficulty'] as num?)?.toInt()??35,
+        modifier:(challenge['modifier'] as num?)?.toInt()??0,
+        opponentAttribute:(challenge['opponentAttribute'] as num?)?.toInt(),
+        opponentSkill:(challenge['opponentSkill'] as num?)?.toInt(),
+        secondarySkill:challenge['secondarySkill'] as String?,
+      );
+      List<dynamic> outcomeEffects;
+      String? alternativeText;
+      switch(rolled.outcome){
+        case ActionOutcome.criticalSuccess:
+          outcomeEffects=[...choice.effects,...((challenge['criticalSuccessEffects'] as List?)??const[])];
+          alternativeText=challenge['criticalSuccessText'] as String?;
+        case ActionOutcome.success:
+          outcomeEffects=choice.effects;
+          alternativeText=challenge['successText'] as String?;
+        case ActionOutcome.partial:
+          outcomeEffects=((challenge['partialEffects'] as List?)??const[]);
+          alternativeText=challenge['partialText'] as String?;
+        case ActionOutcome.failure:
+          outcomeEffects=((challenge['failureEffects'] as List?)??const[]);
+          alternativeText=challenge['failureText'] as String?;
+        case ActionOutcome.criticalFailure:
+          final critical=((challenge['criticalFailureEffects'] as List?)??const[]);
+          outcomeEffects=critical.isEmpty?((challenge['failureEffects'] as List?)??const[]):critical;
+          alternativeText=(challenge['criticalFailureText'] as String?)??challenge['failureText'] as String?;
+      }
+      for(final effect in outcomeEffects)_applyEventEffect(Map<String,dynamic>.from(effect as Map),def.id);
+      if(rolled.succeeded){
+        final skill=challenge['skill'] as String?;
+        if(skill!=null)state.skills[skill]=clamp100((state.skills[skill]??0)+1);
+      }
+      if(alternativeText!=null)resultText=_renderText(alternativeText);
+    }
+
+    final rollNote=rolled==null?'':' • zar ${rolled.roll}';
+    state.chronicle.add('${state.day}. gün — ${_renderText(def.title)}: ${_renderText(choice.title)}$rollNote.');
     _sync();
-    return _renderText(choice.resultText);
+    if(rolled==null)return resultText;
+    final outcomeLabel=switch(rolled.outcome){
+      ActionOutcome.criticalSuccess=>'Kritik başarı',
+      ActionOutcome.success=>'Başarı',
+      ActionOutcome.partial=>'Kısmi sonuç',
+      ActionOutcome.failure=>'Başarısızlık',
+      ActionOutcome.criticalFailure=>'Kritik başarısızlık',
+    };
+    return 'Zar ${rolled.roll} — $outcomeLabel\n$resultText';
   }
 
   void _applyEventEffect(Map<String,dynamic> effect,String sourceEventId){
@@ -939,8 +993,8 @@ class GameEngine {
         final reliability=min+_rng.nextInt(math.max(1,max-min+1));
         state.knowledge.add(KnowledgeEntry(
           id:'${effect['id']}_${state.day}_${state.knowledge.length}',
-          text:effect['text'] as String,
-          source:effect['source'] as String,
+          text:_renderText(effect['text'] as String),
+          source:_renderText(effect['source'] as String),
           reliability:reliability,
           day:state.day,
         ));
@@ -948,15 +1002,18 @@ class GameEngine {
         final npc=state.npcs[effect['npc']];
         if(npc!=null){
           final memory=_renderText((effect['memory'] as String?)??'Bu olayda oyuncunun tavrını hatırlıyor');
+          final trust=(effect['trust'] as num?)?.toInt()??0;
+          final respect=(effect['respect'] as num?)?.toInt()??0;
+          final fear=(effect['fear'] as num?)?.toInt()??0;
+          final affection=(effect['affection'] as num?)?.toInt()??0;
+          final suspicion=(effect['suspicion'] as num?)?.toInt()??0;
+          final debt=(effect['debt'] as num?)?.toInt()??0;
           npc.remember(MemoryEntry(
             text:memory,day:state.day,importance:(effect['importance'] as num?)?.toInt()??30,
-            trust:(effect['trust'] as num?)?.toInt()??0,
-            respect:(effect['respect'] as num?)?.toInt()??0,
-            fear:(effect['fear'] as num?)?.toInt()??0,
-            affection:(effect['affection'] as num?)?.toInt()??0,
-            suspicion:(effect['suspicion'] as num?)?.toInt()??0,
+            trust:trust,respect:respect,fear:fear,affection:affection,suspicion:suspicion,
           ));
-          npc.relation.change(debt:(effect['debt'] as num?)?.toInt()??0);
+          npc.relation.change(debt:debt);
+          _scheduleSocialPropagation(npc,trust+respect+affection-suspicion+(debt~/2),memory);
         }
       case 'family_relation':
         final member=_familyRole(effect['role'] as String);
@@ -965,6 +1022,7 @@ class GameEngine {
           final a=_familyBond(member);final b=member.relations.putIfAbsent(current.id,()=>RelationState());
           final trust=(effect['trust'] as num?)?.toInt()??0,respect=(effect['respect'] as num?)?.toInt()??0,fear=(effect['fear'] as num?)?.toInt()??0,affection=(effect['affection'] as num?)?.toInt()??0,suspicion=(effect['suspicion'] as num?)?.toInt()??0,debt=(effect['debt'] as num?)?.toInt()??0;
           a.change(trust:trust,respect:respect,fear:fear,affection:affection,suspicion:suspicion,debt:debt);b.change(trust:trust,respect:respect,fear:fear,affection:affection,suspicion:suspicion,debt:-debt);
+          _scheduleFamilyEcho(member,trust+respect+affection-suspicion+(debt~/2));
         }
       case 'family_add_spouse':
         final current=state.family[state.playerFamilyId];
