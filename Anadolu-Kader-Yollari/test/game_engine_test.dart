@@ -445,7 +445,7 @@ void main(){
   test('yeni oyun hikâye ile açılır ve oyuncuyu tanıtır',(){
     final s=GameEngine.newGame(seed:1701,name:'Hasan',background:'Köylü ailesi',gender:'male');
     final e=GameEngine(s,catalog);
-    expect(s.narrativeQueue,['intro_identity','background_koylu','city_konya','intro_path']);
+    expect(s.narrativeQueue,['intro_identity','background_koylu','city_konya','hook_konya','intro_path']);
     final story=e.currentStory(stories)!;
     expect(story.title,'Sen Kimsin?');
     expect(story.body,contains('Hasan'));
@@ -459,7 +459,7 @@ void main(){
     s.narrativeQueue.clear();
     e.travel('kayseri');
     expect(s.visitedCities,contains('kayseri'));
-    expect(s.narrativeQueue.last,'city_kayseri');
+    expect(s.narrativeQueue,['city_kayseri','hook_kayseri']);
     s.narrativeQueue.clear();
     e.travel('konya');
     expect(s.narrativeQueue.last,'city_return');
