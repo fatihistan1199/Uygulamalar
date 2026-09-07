@@ -628,46 +628,73 @@ class GundemViewModel(context:Context):ViewModel(){
 
     BoxWithConstraints(modifier.padding(vertical=8.dp)){
         val maxIndex=(totalItems-visibleCount).coerceAtLeast(1)
-        val progress=(listState.firstVisibleItemIndex.toFloat()/maxIndex).coerceIn(0f,1f)
-        val thumbFraction=(visibleCount.toFloat()/totalItems).coerceIn(.08f,.45f)
+        val progress=(listState.firstVisibleItemIndex.toFloat()/maxIndex)
+            .coerceIn(0f,1f)
+        val thumbFraction=(visibleCount.toFloat()/totalItems)
+            .coerceIn(.08f,.45f)
         val thumbHeight=(maxHeight*thumbFraction).coerceAtLeast(34.dp)
         val maxOffset=(maxHeight-thumbHeight).coerceAtLeast(0.dp)
         val offset=maxOffset*progress
+
+        val trackHeightPx=with(density){maxHeight.toPx()}
         val thumbHeightPx=with(density){thumbHeight.toPx()}
+        val usableTrackPx=(trackHeightPx-thumbHeightPx).coerceAtLeast(1f)
 
         Box(
             Modifier
-                .align(Alignment.Center)
+                .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .width(3.dp)
-                .background(
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha=.55f),
-                    CircleShape
-                )
-        )
+                .width(18.dp)
+                .pointerInput(totalItems,visibleCount,trackHeightPx){
+                    var dragProgress=0f
 
-        Box(
-            Modifier
-                .align(Alignment.TopCenter)
-                .offset(y=offset)
-                .width(6.dp)
-                .height(thumbHeight)
-                .background(
-                    MaterialTheme.colorScheme.primary.copy(alpha=.78f),
-                    CircleShape
-                )
-                .pointerInput(totalItems,visibleCount){
-                    detectVerticalDragGestures{change,dragAmount->
-                        change.consume()
-                        val usablePx=(size.height-thumbHeightPx).coerceAtLeast(1f)
-                        val current=listState.firstVisibleItemIndex.toFloat()/maxIndex
-                        val next=(current+dragAmount/usablePx).coerceIn(0f,1f)
-                        scope.launch{
-                            listState.scrollToItem((next*maxIndex).roundToInt())
+                    detectVerticalDragGestures(
+                        onDragStart={
+                            dragProgress=(
+                                listState.firstVisibleItemIndex.toFloat()/maxIndex
+                            ).coerceIn(0f,1f)
+                        },
+                        onVerticalDrag={change,dragAmount->
+                            change.consume()
+
+                            dragProgress=(
+                                dragProgress+dragAmount/usableTrackPx
+                            ).coerceIn(0f,1f)
+
+                            val targetIndex=(
+                                dragProgress*maxIndex
+                            ).roundToInt()
+
+                            scope.launch{
+                                listState.scrollToItem(targetIndex)
+                            }
                         }
-                    }
+                    )
                 }
-        )
+        ){
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .fillMaxHeight()
+                    .width(3.dp)
+                    .background(
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha=.55f),
+                        CircleShape
+                    )
+            )
+
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y=offset)
+                    .width(6.dp)
+                    .height(thumbHeight)
+                    .background(
+                        MaterialTheme.colorScheme.primary.copy(alpha=.78f),
+                        CircleShape
+                    )
+            )
+        }
     }
 }
 
