@@ -178,6 +178,7 @@ class _GamePageState extends State<GamePage>{
       if(outcome!=null)Card(child:Padding(padding:const EdgeInsets.all(14),child:Text(outcome!))),
       _cityCard(context),
       FilledButton.icon(onPressed:_seek,icon:const Icon(Icons.forum_outlined),label:const Text('Şehirde dolaş / bilgi ara')),
+      OutlinedButton.icon(onPressed:_marketSheet,icon:const Icon(Icons.storefront_outlined),label:const Text('Pazara git')),
       OutlinedButton.icon(onPressed:_travel,icon:const Icon(Icons.map_outlined),label:const Text('Seyahat et')),
       OutlinedButton.icon(onPressed:()=>_advance(7),icon:const Icon(Icons.calendar_month),label:const Text('Bir hafta geçir')),
       if(state!.delayedEffects.isNotEmpty)Padding(
@@ -196,7 +197,49 @@ class _GamePageState extends State<GamePage>{
         Chip(label:Text('Gıda ${c.food}')),Chip(label:Text('Ticaret ${c.trade}')),Chip(label:Text('Huzur ${c.order}')),
         Chip(label:Text('Güvenlik ${c.security}')),Chip(label:Text('Refah ${c.prosperity}')),Chip(label:Text('Eşkıyalık ${c.banditry}')),
       ]),
+      if(state!.inventory.values.any((q)=>q>0))...[
+        const Divider(),const Text('Heybe',style:TextStyle(fontWeight:FontWeight.bold)),
+        Wrap(spacing:6,children:state!.inventory.entries.where((e)=>e.value>0).map((e)=>Chip(label:Text('${GameEngine.goods[e.key]} ×${e.value}'))).toList()),
+      ],
     ])));
+  }
+
+
+  Future<void> _marketSheet()async{
+    await showModalBottomSheet<void>(
+      context:context,
+      isScrollControlled:true,
+      builder:(sheetContext)=>StatefulBuilder(builder:(context,setSheetState)=>SafeArea(child:Padding(
+        padding:const EdgeInsets.all(16),
+        child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+          Row(children:[Expanded(child:Text('${state!.city.name} Pazarı',style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold))),Text('${state!.money} akçe',style:const TextStyle(fontWeight:FontWeight.bold))]),
+          const SizedBox(height:6),
+          Text('Fiyatlar şehir stokuna ve ticaret durumuna göre değişir.',style:Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height:10),
+          ...GameEngine.goods.entries.map((g){
+            final buy=engine!.marketPrice(g.key,buying:true),sell=engine!.marketPrice(g.key,buying:false);
+            final have=state!.inventory[g.key]??0,stock=state!.city.stock[g.key]??0;
+            return Card(child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[
+              Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                Text(g.value,style:const TextStyle(fontWeight:FontWeight.bold)),
+                Text('Pazar stoku $stock • Heybende $have',style:Theme.of(context).textTheme.bodySmall),
+              ])),
+              Column(children:[
+                FilledButton.tonal(onPressed:(){
+                  outcome=engine!.buyGood(g.key);setSheetState((){});setState((){});_save();
+                },child:Text('Al $buy')),
+                SizedBox(height:4),
+                OutlinedButton(onPressed:have>0?(){
+                  outcome=engine!.sellGood(g.key);setSheetState((){});setState((){});_save();
+                }:null,child:Text('Sat $sell')),
+              ]),
+            ])));
+          }),
+          const SizedBox(height:4),
+          FilledButton(onPressed:()=>Navigator.pop(sheetContext),child:const Text('Pazardan ayrıl')),
+        ]),
+      ))),
+    );
   }
 
   Widget _eventCard(BuildContext context)=>Card(child:Padding(
