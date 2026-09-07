@@ -14,7 +14,8 @@ data class EventResearchReport(
     val event:EventEntity,
     val whatHappened:List<String>,
     val details:List<String>,
-    val articles:List<ResearchedArticle>,
+    val background:List<String>,
+    val displayArticles:List<ResearchedArticle>,
     val firstAt:Long?,
     val latestAt:Long?
 )
@@ -29,7 +30,7 @@ class EventResearchService(
         val times=rows.map{it.publishedAt?:it.firstSeenAt}
         val query=rows.firstOrNull{it.originalTitle.isNotBlank()}?.originalTitle ?: event.title
 
-        val primaryJobs=rows.distinctBy{it.url}.take(3).mapIndexed{index,row->
+        val primaryArticles=rows.distinctBy{it.url}.take(3).mapIndexed{index,row->
             async{
                 articleReader.read(row.url)?.let{d->
                     ResearchedArticle(
@@ -51,17 +52,15 @@ class EventResearchService(
                     isPrimary=index==0
                 )
             }
-        }
-
-        val primaryArticles=primaryJobs.awaitAll()
+        }.awaitAll()
 
         val webResults=runCatching{
-            webSearch.search(query,limit=8,expandDescriptions=false)
+            webSearch.search(query,limit=10,expandDescriptions=false)
         }.getOrElse{emptyList()}
 
-        val webJobs=webResults
-            .filter{wr->primaryArticles.none{it.url==wr.url || it.title.equals(wr.title,true)}}
-            .take(5)
+        val webArticles=webResults
+            .filter{wr->primaryArticles.none{it.title.equals(wr.title,true)}}
+            .take(6)
             .map{wr->
                 async{
                     articleReader.read(wr.url)?.let{d->
@@ -84,20 +83,29 @@ class EventResearchService(
                         isPrimary=false
                     )
                 }
-            }
+            }.awaitAll()
 
-        val articles=(primaryArticles+webJobs.awaitAll())
-            .filter{it.title.isNotBlank()||it.description.isNotBlank()}
+        val allArticles=(primaryArticles+webArticles)
+            .filter{it.title.isNotBlank()||it.description.isNotBlank()||it.paragraphs.isNotEmpty()}
             .distinctBy{it.url}
-            .take(8)
+            .take(9)
 
-        val (what,details)=summarizeResearch(event.title,articles)
+        val summary=summarizeResearch(event.title,allArticles)
+
+        val visible=allArticles
+            .sortedWith(
+                compareByDescending<ResearchedArticle>{it.isPrimary}
+                    .thenByDescending{it.description.length+it.paragraphs.sumOf{p->p.length}}
+            )
+            .distinctBy{it.sourceName.lowercase()}
+            .take(2)
 
         EventResearchReport(
             event=event,
-            whatHappened=what,
-            details=details,
-            articles=articles,
+            whatHappened=summary.whatHappened,
+            details=summary.details,
+            background=summary.background,
+            displayArticles=visible,
             firstAt=times.minOrNull(),
             latestAt=times.maxOrNull()
         )

@@ -6,7 +6,7 @@ plugins {
     id("com.google.devtools.ksp")
 }
 android { namespace = "tr.com.gundemradari"; compileSdk = 35
-    defaultConfig { applicationId = "tr.com.gundemradari"; minSdk = 26; targetSdk = 35; versionCode = 6; versionName = "0.5" }
+    defaultConfig { applicationId = "tr.com.gundemradari"; minSdk = 26; targetSdk = 35; versionCode = 7; versionName = "0.6" }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -28,8 +28,6 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
-    implementation("com.google.mlkit:translate:17.0.3")
     implementation("org.jsoup:jsoup:1.18.3")
     debugImplementation("androidx.compose.ui:ui-tooling:1.7.8")
     testImplementation("junit:junit:4.13.2")
