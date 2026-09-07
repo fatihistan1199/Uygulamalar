@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.Flow
 data class ResearchItemRow(
     val sourceName:String,
     val groupName:String,
+    val url:String,
     val title:String,
     val summary:String,
     val originalTitle:String,
@@ -44,6 +45,7 @@ data class ResearchItemRow(
     @Query("SELECT * FROM sources WHERE enabled=1 AND staged=0") suspend fun enabledSources(): List<SourceEntity>
     @Query("SELECT * FROM sources WHERE id=:id LIMIT 1") suspend fun source(id:String):SourceEntity?
     @Insert(onConflict=OnConflictStrategy.REPLACE) suspend fun putSource(row:SourceEntity)
+    @Query("DELETE FROM sources WHERE id NOT IN (:ids)") suspend fun deleteSourcesExcept(ids:List<String>)
     @Query("UPDATE sources SET enabled=:enabled WHERE id=:id") suspend fun setSource(id:String,enabled:Boolean)
     @Query("UPDATE sources SET enabled=CASE WHEN staged=0 AND :mode=1 THEN 1 WHEN :mode=0 THEN 0 ELSE enabled END") suspend fun setAll(mode:Int)
     @Query("SELECT EXISTS(SELECT 1 FROM raw_items WHERE url=:url)") suspend fun rawExists(url:String):Boolean
@@ -58,7 +60,7 @@ data class ResearchItemRow(
     @Query("SELECT * FROM events WHERE religionPriority > 0 AND noise < 70 ORDER BY religionPriority DESC,importance DESC,updatedAt DESC LIMIT 80") fun religionFeed():Flow<List<EventEntity>>
     @Query("SELECT * FROM events WHERE importance >= 55 AND firstSeenAt > :after AND noise < 50 ORDER BY importance DESC") fun missedFeed(after:Long):Flow<List<EventEntity>>
     @Query("""
-        SELECT s.name AS sourceName, s.groupName AS groupName,
+        SELECT s.name AS sourceName, s.groupName AS groupName, r.url AS url,
                r.title AS title, r.summary AS summary,
                r.originalTitle AS originalTitle, r.originalSummary AS originalSummary,
                r.publishedAt AS publishedAt, r.firstSeenAt AS firstSeenAt, s.trust AS trust
@@ -74,7 +76,7 @@ data class ResearchItemRow(
 
 @Database(
     entities=[SourceEntity::class,RawItemEntity::class,EventEntity::class,EventItemEntity::class,EventVersionEntity::class,ScanHistoryEntity::class],
-    version=5,
+    version=6,
     exportSchema=false
 )
 abstract class AppDatabase:RoomDatabase(){
@@ -82,40 +84,38 @@ abstract class AppDatabase:RoomDatabase(){
     companion object {
         @Volatile private var INSTANCE:AppDatabase?=null
         private val MIGRATION_1_2=object:Migration(1,2){
-            override fun migrate(db:SupportSQLiteDatabase){
-                db.execSQL("ALTER TABLE events ADD COLUMN publishedAt INTEGER")
-            }
+            override fun migrate(db:SupportSQLiteDatabase){db.execSQL("ALTER TABLE events ADD COLUMN publishedAt INTEGER")}
         }
         private val MIGRATION_2_3=object:Migration(2,3){
             override fun migrate(db:SupportSQLiteDatabase){
-                db.execSQL("DELETE FROM event_items")
-                db.execSQL("DELETE FROM event_versions")
-                db.execSQL("DELETE FROM events")
-                db.execSQL("DELETE FROM raw_items")
+                db.execSQL("DELETE FROM event_items");db.execSQL("DELETE FROM event_versions")
+                db.execSQL("DELETE FROM events");db.execSQL("DELETE FROM raw_items")
             }
         }
         private val MIGRATION_3_4=object:Migration(3,4){
             override fun migrate(db:SupportSQLiteDatabase){
                 db.execSQL("ALTER TABLE events ADD COLUMN religionPriority INTEGER NOT NULL DEFAULT 0")
-                db.execSQL("DELETE FROM event_items")
-                db.execSQL("DELETE FROM event_versions")
-                db.execSQL("DELETE FROM events")
-                db.execSQL("DELETE FROM raw_items")
+                db.execSQL("DELETE FROM event_items");db.execSQL("DELETE FROM event_versions")
+                db.execSQL("DELETE FROM events");db.execSQL("DELETE FROM raw_items")
             }
         }
         private val MIGRATION_4_5=object:Migration(4,5){
             override fun migrate(db:SupportSQLiteDatabase){
                 db.execSQL("ALTER TABLE raw_items ADD COLUMN originalTitle TEXT NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE raw_items ADD COLUMN originalSummary TEXT NOT NULL DEFAULT ''")
-                db.execSQL("DELETE FROM event_items")
-                db.execSQL("DELETE FROM event_versions")
-                db.execSQL("DELETE FROM events")
-                db.execSQL("DELETE FROM raw_items")
+                db.execSQL("DELETE FROM event_items");db.execSQL("DELETE FROM event_versions")
+                db.execSQL("DELETE FROM events");db.execSQL("DELETE FROM raw_items")
+            }
+        }
+        private val MIGRATION_5_6=object:Migration(5,6){
+            override fun migrate(db:SupportSQLiteDatabase){
+                db.execSQL("DELETE FROM event_items");db.execSQL("DELETE FROM event_versions")
+                db.execSQL("DELETE FROM events");db.execSQL("DELETE FROM raw_items")
             }
         }
         fun get(context:Context)=INSTANCE?: synchronized(this){
             INSTANCE?:Room.databaseBuilder(context.applicationContext,AppDatabase::class.java,"gundem-radari.db")
-                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6)
                 .build()
                 .also{INSTANCE=it}
         }

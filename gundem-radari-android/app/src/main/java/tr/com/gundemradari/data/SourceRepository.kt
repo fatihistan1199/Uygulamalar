@@ -16,11 +16,13 @@ class SourceRepository(private val context:Context,private val dao:GundemDao){
             val row=SourceEntity(src.id,src.name,src.group,src.endpoint,src.kind,src.trust,src.enabled,src.staged,src.note)
             val old=dao.source(src.id)
             val enabled=when{
+                row.staged -> false
                 old==null -> row.enabled
                 old.staged && !row.staged -> row.enabled
                 else -> old.enabled
             }
             dao.putSource(row.copy(enabled=enabled))
         }
+        dao.deleteSourcesExcept(rows.map{it.id})
     }
 }
