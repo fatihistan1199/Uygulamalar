@@ -4151,6 +4151,12 @@
             {
               "type": "queue_story",
               "storyId": "story_named_marriage"
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "family_child_birth",
+              "minDays": 300,
+              "maxDays": 620
             }
           ],
           "challenge": {
@@ -4406,6 +4412,12 @@
             {
               "type": "queue_story",
               "storyId": "story_named_marriage"
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "family_child_birth",
+              "minDays": 300,
+              "maxDays": 620
             }
           ],
           "challenge": {
