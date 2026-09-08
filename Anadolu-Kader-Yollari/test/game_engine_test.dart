@@ -512,4 +512,94 @@ void main(){
     expect(e.cityMoodText(),contains('güvenliği'));
   });
 
+
+  test('geçici anılar zayıflar, kalıcı anılar korunur',(){
+    final s=GameEngine.newGame(seed:1801,name:'Hasan',background:'Köylü ailesi');
+    final e=GameEngine(s,catalog);
+    final npc=s.npcs['selma']!;
+    npc.memories.add(MemoryEntry(text:'Geçici olay',day:s.day,importance:40,trust:2,respect:0,fear:0,affection:1,suspicion:0,decay:3));
+    npc.memories.add(MemoryEntry(text:'Kalıcı olay',day:s.day,importance:80,trust:8,respect:4,fear:0,affection:6,suspicion:0,decay:5,permanent:true));
+    e.decayMemoriesForTest();
+    expect(npc.memories[0].importance,37);
+    expect(npc.memories[1].importance,80);
+    expect(npc.memories[1].permanent,isTrue);
+    expect(npc.memories[1].deltaSummary,contains('güven +8'));
+  });
+
+  test('üç işten sonra başlangıçta seçilmeyen doğal geçim yolu oluşur',(){
+    final s=GameEngine.newGame(seed:1802,name:'Hasan',background:'Asker ailesi');
+    final e=GameEngine(s,catalog);
+    s.narrativeQueue.clear();
+    e.doLocalWork();e.doLocalWork();e.doLocalWork();
+    expect(s.eventFlags['work_count'],3);
+    expect(s.storyThreads['livelihood'],isNotNull);
+    expect(s.narrativeQueue,contains('milestone_work_identity'));
+    expect(s.pendingEvents,contains('work_patron_offer'));
+    expect(e.workIdentity(),isNot('henüz belirginleşmemiş'));
+  });
+
+  test('hikâye iplikleri save load ile korunur',(){
+    final s=GameEngine.newGame(seed:1803,name:'Hasan',background:'Tüccar ailesi');
+    s.storyThreads['selma_friendship']='dostluk';
+    s.storyThreads['nasir_relation']='rekabet';
+    final restored=GameState.fromJson(Map<String,dynamic>.from(jsonDecode(jsonEncode(s.toJson()))));
+    expect(restored.storyThreads['selma_friendship'],'dostluk');
+    expect(restored.storyThreads['nasir_relation'],'rekabet');
+  });
+
+  test('Selma hikâyesi ilişki nedeni ve aylar sonrası takip üretir',(){
+    final s=GameEngine.newGame(seed:11,name:'Hasan',background:'Tüccar ailesi');
+    final e=GameEngine(s,catalog);
+    s.currentCityId='kayseri';
+    s.eventFlags['first_task_done']=true;
+    s.attributes['rhetoric']=100;s.skills['leadership']=100;s.skills['localCulture']=100;
+    s.pendingEvents.add('selma_han_acquaintance');
+    final event=e.pickEvent();
+    expect(event.id,'selma_han_acquaintance');
+    final result=e.resolve(event,'help');
+    expect(result,contains('Başarı'));
+    expect(s.storyThreads['selma_friendship'],'tanışıklık derinleşiyor');
+    expect(s.npcs['selma']!.memories.any((m)=>m.text.contains('Han karıştığında')),isTrue);
+    expect(s.delayedEffects.where((x)=>x.type=='event_followup'&&x.payload['eventId']=='selma_han_return').length,1);
+    expect(s.narrativeQueue,contains('story_selma_bond'));
+  });
+
+  test('Nâsır rekabet kararı kalıcı hafıza ve gecikmiş karşı hamle üretir',(){
+    final s=GameEngine.newGame(seed:1805,name:'Hasan',background:'Medrese öğrencisi');
+    final e=GameEngine(s,catalog);
+    s.currentCityId='konya';
+    s.eventFlags['first_task_done']=true;
+    s.pendingEvents.add('nasir_offer');
+    final event=e.pickEvent();
+    expect(event.id,'nasir_offer');
+    e.resolve(event,'refuse');
+    expect(s.storyThreads['nasir_relation'],'rekabet');
+    expect(s.npcs['nasir']!.memories.last.permanent,isTrue);
+    expect(s.delayedEffects.any((x)=>x.payload['eventId']=='nasir_rivalry_return'),isTrue);
+    expect(s.narrativeQueue,contains('story_nasir_rivalry'));
+  });
+
+  test('NPC ile evlilik oyuncu ailesine ve toplumsal ağa bağlanır',(){
+    final s=GameEngine.newGame(seed:1806,name:'Hasan',background:'Köylü ailesi',gender:'male');
+    final e=GameEngine(s,catalog);
+    final before=s.factions['tuccar']!.reputation;
+    final spouse=e.marryNpcForTest('leyla');
+    expect(spouse,isNotNull);
+    expect(spouse!.linkedNpcId,'leyla');
+    expect(spouse.networkFactionId,'tuccar');
+    expect(s.family[s.playerFamilyId]!.spouseId,spouse.id);
+    expect(s.npcs['leyla']!.spouseId,startsWith('family:'));
+    expect(s.factions['tuccar']!.reputation,before+4);
+    expect(e.householdNetworkSummary(),contains('Tüccarlar'));
+  });
+
+  test('kişisel hikâye olayları katalogda uzun zincir olarak bulunur',(){
+    expect(catalog['selma_han_acquaintance']?.chainId,'selma_personal');
+    expect(catalog['selma_old_favor']?.chainStage,3);
+    expect(catalog['nasir_rivalry_return']?.scheduledOnly,isTrue);
+    expect(catalog['leyla_courtship']?.tags,contains('romance'));
+    expect(catalog.events.length,greaterThanOrEqualTo(36));
+    expect(stories.scenes,contains('milestone_work_identity'));
+  });
+
 }
