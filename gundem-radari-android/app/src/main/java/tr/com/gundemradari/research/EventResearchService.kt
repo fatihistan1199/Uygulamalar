@@ -363,7 +363,14 @@ class EventResearchService(
 
         return LoadedArticle(
             article=ResearchedArticle(
-                sourceName=row.sourceName,
+                sourceName=if(
+                    row.groupName=="religion_search" &&
+                    details.host.isNotBlank()
+                ){
+                    details.host
+                }else{
+                    row.sourceName
+                },
                 title=details.title.ifBlank{row.title},
                 url=details.finalUrl.ifBlank{row.url},
                 description=cleanResearchText(details.description)
