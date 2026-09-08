@@ -274,12 +274,19 @@ class _GamePageState extends State<GamePage>{
       leading:CircleAvatar(child:Text('$done/${goals.length}')),
       title:const Text('Yaşam Yolu',style:TextStyle(fontWeight:FontWeight.bold)),
       subtitle:const Text('Bunlar zorunlu görevler değil; kurduğun hayatın kilometre taşları.'),
-      children:goals.map((g)=>ListTile(
-        dense:true,
-        leading:Icon(g.complete?Icons.check_circle:Icons.radio_button_unchecked),
-        title:Text(g.title),
-        subtitle:Text(g.description),
-      )).toList(),
+      children:[
+        ...goals.map((g)=>ListTile(
+          dense:true,
+          leading:Icon(g.complete?Icons.check_circle:Icons.radio_button_unchecked),
+          title:Text(g.title),
+          subtitle:Text(g.description),
+        )),
+        if(engine!.storyThreadSummaries().isNotEmpty)...[
+          const Divider(),
+          const ListTile(dense:true,title:Text('Devam Eden Hikâyeler',style:TextStyle(fontWeight:FontWeight.bold))),
+          ...engine!.storyThreadSummaries().map((t)=>ListTile(dense:true,leading:const Icon(Icons.auto_stories_outlined,size:20),title:Text(t))),
+        ],
+      ],
     ));
   }
 
@@ -451,7 +458,7 @@ class _GamePageState extends State<GamePage>{
         subtitle:Text('${n.profession} • ${n.age} yaş • ${state!.cities[n.cityId]!.name} • ${state!.factions[n.factionId]!.name}'),
         children:[Padding(padding:const EdgeInsets.fromLTRB(16,0,16,14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text('Hedef: ${n.goal}',style:const TextStyle(fontStyle:FontStyle.italic)),
-          if(n.spouseId!=null)Text('Eşi: ${state!.npcs[n.spouseId]?.name??'bilinmiyor'} • Çocuk: ${n.childIds.length}'),
+          if(n.spouseId!=null)Text('Eşi: ${n.spouseId!.startsWith('family:')?state!.playerName:(state!.npcs[n.spouseId]?.name??'bilinmiyor')} • Çocuk: ${n.childIds.length}'),
           const SizedBox(height:8),
           Wrap(spacing:6,runSpacing:4,children:[
             Chip(label:Text('Güven ${n.relation.trust}')),Chip(label:Text('Saygı ${n.relation.respect}')),Chip(label:Text('Korku ${n.relation.fear}')),
@@ -459,7 +466,12 @@ class _GamePageState extends State<GamePage>{
           ]),
           if(n.memories.isNotEmpty)...[
             const Divider(),const Text('Seni neden böyle görüyor?',style:TextStyle(fontWeight:FontWeight.bold)),
-            ...n.memories.reversed.take(5).map((m)=>ListTile(dense:true,contentPadding:EdgeInsets.zero,title:Text(m.text),subtitle:Text('${m.day}. gün • önem ${m.importance}'))),
+            ...n.memories.reversed.take(6).map((m)=>ListTile(
+              dense:true,contentPadding:EdgeInsets.zero,
+              leading:Icon(m.permanent?Icons.bookmark:Icons.history,size:18),
+              title:Text(m.text),
+              subtitle:Text('${m.day}. gün • ${m.source} • ${m.deltaSummary}${m.permanent?' • kalıcı anı':' • önem '+m.importance.toString()}'),
+            )),
           ],
         ]))],
       ))),
@@ -483,7 +495,9 @@ class _GamePageState extends State<GamePage>{
     final current=state!.family[state!.playerFamilyId];
     return ListView(padding:const EdgeInsets.all(12),children:[
       Text('Aile ve Soy',style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.bold)),
-      const Text('Akrabalık artık yalnız soy kaydı değildir: güven, yakınlık, şüphe ve yükümlülükler olay seçeneklerini değiştirebilir.'),
+      const Text('Akrabalık yalnız soy kaydı değildir: güven, yakınlık, şüphe, yükümlülük ve evlilikle gelen toplumsal ağlar olayları değiştirebilir.'),
+      const SizedBox(height:6),
+      Text(engine!.householdNetworkSummary(),style:Theme.of(context).textTheme.bodySmall),
       const SizedBox(height:8),
       ...members.map((m){
         final parents=m.parentIds.map((id)=>state!.family[id]?.name??id).join(', ');
@@ -494,7 +508,7 @@ class _GamePageState extends State<GamePage>{
         return Card(child:ListTile(
           leading:CircleAvatar(child:Icon(m.id==state!.playerFamilyId?Icons.person:Icons.account_tree_outlined)),
           title:Text('${m.name}${m.id==state!.playerFamilyId?' (oynanan kişi)':''}'),
-          subtitle:Text('$sex • ${m.age} yaş • ${m.alive?'hayatta':'vefat etti'}${spouse.isEmpty?'':'\nEş: $spouse'}${parents.isEmpty?'':'\nEbeveyn: $parents'}${children.isEmpty?'':'\nÇocuk: $children'}${bond==null?'':'\nBağ: güven ${bond.trust} • yakınlık ${bond.affection} • şüphe ${bond.suspicion} • borç ${bond.debt}'}'),
+          subtitle:Text('$sex • ${m.age} yaş • ${m.alive?'hayatta':'vefat etti'}${spouse.isEmpty?'':'\nEş: $spouse'}${parents.isEmpty?'':'\nEbeveyn: $parents'}${children.isEmpty?'':'\nÇocuk: $children'}${m.networkFactionId==null?'':'\nÇevre bağı: ${state!.factions[m.networkFactionId!]?.name??m.networkFactionId}'}${bond==null?'':'\nBağ: güven ${bond.trust} • yakınlık ${bond.affection} • şüphe ${bond.suspicion} • borç ${bond.debt}'}'),
         ));
       }),
     ]);
