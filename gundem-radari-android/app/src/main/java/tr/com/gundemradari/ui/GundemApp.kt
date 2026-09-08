@@ -945,7 +945,13 @@ private fun openInOpera(context:Context,url:String){
 
                     if(report.displayArticles.isNotEmpty()){
                         HorizontalDivider()
-                        Text("Kaynaklar",style=MaterialTheme.typography.labelLarge)
+                        Text(
+                            if(report.displayArticles.any{it.quality<0.0})
+                                "Kaynaklar ve kişi hesapları"
+                            else
+                                "Kaynaklar",
+                            style=MaterialTheme.typography.labelLarge
+                        )
                         report.displayArticles.forEach{a->
                             Column(Modifier.fillMaxWidth().padding(vertical=4.dp)){
                                 Text(
