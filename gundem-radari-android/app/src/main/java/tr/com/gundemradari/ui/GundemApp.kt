@@ -207,8 +207,22 @@ class GundemViewModel(context:Context):ViewModel(){
                     )
                 }.getOrElse{emptyList()}
                     .filter{row->
-                        val hay=normalizeSearch(row.title+" "+row.snippet)
-                        terms.all{hay.contains(it)}
+                        val matched=matchedSearchTerms(
+                            terms,
+                            row.title+" "+row.snippet
+                        )
+                        val required=if(terms.size<=2){
+                            terms.size
+                        }else{
+                            terms.size-1
+                        }
+                        matched>=required &&
+                            searchMatchScore(
+                                terms=terms,
+                                title=row.title,
+                                summary=row.snippet,
+                                fullText=row.title+" "+row.snippet
+                            )>=3.0
                     }
                     .map{row->
                         EventEntity(
