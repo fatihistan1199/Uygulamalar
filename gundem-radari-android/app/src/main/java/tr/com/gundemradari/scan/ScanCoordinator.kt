@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import tr.com.gundemradari.data.*
+import tr.com.gundemradari.religion.ReligionTracker
 import tr.com.gundemradari.religion.ReligionWatchEngine
 import tr.com.gundemradari.research.EventResearchService
 import java.util.UUID
@@ -23,62 +24,121 @@ class ScanCoordinator(private val db:AppDatabase){
         try{
             return withContext(Dispatchers.Default){
                 coroutineScope{
-                val started=System.currentTimeMillis()
-                val sources=dao.scanSources(started)
-                val touchedEvents=linkedSetOf<String>()
-                val failures=mutableListOf<String>()
-                var count=0
+                    val started=System.currentTimeMillis()
+                    cleanupOldReligion(started)
 
-                onProgress("${sources.size} kaynak taranıyor")
+                    val sources=dao.scanSources(started)
+                    val mainSources=sources.filterNot{
+                        it.groupName=="religion_direct" ||
+                        it.groupName=="religion_search"
+                    }
+                    val religionDirect=sources.filter{
+                        it.groupName=="religion_direct"
+                    }
+                    val religionPeople=sources.filter{
+                        it.groupName=="religion_search"
+                    }
 
-                val outcomes=sources.map{s->async{s to runCatching{client.fetch(s)}}}.awaitAll()
+                    val touchedEvents=linkedSetOf<String>()
+                    val failures=mutableListOf<String>()
+                    var count=0
 
-                outcomes.forEach{(source,result)->
-                    result.onSuccess{items->
-                        markSourceSuccess(source.id)
-                        for(item in items){
-                            if(dao.rawExists(item.url))continue
+                    suspend fun processStage(
+                        stageSources:List<SourceEntity>,
+                        progress:String
+                    ):Int{
+                        if(stageSources.isEmpty())return 0
 
-                            val localized=translator.translateIfNeeded(item)
-                            val cleaned=localized.copy(
-                                title=sanitizeNewsText(localized.title),
-                                summary=sanitizeNewsText(localized.summary),
-                                originalTitle=sanitizeNewsText(localized.originalTitle),
-                                originalSummary=sanitizeNewsText(localized.originalSummary)
-                            )
+                        onProgress(progress)
+                        val outcomes=stageSources.map{s->
+                            async{s to runCatching{client.fetch(s)}}
+                        }.awaitAll()
 
-                            persist(cleaned)?.let{eventId->
-                                count++
-                                touchedEvents+=eventId
+                        var fetchedCount=0
+                        outcomes.forEach{(source,result)->
+                            result.onSuccess{items->
+                                markSourceSuccess(source.id)
+                                fetchedCount+=items.size
+
+                                for(item in items){
+                                    if(dao.rawExists(item.url))continue
+
+                                    val localized=translator.translateIfNeeded(item)
+                                    val cleaned=localized.copy(
+                                        title=sanitizeNewsText(localized.title),
+                                        summary=sanitizeNewsText(localized.summary),
+                                        originalTitle=sanitizeNewsText(localized.originalTitle),
+                                        originalSummary=sanitizeNewsText(localized.originalSummary)
+                                    )
+
+                                    persist(cleaned)?.let{eventId->
+                                        count++
+                                        touchedEvents+=eventId
+                                    }
+                                }
+                            }.onFailure{
+                                failures+=source.name
+                                markSourceFailure(source.id)
                             }
                         }
-                    }.onFailure{
-                        failures+=source.name
-                        markSourceFailure(source.id)
+
+                        return fetchedCount
                     }
-                }
 
-                dao.scan(
-                    ScanHistoryEntity(
-                        startedAt=started,
-                        finishedAt=System.currentTimeMillis(),
-                        newItems=count,
-                        failedSources=failures.size
+                    // 1) Türkiye/Dünya ve genel erken sinyaller tamamlanmadan
+                    // Din taraması başlamaz.
+                    val mainFetched=processStage(
+                        mainSources,
+                        "Türkiye ve dünya gündemi taranıyor"
                     )
-                )
 
-                if(touchedEvents.isNotEmpty()){
-                    if(waitForReview)reviewCategorizationSlowly(touchedEvents)
-                    else scheduleBackgroundMaintenance(touchedEvents)
-                }
+                    // Ana kaynaklar gerçekten haber döndürdüyse Din aşamasına geç.
+                    // Yeni kayıt şart değildir; var olan güncel haberlerin bulunması yeterlidir.
+                    if(mainFetched>0){
+                        // 2) Genel Din gündemi.
+                        processStage(
+                            religionDirect,
+                            "Din gündemi taranıyor"
+                        )
 
-                onProgress("$count yeni kayıt")
-                ScanOutcome(count,failures)
+                        // 3) En son yalnız takip edilen kişilere özel tarama.
+                        processStage(
+                            religionPeople,
+                            "Takip edilen kişiler aranıyor"
+                        )
+                    }else{
+                        onProgress("Ana gündemden sonuç alınamadı; Din taraması ertelendi")
+                    }
+
+                    dao.scan(
+                        ScanHistoryEntity(
+                            startedAt=started,
+                            finishedAt=System.currentTimeMillis(),
+                            newItems=count,
+                            failedSources=failures.size
+                        )
+                    )
+
+                    if(touchedEvents.isNotEmpty()){
+                        if(waitForReview)reviewCategorizationSlowly(touchedEvents)
+                        else scheduleBackgroundMaintenance(touchedEvents)
+                    }
+
+                    onProgress("$count yeni kayıt")
+                    ScanOutcome(count,failures)
                 }
             }
         }finally{
             scanMutex.unlock()
         }
+    }
+
+    private suspend fun cleanupOldReligion(now:Long)=db.withTransaction{
+        val after=ReligionTracker.cutoff(now)
+        dao.deleteOldReligionEnrichment(after)
+        dao.deleteOldReligionVersions(after)
+        dao.deleteOldReligionLinks(after)
+        dao.deleteOldReligionEvents(after)
     }
 
     private suspend fun markSourceSuccess(sourceId:String){
@@ -162,14 +222,27 @@ class ScanCoordinator(private val db:AppDatabase){
     private suspend fun persist(item:FetchedItem):String?=db.withTransaction{
         val now=System.currentTimeMillis()
         val religionMatch=ReligionWatchEngine.evaluate(item.source,item.title,item.summary)
-        val dedicatedReligionSource=
-            item.source.groupName=="religion_search" || item.source.groupName=="religion_direct"
+        val religionSearch=item.source.groupName=="religion_search"
+        val religionDirect=item.source.groupName=="religion_direct"
+        val dedicatedReligionSource=religionSearch || religionDirect
 
-        if(dedicatedReligionSource && !religionMatch.accepted){
+        // Din kanalında tarih kesin güvenlik sınırıdır.
+        // Tarihi bilinmeyen veya 30 günden eski içerik kabul edilmez.
+        if(dedicatedReligionSource && !ReligionTracker.isFresh(item.publishedAt,now)){
             return@withTransaction null
         }
 
-        val religionPriority=if(religionMatch.accepted)religionMatch.priority else 0
+        // Kişi özel araması yalnız takip listesindeki kişilerle açık eşleşme kabul eder.
+        // Diyanet gibi doğrudan Din kaynaklarında kişi adı şart değildir.
+        if(religionSearch && !religionMatch.accepted){
+            return@withTransaction null
+        }
+
+        val religionPriority=when{
+            religionMatch.accepted->religionMatch.priority
+            religionDirect->1
+            else->0
+        }
         val incomingQuality=contentQuality(item)
 
         val raw=RawItemEntity(
