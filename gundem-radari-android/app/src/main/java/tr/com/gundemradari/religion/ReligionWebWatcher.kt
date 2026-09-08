@@ -14,9 +14,17 @@ class ReligionWebWatcher(
     suspend fun fetchGoogleNews(source:SourceEntity):List<FetchedItem> = coroutineScope{
         ReligionTracker.searchQueries.map{query->
             async{
-                search.search(query,limit=7,expandDescriptions=false)
+                search.search(
+                    query=query,
+                    limit=8,
+                    expandDescriptions=false,
+                    maxAgeDays=RELIGION_MAX_AGE_DAYS
+                )
                     .filter{row->
-                        ReligionWatchEngine.evaluate(source,row.title,row.snippet).accepted
+                        ReligionTracker.isFresh(row.publishedAt) &&
+                        ReligionWatchEngine.evaluate(
+                            source,row.title,row.snippet
+                        ).accepted
                     }
                     .map{row->
                         FetchedItem(
@@ -32,30 +40,31 @@ class ReligionWebWatcher(
             }
         }.awaitAll().flatten()
             .distinctBy{it.url}
+            .sortedByDescending{it.publishedAt?:0L}
             .take(45)
     }
 
     suspend fun fetchYouTube(source:SourceEntity):List<FetchedItem> = coroutineScope{
-        ReligionTracker.personQueries.map{person->
+        ReligionTracker.profiles.map{profile->
             async{
-                youtube.search(person,limit=4)
-                    .filter{row->
-                        ReligionWatchEngine.evaluate(source,row.title,"").accepted
-                    }
+                youtube.search(profile,limit=5)
+                    .filter{row->ReligionTracker.isFresh(row.publishedAt)}
                     .map{row->
+                        val taggedTitle="${profile.name}: ${row.title}"
                         FetchedItem(
                             source=source,
                             url=row.url,
-                            title=row.title,
-                            summary="YouTube · $person",
-                            publishedAt=null,
+                            title=taggedTitle,
+                            summary="Doğrudan YouTube · ${profile.name}",
+                            publishedAt=row.publishedAt,
                             originalTitle=row.title,
-                            originalSummary="YouTube · $person"
+                            originalSummary="Doğrudan YouTube · ${profile.name}"
                         )
                     }
             }
         }.awaitAll().flatten()
             .distinctBy{it.url}
-            .take(24)
+            .sortedByDescending{it.publishedAt?:0L}
+            .take(30)
     }
 }
