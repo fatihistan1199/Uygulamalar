@@ -6,6 +6,7 @@ import tr.com.gundemradari.data.EventEnrichmentEntity
 import tr.com.gundemradari.data.EventEntity
 import tr.com.gundemradari.data.GundemDao
 import tr.com.gundemradari.data.ResearchItemRow
+import tr.com.gundemradari.religion.ReligionTracker
 import tr.com.gundemradari.web.ArticleReader
 import tr.com.gundemradari.web.NewsWebSearch
 import tr.com.gundemradari.web.ResearchedArticle
@@ -207,7 +208,7 @@ class EventResearchService(
             whatHappened=summary.whatHappened,
             whyImportant=summary.whyImportant,
             latestSituation=summary.latestSituation,
-            displayArticles=articles.take(1),
+            displayArticles=articles.take(1)+personAccountLinks(event),
             firstAt=times.minOrNull(),
             latestAt=times.maxOrNull()
         )
@@ -263,7 +264,7 @@ class EventResearchService(
         event:EventEntity,
         report:EventResearchReport
     ){
-        val source=report.displayArticles.firstOrNull()
+        val source=report.displayArticles.firstOrNull{it.quality>=0.0}
         val shortSummary=(
             report.whatHappened.joinToString(" ")
                 .ifBlank{source?.description.orEmpty()}
@@ -326,10 +327,30 @@ class EventResearchService(
             whatHappened=unpack(saved.whatHappened),
             whyImportant=unpack(saved.whyImportant),
             latestSituation=unpack(saved.latestSituation),
-            displayArticles=source,
+            displayArticles=source+personAccountLinks(event),
             firstAt=times.minOrNull(),
             latestAt=times.maxOrNull()
         )
+    }
+
+    private fun personAccountLinks(event:EventEntity):List<ResearchedArticle>{
+        if(event.scope!="religion" && event.religionPriority<=0)return emptyList()
+
+        val profile=ReligionTracker.profileFor(event.title,event.summary)
+            ?:return emptyList()
+
+        return profile.links().map{(platform,url)->
+            ResearchedArticle(
+                sourceName="${profile.name} · $platform",
+                title="Doğrudan kişi hesabı",
+                url=url,
+                description="",
+                paragraphs=emptyList(),
+                publishedAt=null,
+                isPrimary=false,
+                quality=-1.0
+            )
+        }
     }
 
     private fun pack(lines:List<String>):String=
