@@ -557,7 +557,7 @@ void main(){
     final event=e.pickEvent();
     expect(event.id,'selma_han_acquaintance');
     final result=e.resolve(event,'help');
-    expect(result,contains('Başarı'));
+    expect(result,contains('başarı'));
     expect(s.storyThreads['selma_friendship'],'tanışıklık derinleşiyor');
     expect(s.npcs['selma']!.memories.any((m)=>m.text.contains('Han karıştığında')),isTrue);
     expect(s.delayedEffects.where((x)=>x.type=='event_followup'&&x.payload['eventId']=='selma_han_return').length,1);
