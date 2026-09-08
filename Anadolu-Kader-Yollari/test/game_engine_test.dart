@@ -599,7 +599,7 @@ void main(){
     expect(catalog['nasir_rivalry_return']?.scheduledOnly,isTrue);
     expect(catalog['leyla_courtship']?.tags,contains('romance'));
     expect(catalog.events.length,greaterThanOrEqualTo(36));
-    expect(stories.scenes,contains('milestone_work_identity'));
+    expect(stories.scenes.containsKey('milestone_work_identity'),isTrue);
   });
 
 }
