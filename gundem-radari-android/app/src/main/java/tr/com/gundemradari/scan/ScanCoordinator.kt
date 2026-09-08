@@ -5,6 +5,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import tr.com.gundemradari.data.*
 import tr.com.gundemradari.religion.ReligionWatchEngine
+import tr.com.gundemradari.research.EventResearchService
 import java.util.UUID
 
 data class ScanOutcome(val newItems:Int,val failed:List<String>)
@@ -13,6 +14,7 @@ class ScanCoordinator(private val db:AppDatabase){
     private val dao=db.dao()
     private val client=FeedClient()
     private val translator=NewsTranslator()
+    private val researcher=EventResearchService(dao)
     private val maintenanceScope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
 
     suspend fun scan(onProgress:(String)->Unit,waitForReview:Boolean=false):ScanOutcome{
@@ -67,7 +69,7 @@ class ScanCoordinator(private val db:AppDatabase){
 
                 if(touchedEvents.isNotEmpty()){
                     if(waitForReview)reviewCategorizationSlowly(touchedEvents)
-                    else scheduleBackgroundReview(touchedEvents)
+                    else scheduleBackgroundMaintenance(touchedEvents)
                 }
 
                 onProgress("$count yeni kayıt")
@@ -113,10 +115,32 @@ class ScanCoordinator(private val db:AppDatabase){
         )
     }
 
-    private fun scheduleBackgroundReview(eventIds:Set<String>){
+    private fun scheduleBackgroundMaintenance(eventIds:Set<String>){
         maintenanceScope.launch{
-            delay(1200)
+            delay(700)
             reviewCategorizationSlowly(eventIds)
+            enrichContentSlowly(eventIds)
+        }
+    }
+
+    private suspend fun enrichContentSlowly(eventIds:Set<String>){
+        val ordered=eventIds
+            .mapNotNull{dao.event(it)}
+            .filter{it.noise<70}
+            .sortedByDescending{it.importance}
+
+        // Aynı haberi çoklu kaynakla teyit etmek yerine farklı haberleri paralel işler.
+        // Her olay kendi içinde tek güçlü kaynak politikasını kullanır.
+        ordered.chunked(2).forEach{batch->
+            coroutineScope{
+                batch.map{event->
+                    async(Dispatchers.IO){
+                        runCatching{researcher.enrichIfNeeded(event.id)}
+                    }
+                }.awaitAll()
+            }
+            yield()
+            delay(180)
         }
     }
 
