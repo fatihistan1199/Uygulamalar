@@ -347,7 +347,7 @@ data class SearchEventRow(
         EventItemEntity::class,EventVersionEntity::class,EventEnrichmentEntity::class,
         ScanHistoryEntity::class
     ],
-    version=15, exportSchema=false
+    version=16, exportSchema=false
 )
 abstract class AppDatabase:RoomDatabase(){
     abstract fun dao():GundemDao
@@ -471,9 +471,47 @@ abstract class AppDatabase:RoomDatabase(){
                 """.trimIndent())
             }
         }
+        private val MIGRATION_15_16=object:Migration(15,16){
+            override fun migrate(db:SupportSQLiteDatabase){
+                // v20: v19'da doğrudan Din kaynağından gelen alakasız genel haberler
+                // bulunabildiği için Din kanalı bir kez yeniden kuruluyor.
+                db.execSQL("""
+                    DELETE FROM event_enrichment
+                    WHERE eventId IN (
+                        SELECT id FROM events
+                        WHERE scope='religion' OR religionPriority>0
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    DELETE FROM event_versions
+                    WHERE eventId IN (
+                        SELECT id FROM events
+                        WHERE scope='religion' OR religionPriority>0
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    DELETE FROM event_items
+                    WHERE eventId IN (
+                        SELECT id FROM events
+                        WHERE scope='religion' OR religionPriority>0
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    DELETE FROM events
+                    WHERE scope='religion' OR religionPriority>0
+                """.trimIndent())
+                db.execSQL("""
+                    DELETE FROM raw_items
+                    WHERE sourceId IN (
+                        SELECT id FROM sources
+                        WHERE groupName IN ('religion_search','religion_direct')
+                    )
+                """.trimIndent())
+            }
+        }
         fun get(context:Context)=INSTANCE?:synchronized(this){
             INSTANCE?:Room.databaseBuilder(context.applicationContext,AppDatabase::class.java,"gundem-radari.db")
-                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8,MIGRATION_8_9,MIGRATION_9_10,MIGRATION_10_11,MIGRATION_11_12,MIGRATION_12_13,MIGRATION_13_14,MIGRATION_14_15)
+                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8,MIGRATION_8_9,MIGRATION_9_10,MIGRATION_10_11,MIGRATION_11_12,MIGRATION_12_13,MIGRATION_13_14,MIGRATION_14_15,MIGRATION_15_16)
                 .build().also{INSTANCE=it}
         }
     }
