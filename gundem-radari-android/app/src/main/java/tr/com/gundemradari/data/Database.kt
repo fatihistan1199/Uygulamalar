@@ -150,6 +150,20 @@ data class SearchEventRow(
     @Query("SELECT max(version) FROM event_versions WHERE eventId=:eventId")
     suspend fun maxEventVersion(eventId:String):Int?
 
+    @Query("""
+        SELECT * FROM events
+        WHERE updatedAt >= :after
+          AND importance >= :minImportance
+          AND noise < 35
+          AND scope != 'religion'
+        ORDER BY importance DESC, updatedAt DESC
+        LIMIT 12
+    """)
+    suspend fun criticalEvents(
+        after:Long,
+        minImportance:Double
+    ):List<EventEntity>
+
     @Insert(onConflict=OnConflictStrategy.REPLACE)
     suspend fun putEvent(row:EventEntity)
 

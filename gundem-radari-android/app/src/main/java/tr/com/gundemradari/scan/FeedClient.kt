@@ -35,7 +35,7 @@ class FeedClient {
             val conn=(URL(source.endpoint).openConnection() as HttpURLConnection).apply {
                 connectTimeout=15000
                 readTimeout=15000
-                setRequestProperty("User-Agent","Mozilla/5.0 (Android) GundemRadari/16")
+                setRequestProperty("User-Agent","Mozilla/5.0 (Android) GundemRadari/17")
                 setRequestProperty("Accept","application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.7")
                 instanceFollowRedirects=true
             }

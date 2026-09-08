@@ -1,7 +1,9 @@
 package tr.com.gundemradari.ui
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -21,6 +23,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -42,6 +46,8 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import tr.com.gundemradari.data.*
+import tr.com.gundemradari.notifications.CriticalNotificationManager
+import tr.com.gundemradari.notifications.CriticalNotificationPrefs
 import tr.com.gundemradari.research.EventResearchReport
 import tr.com.gundemradari.research.EventResearchService
 import tr.com.gundemradari.scan.ScanCoordinator
@@ -61,6 +67,7 @@ enum class FeedTab(val label:String,val icon:ImageVector){
 }
 
 class GundemViewModel(context:Context):ViewModel(){
+    private val appContext=context.applicationContext
     private val db=AppDatabase.get(context)
     private val dao=db.dao()
     private val repo=SourceRepository(context,dao)
@@ -113,8 +120,14 @@ class GundemViewModel(context:Context):ViewModel(){
         if(scanning.value)return
         scanning.value=true
         scanMessage.value="Kaynaklar hazırlanıyor"
+        val startedAt=System.currentTimeMillis()
         try{
             scanner.scan(onProgress={scanMessage.value=it})
+            CriticalNotificationManager.dispatchAfterScan(
+                context=appContext,
+                dao=dao,
+                scanStartedAt=startedAt
+            )
             rankingClock.value=System.currentTimeMillis()
         }finally{
             scanning.value=false
@@ -468,7 +481,7 @@ class GundemViewModel(context:Context):ViewModel(){
         }
     )
     var settings by remember{mutableStateOf(false)}
-    if(settings)SourcesScreen(vm,{settings=false})
+    if(settings)SourcesScreen(vm,{settings=false},context)
     else HomeScreen(vm,{settings=true},context)
 }
 
@@ -1014,9 +1027,22 @@ private fun openInOpera(context:Context,url:String){
 
 @Composable private fun SourcesScreen(
     vm:GundemViewModel,
-    onBack:()->Unit
+    onBack:()->Unit,
+    context:Context
 ){
     val rows by vm.sources.collectAsStateWithLifecycle()
+    var notificationsEnabled by remember(context){
+        mutableStateOf(
+            CriticalNotificationPrefs.isEnabled(context) &&
+                CriticalNotificationManager.hasPermission(context)
+        )
+    }
+    val permissionLauncher=rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ){granted->
+        CriticalNotificationPrefs.setEnabled(context,granted)
+        notificationsEnabled=granted
+    }
 
     Column(Modifier.fillMaxSize().padding(16.dp)){
         Row(verticalAlignment=Alignment.CenterVertically){
@@ -1030,6 +1056,54 @@ private fun openInOpera(context:Context,url:String){
             )
             Spacer(Modifier.width(8.dp))
             Text("Kaynaklar",style=MaterialTheme.typography.headlineSmall)
+        }
+
+        Card(
+            modifier=Modifier
+                .fillMaxWidth()
+                .padding(vertical=8.dp),
+            colors=CardDefaults.cardColors(
+                containerColor=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.45f)
+            )
+        ){
+            Row(
+                modifier=Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.SpaceBetween
+            ){
+                Column(Modifier.weight(1f)){
+                    Text(
+                        "Kritik bildirimler",
+                        style=MaterialTheme.typography.titleSmall
+                    )
+                    Text(
+                        "Yalnız çok yüksek önem düzeyindeki yeni olaylar",
+                        style=MaterialTheme.typography.bodySmall,
+                        color=MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked=notificationsEnabled,
+                    onCheckedChange={enabled->
+                        if(!enabled){
+                            CriticalNotificationPrefs.setEnabled(context,false)
+                            notificationsEnabled=false
+                        }else if(
+                            Build.VERSION.SDK_INT>=33 &&
+                            !CriticalNotificationManager.hasPermission(context)
+                        ){
+                            permissionLauncher.launch(
+                                Manifest.permission.POST_NOTIFICATIONS
+                            )
+                        }else{
+                            CriticalNotificationPrefs.setEnabled(context,true)
+                            notificationsEnabled=true
+                        }
+                    }
+                )
+            }
         }
 
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){

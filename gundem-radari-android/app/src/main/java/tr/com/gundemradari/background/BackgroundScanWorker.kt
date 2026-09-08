@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.*
 import tr.com.gundemradari.data.AppDatabase
 import tr.com.gundemradari.data.SourceRepository
+import tr.com.gundemradari.notifications.CriticalNotificationManager
 import tr.com.gundemradari.scan.ScanCoordinator
 import java.util.concurrent.TimeUnit
 
@@ -13,9 +14,15 @@ class BackgroundScanWorker(
 ):CoroutineWorker(appContext,params){
     override suspend fun doWork():Result{
         return runCatching{
+            val startedAt=System.currentTimeMillis()
             val db=AppDatabase.get(applicationContext)
             SourceRepository(applicationContext,db.dao()).seed()
             ScanCoordinator(db).scan({},waitForReview=true)
+            CriticalNotificationManager.dispatchAfterScan(
+                context=applicationContext,
+                dao=db.dao(),
+                scanStartedAt=startedAt
+            )
             Result.success()
         }.getOrElse{
             Result.retry()
@@ -36,6 +43,11 @@ object BackgroundScanScheduler{
             15,TimeUnit.MINUTES
         )
             .setConstraints(constraints)
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                15,
+                TimeUnit.MINUTES
+            )
             .build()
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
