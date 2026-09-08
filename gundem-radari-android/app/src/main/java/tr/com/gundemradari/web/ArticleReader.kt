@@ -8,6 +8,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
 import java.net.URI
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 data class ArticleDetails(
@@ -15,7 +20,8 @@ data class ArticleDetails(
     val description:String,
     val paragraphs:List<String>,
     val finalUrl:String,
-    val host:String
+    val host:String,
+    val publishedAt:Long?
 )
 
 data class ResearchSummary(
@@ -28,7 +34,7 @@ class ArticleReader {
     suspend fun read(url:String):ArticleDetails?=withContext(Dispatchers.IO){
         runCatching{
             val first=Jsoup.connect(url)
-                .userAgent("Mozilla/5.0 (Android) GundemRadari/17")
+                .userAgent("Mozilla/5.0 (Android) GundemRadari/19")
                 .timeout(14000)
                 .followRedirects(true)
                 .get()
@@ -45,7 +51,7 @@ class ArticleReader {
                 if(external!=null){
                     runCatching{
                         Jsoup.connect(external)
-                            .userAgent("Mozilla/5.0 (Android) GundemRadari/17")
+                            .userAgent("Mozilla/5.0 (Android) GundemRadari/19")
                             .timeout(14000)
                             .followRedirects(true)
                             .get()
@@ -115,6 +121,16 @@ class ArticleReader {
                 .distinctBy{normalizeForDedup(it)}
                 .take(30)
 
+            val publishedAt=listOf(
+                structured.datePublished,
+                doc.selectFirst("meta[property=article:published_time]")?.attr("content").orEmpty(),
+                doc.selectFirst("meta[itemprop=datePublished]")?.attr("content").orEmpty(),
+                doc.selectFirst("time[datetime]")?.attr("datetime").orEmpty()
+            )
+                .asSequence()
+                .mapNotNull(::parseArticleDate)
+                .firstOrNull()
+
             ArticleDetails(
                 title=title,
                 description=description,
@@ -122,7 +138,8 @@ class ArticleReader {
                 finalUrl=doc.location(),
                 host=runCatching{
                     URI(doc.location()).host.orEmpty().removePrefix("www.")
-                }.getOrDefault("")
+                }.getOrDefault(""),
+                publishedAt=publishedAt
             )
         }.getOrNull()
     }
@@ -140,7 +157,8 @@ class ArticleReader {
 private data class StructuredArticle(
     val headline:String="",
     val description:String="",
-    val articleBody:String=""
+    val articleBody:String="",
+    val datePublished:String=""
 )
 
 private fun extractStructuredArticle(doc:Document):StructuredArticle{
@@ -165,7 +183,8 @@ private fun extractStructuredArticle(doc:Document):StructuredArticle{
     return StructuredArticle(
         headline=jsonString(best,"headline"),
         description=jsonString(best,"description"),
-        articleBody=jsonString(best,"articleBody")
+        articleBody=jsonString(best,"articleBody"),
+        datePublished=jsonString(best,"datePublished")
     )
 }
 
@@ -223,6 +242,37 @@ private fun structuredBodyParagraphs(body:String):List<String>{
         .chunked(2)
         .map{it.joinToString(" ")}
         .take(24)
+}
+
+private fun parseArticleDate(raw:String):Long?{
+    val clean=raw.trim()
+    if(clean.isBlank())return null
+
+    runCatching{
+        return Instant.parse(clean).toEpochMilli()
+    }
+    runCatching{
+        return OffsetDateTime.parse(clean).toInstant().toEpochMilli()
+    }
+    runCatching{
+        return ZonedDateTime.parse(clean).toInstant().toEpochMilli()
+    }
+
+    val localPatterns=listOf(
+        DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+    )
+    for(format in localPatterns){
+        runCatching{
+            return LocalDateTime.parse(clean,format)
+                .atZone(java.time.ZoneId.of("Europe/Istanbul"))
+                .toInstant()
+                .toEpochMilli()
+        }
+    }
+
+    return null
 }
 
 private fun normalizeForDedup(text:String):String=
