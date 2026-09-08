@@ -15,10 +15,19 @@ class KaderRng {
 int clamp100(int value) => math.max(0, math.min(100, value));
 
 class MemoryEntry {
-  MemoryEntry({required this.text,required this.day,required this.importance,required this.trust,required this.respect,required this.fear,required this.affection,required this.suspicion,this.source='doğrudan',this.kind='event'});
-  final String text,source,kind; final int day,importance,trust,respect,fear,affection,suspicion;
-  Map<String,dynamic> toJson()=>{'text':text,'day':day,'importance':importance,'trust':trust,'respect':respect,'fear':fear,'affection':affection,'suspicion':suspicion,'source':source,'kind':kind};
-  factory MemoryEntry.fromJson(Map<String,dynamic> j)=>MemoryEntry(text:j['text'],day:j['day'],importance:j['importance'],trust:j['trust'],respect:j['respect'],fear:j['fear'],affection:j['affection'],suspicion:j['suspicion'],source:j['source']??'doğrudan',kind:j['kind']??'event');
+  MemoryEntry({required this.text,required this.day,required this.importance,required this.trust,required this.respect,required this.fear,required this.affection,required this.suspicion,this.source='doğrudan',this.kind='event',this.confidence=100,this.decay=2,this.permanent=false,List<String>? tags}):tags=tags??[];
+  final String text,source,kind; final int day,trust,respect,fear,affection,suspicion,confidence,decay; int importance; final bool permanent; final List<String> tags;
+  String get deltaSummary{
+    final parts=<String>[];
+    if(trust!=0)parts.add('güven ${trust>0?'+':''}$trust');
+    if(respect!=0)parts.add('saygı ${respect>0?'+':''}$respect');
+    if(fear!=0)parts.add('korku ${fear>0?'+':''}$fear');
+    if(affection!=0)parts.add('yakınlık ${affection>0?'+':''}$affection');
+    if(suspicion!=0)parts.add('şüphe ${suspicion>0?'+':''}$suspicion');
+    return parts.isEmpty?'ilişki puanı değişmedi':parts.join(' • ');
+  }
+  Map<String,dynamic> toJson()=>{'text':text,'day':day,'importance':importance,'trust':trust,'respect':respect,'fear':fear,'affection':affection,'suspicion':suspicion,'source':source,'kind':kind,'confidence':confidence,'decay':decay,'permanent':permanent,'tags':tags};
+  factory MemoryEntry.fromJson(Map<String,dynamic> j)=>MemoryEntry(text:j['text'],day:j['day'],importance:j['importance'],trust:j['trust'],respect:j['respect'],fear:j['fear'],affection:j['affection'],suspicion:j['suspicion'],source:j['source']??'doğrudan',kind:j['kind']??'event',confidence:j['confidence']??100,decay:j['decay']??2,permanent:j['permanent']??false,tags:((j['tags'] as List?)??[]).cast<String>());
 }
 
 class RelationState {
@@ -43,10 +52,10 @@ class NpcState {
 
 /// Oyuncu hanesinin, NPC dizininden bağımsız kalıcı soy kaydı.
 class FamilyMember {
-  FamilyMember({required this.id,required this.name,required this.age,required this.cityId,this.gender='unknown',this.alive=true,this.spouseId,this.parentIds=const[],List<String>? childIds,this.isPlayerLine=false,Map<String,RelationState>? relations}):childIds=childIds??[],relations=relations??{};
-  final String id; String name,cityId,gender; int age; bool alive,isPlayerLine; String? spouseId; final List<String> parentIds,childIds; final Map<String,RelationState> relations;
-  Map<String,dynamic> toJson()=>{'id':id,'name':name,'age':age,'cityId':cityId,'gender':gender,'alive':alive,'spouseId':spouseId,'parentIds':parentIds,'childIds':childIds,'isPlayerLine':isPlayerLine,'relations':relations.map((k,v)=>MapEntry(k,v.toJson()))};
-  factory FamilyMember.fromJson(Map<String,dynamic> j)=>FamilyMember(id:j['id'],name:j['name'],age:j['age']??18,cityId:j['cityId']??'konya',gender:j['gender']??'unknown',alive:j['alive']??true,spouseId:j['spouseId'],parentIds:((j['parentIds'] as List?)??[]).cast<String>(),childIds:((j['childIds'] as List?)??[]).cast<String>(),isPlayerLine:j['isPlayerLine']??false,relations:((j['relations'] as Map?)??{}).map((k,v)=>MapEntry(k.toString(),RelationState.fromJson(Map<String,dynamic>.from(v)))));
+  FamilyMember({required this.id,required this.name,required this.age,required this.cityId,this.gender='unknown',this.alive=true,this.spouseId,this.parentIds=const[],List<String>? childIds,this.isPlayerLine=false,Map<String,RelationState>? relations,this.networkFactionId,this.linkedNpcId,this.standing=0}):childIds=childIds??[],relations=relations??{};
+  final String id; String name,cityId,gender; int age,standing; bool alive,isPlayerLine; String? spouseId,networkFactionId,linkedNpcId; final List<String> parentIds,childIds; final Map<String,RelationState> relations;
+  Map<String,dynamic> toJson()=>{'id':id,'name':name,'age':age,'cityId':cityId,'gender':gender,'alive':alive,'spouseId':spouseId,'parentIds':parentIds,'childIds':childIds,'isPlayerLine':isPlayerLine,'relations':relations.map((k,v)=>MapEntry(k,v.toJson())),'networkFactionId':networkFactionId,'linkedNpcId':linkedNpcId,'standing':standing};
+  factory FamilyMember.fromJson(Map<String,dynamic> j)=>FamilyMember(id:j['id'],name:j['name'],age:j['age']??18,cityId:j['cityId']??'konya',gender:j['gender']??'unknown',alive:j['alive']??true,spouseId:j['spouseId'],parentIds:((j['parentIds'] as List?)??[]).cast<String>(),childIds:((j['childIds'] as List?)??[]).cast<String>(),isPlayerLine:j['isPlayerLine']??false,relations:((j['relations'] as Map?)??{}).map((k,v)=>MapEntry(k.toString(),RelationState.fromJson(Map<String,dynamic>.from(v)))),networkFactionId:j['networkFactionId'],linkedNpcId:j['linkedNpcId'],standing:j['standing']??0);
 }
 
 class CityState {
@@ -119,14 +128,14 @@ class GameState {
     int? health,int? age,int? generation,bool? alive,List<Injury>? injuries,List<String>? lineage,String? deathCause,
     Map<String,dynamic>? eventFlags,List<String>? pendingEvents,Map<String,int>? eventLastDay,
     Map<String,FamilyMember>? family,String? playerFamilyId,int? nextLifeId,String? playerGender,
-    Map<String,bool>? worldFacts,List<String>? recentEventIds,List<String>? narrativeQueue,List<String>? visitedCities
+    Map<String,bool>? worldFacts,List<String>? recentEventIds,List<String>? narrativeQueue,List<String>? visitedCities,Map<String,String>? storyThreads
   }):inventory=inventory??{},lastMajorEventDay=lastMajorEventDay??-999,
     attributes=attributes??{'strength':40,'agility':40,'intellect':40,'rhetoric':40,'intuition':40,'willpower':40},
     skills=skills??{'trade':25,'diplomacy':25,'law':20,'medicine':15,'religion':20,'military':20,'tracking':15,'espionage':10,'leadership':20,'localCulture':30},
     health=health??100,age=age??22,generation=generation??1,alive=alive??true,injuries=injuries??[],lineage=lineage??[],deathCause=deathCause??'',
     eventFlags=eventFlags??{},pendingEvents=pendingEvents??[],eventLastDay=eventLastDay??{},
     family=family??{},playerFamilyId=playerFamilyId??'player',nextLifeId=nextLifeId??1,playerGender=playerGender??'unknown',
-    worldFacts=worldFacts??{},recentEventIds=recentEventIds??[],narrativeQueue=narrativeQueue??[],visitedCities=visitedCities??[currentCityId] {
+    worldFacts=worldFacts??{},recentEventIds=recentEventIds??[],narrativeQueue=narrativeQueue??[],visitedCities=visitedCities??[currentCityId],storyThreads=storyThreads??{} {
       // v0.5 kayıtlarında soy alanı yoktu; dünya verisine dokunmadan ince bir başlangıç ağacı üret.
       if(this.family.isEmpty){
         this.family['player']=FamilyMember(id:'player',name:playerName,age:this.age,cityId:currentCityId,gender:this.playerGender,isPlayerLine:true);
@@ -142,7 +151,7 @@ class GameState {
   final Map<String,int> inventory,attributes,skills; final List<Injury> injuries; final List<String> lineage;
   final Map<String,dynamic> eventFlags; final List<String> pendingEvents; final Map<String,int> eventLastDay;
   final Map<String,FamilyMember> family; String playerFamilyId; int nextLifeId;
-  final Map<String,bool> worldFacts; final List<String> recentEventIds,narrativeQueue,visitedCities;
+  final Map<String,bool> worldFacts; final List<String> recentEventIds,narrativeQueue,visitedCities; final Map<String,String> storyThreads;
 
   CityState get city=>cities[currentCityId]!;
 
@@ -155,7 +164,7 @@ class GameState {
     'health':health,'age':age,'generation':generation,'alive':alive,'injuries':injuries.map((i)=>i.toJson()).toList(),
     'lineage':lineage,'deathCause':deathCause,'eventFlags':eventFlags,'pendingEvents':pendingEvents,'eventLastDay':eventLastDay,
     'family':family.map((k,v)=>MapEntry(k,v.toJson())),'playerFamilyId':playerFamilyId,'nextLifeId':nextLifeId,'playerGender':playerGender,
-    'worldFacts':worldFacts,'recentEventIds':recentEventIds,'narrativeQueue':narrativeQueue,'visitedCities':visitedCities
+    'worldFacts':worldFacts,'recentEventIds':recentEventIds,'narrativeQueue':narrativeQueue,'visitedCities':visitedCities,'storyThreads':storyThreads
   };
 
   factory GameState.fromJson(Map<String,dynamic> j)=>GameState(
@@ -179,7 +188,8 @@ class GameState {
     worldFacts:Map<String,bool>.from((j['worldFacts'] as Map?)??{}),
     recentEventIds:((j['recentEventIds'] as List?)??[]).cast<String>(),
     narrativeQueue:((j['narrativeQueue'] as List?)??[]).cast<String>(),
-    visitedCities:((j['visitedCities'] as List?)??[j['currentCityId']]).cast<String>()
+    visitedCities:((j['visitedCities'] as List?)??[j['currentCityId']]).cast<String>(),
+    storyThreads:Map<String,String>.from((j['storyThreads'] as Map?)??{})
   );
 }
 
@@ -262,7 +272,7 @@ class GameEngine {
       'Asker ailesi'=>'background_asker',
       _=>'background_tuccar',
     };
-    return GameState(version:10,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999,attributes:attrs,skills:skills,health:100,age:22,generation:1,alive:true,injuries:[],lineage:[],eventFlags:{},pendingEvents:[],eventLastDay:{},family:family,playerFamilyId:'player',nextLifeId:1,playerGender:gender,worldFacts:worldFacts,recentEventIds:[],narrativeQueue:['intro_identity',backgroundScene,'city_konya','hook_konya','intro_path'],visitedCities:['konya']);
+    return GameState(version:11,seed:seed,rngState:seed,playerName:name,background:background,day:1,money:background=='Tüccar ailesi'?70:50,tension:20,currentCityId:'konya',cities:cities,npcs:npcs,factions:factions,knowledge:[],delayedEffects:[],chronicle:['1. gün — $name Konya’da yolculuğuna başladı.'],inventory:{},lastMajorEventDay:-999,attributes:attrs,skills:skills,health:100,age:22,generation:1,alive:true,injuries:[],lineage:[],eventFlags:{},pendingEvents:[],eventLastDay:{},family:family,playerFamilyId:'player',nextLifeId:1,playerGender:gender,worldFacts:worldFacts,recentEventIds:[],narrativeQueue:['intro_identity',backgroundScene,'city_konya','hook_konya','intro_path'],visitedCities:['konya'],storyThreads:{});
   }
 
   void _sync()=>state.rngState=_rng.state;
