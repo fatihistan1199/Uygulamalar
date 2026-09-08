@@ -154,11 +154,12 @@ fun summarizeResearch(
         val impact:Boolean,
         val latest:Boolean,
         val quality:Double,
-        val publishedAt:Long?
+        val publishedAt:Long?,
+        val sourceIndex:Int
     )
 
     val candidates=mutableListOf<Candidate>()
-    articles.forEach{article->
+    articles.forEachIndexed{articleIndex,article->
         val blocks=buildList{
             if(article.description.isNotBlank())add(article.description)
             addAll(article.paragraphs.take(14))
@@ -187,7 +188,8 @@ fun summarizeResearch(
                         impact=impactMarkers.any{lower.contains(it)},
                         latest=latestMarkers.any{lower.contains(it)},
                         quality=article.quality,
-                        publishedAt=article.publishedAt
+                        publishedAt=article.publishedAt,
+                        sourceIndex=articleIndex
                     )
                 }
         }
@@ -205,8 +207,26 @@ fun summarizeResearch(
         return out
     }
 
+    fun support(candidate:Candidate):Int =
+        candidates
+            .asSequence()
+            .filter{
+                it.sourceIndex!=candidate.sourceIndex
+            }
+            .count{
+                sentenceSimilarity(
+                    it.text,
+                    candidate.text
+                )>.42
+            }
+            .coerceAtMost(3)
+
     val ranked=candidates.sortedWith(
-        compareByDescending<Candidate>{it.relevance + (it.quality/12).toInt()}
+        compareByDescending<Candidate>{
+            it.relevance +
+                (it.quality/12).toInt() +
+                support(it)*4
+        }
             .thenByDescending{it.quality}
     )
     val fallbackWhat=eventSummary
@@ -233,7 +253,11 @@ fun summarizeResearch(
         .ifEmpty{titleFallback}
 
     val whyCandidates=candidates.filter{it.impact}.sortedWith(
-        compareByDescending<Candidate>{it.relevance + (it.quality/10).toInt()}
+        compareByDescending<Candidate>{
+            it.relevance +
+                (it.quality/10).toInt() +
+                support(it)*3
+        }
             .thenByDescending{it.quality}
     )
     val why=distinctTake(whyCandidates,2,what.toSet())
@@ -243,7 +267,9 @@ fun summarizeResearch(
         .sortedWith(
             compareByDescending<Candidate>{it.latest}
                 .thenByDescending{it.publishedAt?:0L}
-                .thenByDescending{it.relevance}
+                .thenByDescending{
+                    it.relevance+support(it)*2
+                }
         )
     val used=(what+why).toSet()
     val latest=distinctTake(latestCandidates,2,used)

@@ -60,8 +60,17 @@ class EventResearchService(
         val primaryArticles=bestRows.distinctBy{it.url}.take(3).mapIndexed{index,row->
             async{
                 articleReader.read(row.url)?.let{d->
+                    val wrapperSource=
+                        row.groupName=="religion_search" ||
+                        row.sourceName.contains("Google News",ignoreCase=true) ||
+                        row.sourceName.contains("YouTube",ignoreCase=true)
+
                     ResearchedArticle(
-                        sourceName=row.sourceName,
+                        sourceName=if(wrapperSource){
+                            d.host.ifBlank{row.sourceName}
+                        }else{
+                            row.sourceName
+                        },
                         title=d.title.ifBlank{row.title},
                         url=d.finalUrl.ifBlank{row.url},
                         description=cleanResearchText(d.description)

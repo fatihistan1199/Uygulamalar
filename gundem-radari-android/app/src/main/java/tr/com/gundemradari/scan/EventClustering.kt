@@ -47,6 +47,46 @@ private fun tokens(text:String):Set<String> =
 
 private fun titleTokens(text:String)=tokens(text).filter{it.length>=4}.toSet()
 
+
+private val placeAnchors=listOf(
+    "adana","adıyaman","afyonkarahisar","ağrı","amasya","ankara","antalya","artvin",
+    "aydın","balıkesir","bilecik","bingöl","bitlis","bolu","burdur","bursa","çanakkale",
+    "çankırı","çorum","denizli","diyarbakır","edirne","elazığ","erzincan","erzurum",
+    "eskişehir","gaziantep","giresun","gümüşhane","hakkari","hatay","isparta","mersin",
+    "istanbul","izmir","kars","kastamonu","kayseri","kırklareli","kırşehir","kocaeli",
+    "konya","kütahya","malatya","manisa","kahramanmaraş","mardin","muğla","muş",
+    "nevşehir","niğde","ordu","rize","sakarya","samsun","siirt","sinop","sivas",
+    "tekirdağ","tokat","trabzon","tunceli","şanlıurfa","uşak","van","yozgat","zonguldak",
+    "aksaray","bayburt","karaman","kırıkkale","batman","şırnak","bartın","ardahan",
+    "iğdır","yalova","karabük","kilis","osmaniye","düzce",
+    "girne","lefkoşa","gazimağusa","kktc",
+    "gazze","kudüs","tel aviv","tahran","bağdat","şam","beyrut","moskova","kiev",
+    "washington","new york","londra","paris","berlin","roma","atina","bali","jakarta",
+    "endonezya","iran","irak","suriye","israil","filistin","rusya","ukrayna","abd",
+    "almanya","fransa","italya","yunanistan","çin","japonya","hindistan","pakistan"
+)
+
+private fun extractPlaces(text:String):Set<String>{
+    val lower=" "+sanitizeNewsText(text).lowercase(clusterLocale)+" "
+    return placeAnchors.filter{place->
+        Regex("(?<![\\p{L}\\p{N}])${Regex.escape(place)}(?![\\p{L}\\p{N}])")
+            .containsMatchIn(lower)
+    }.toSet()
+}
+
+private fun conflictingPlaces(
+    aText:String,
+    bText:String,
+    kindA:String,
+    kindB:String
+):Boolean{
+    if(kindA=="general" || kindB=="general")return false
+    val aPlaces=extractPlaces(aText)
+    val bPlaces=extractPlaces(bText)
+    if(aPlaces.isEmpty()||bPlaces.isEmpty())return false
+    return aPlaces.intersect(bPlaces).isEmpty()
+}
+
 private fun jaccard(a:Set<String>,b:Set<String>):Double =
     if(a.isEmpty()||b.isEmpty())0.0
     else a.intersect(b).size.toDouble()/a.union(b).size
@@ -128,6 +168,10 @@ fun isSameEvent(item:FetchedItem,event:EventEntity):Boolean{
         return false
     }
 
+    if(conflictingPlaces(itemText,eventText,kindA,kindB)){
+        return false
+    }
+
     val itemTime=item.publishedAt
     val eventTime=event.publishedAt?:event.updatedAt
     if(itemTime!=null){
@@ -189,6 +233,10 @@ fun likelySameSearchEvent(a:EventEntity,b:EventEntity):Boolean{
     val kindB=eventKind(bText)
 
     if(kindA!="general"&&kindB!="general"&&kindA!=kindB){
+        return false
+    }
+
+    if(conflictingPlaces(aText,bText,kindA,kindB)){
         return false
     }
 

@@ -25,6 +25,9 @@ class ScanCoordinator(private val db:AppDatabase){
                 val sources=dao.scanSources(started)
                 val touchedEvents=linkedSetOf<String>()
                 val failures=mutableListOf<String>()
+                val recentCache=dao.recentEvents(
+                    started-14L*24*3600*1000
+                ).toMutableList()
                 var count=0
 
                 onProgress("${sources.size} kaynak taranıyor")
@@ -45,9 +48,18 @@ class ScanCoordinator(private val db:AppDatabase){
                                 originalSummary=sanitizeNewsText(localized.originalSummary)
                             )
 
-                            persist(cleaned)?.let{eventId->
+                            persist(cleaned,recentCache)?.let{saved->
                                 count++
-                                touchedEvents+=eventId
+                                touchedEvents+=saved.id
+                                val index=recentCache.indexOfFirst{it.id==saved.id}
+                                if(index>=0){
+                                    recentCache[index]=saved
+                                }else{
+                                    recentCache.add(0,saved)
+                                    if(recentCache.size>220){
+                                        recentCache.removeAt(recentCache.lastIndex)
+                                    }
+                                }
                             }
                         }
                     }.onFailure{
@@ -135,7 +147,10 @@ class ScanCoordinator(private val db:AppDatabase){
         }
     }
 
-    private suspend fun persist(item:FetchedItem):String?=db.withTransaction{
+    private suspend fun persist(
+        item:FetchedItem,
+        recentCache:List<EventEntity>
+    ):EventEntity?=db.withTransaction{
         val now=System.currentTimeMillis()
         val religionMatch=ReligionWatchEngine.evaluate(item.source,item.title,item.summary)
         val dedicatedReligionSource=
@@ -162,7 +177,7 @@ class ScanCoordinator(private val db:AppDatabase){
         if(dao.addRaw(raw)==-1L)return@withTransaction null
 
         val incomingText=item.title+" "+item.summary.take(320)
-        val candidate=dao.recentEvents(now-14L*24*3600*1000)
+        val candidate=recentCache
             .asSequence()
             .filter{isSameEvent(item,it)}
             .map{event->
@@ -199,7 +214,10 @@ class ScanCoordinator(private val db:AppDatabase){
                     changeNote="İlk kayıt",createdAt=now
                 )
             )
-            id
+            provisional.copy(
+                scope=decision.scope,
+                topic=decision.topic
+            )
         }else{
             val alreadyHasSource=dao.eventHasSource(candidate.id,item.source.id)
             val existingFamilies=dao.eventSourceIds(candidate.id)
@@ -214,21 +232,20 @@ class ScanCoordinator(private val db:AppDatabase){
                 candidate.title.contains("[OBJ]",true) ||
                 candidate.summary.contains("[OBJ]",true)
 
-            dao.putEvent(
-                candidate.copy(
-                    title=if(useIncoming)item.title else candidate.title,
-                    summary=if(useIncoming&&item.summary.isNotBlank())item.summary else candidate.summary,
-                    importance=maxOf(candidate.importance,importance),
-                    noise=minOf(candidate.noise,noise),
-                    verification=0,
-                    sourceCount=nextSourceCount,
-                    updatedAt=now,
-                    changeNote=if(alreadyHasSource)"Yeni gelişme" else "Yeni kaynak eklendi",
-                    publishedAt=eventPublished,
-                    religionPriority=maxOf(candidate.religionPriority,religionPriority),
-                    bestContentQuality=maxOf(candidate.bestContentQuality,incomingQuality)
-                )
+            val updated=candidate.copy(
+                title=if(useIncoming)item.title else candidate.title,
+                summary=if(useIncoming&&item.summary.isNotBlank())item.summary else candidate.summary,
+                importance=maxOf(candidate.importance,importance),
+                noise=minOf(candidate.noise,noise),
+                verification=0,
+                sourceCount=nextSourceCount,
+                updatedAt=now,
+                changeNote=if(alreadyHasSource)"Yeni gelişme" else "Yeni kaynak eklendi",
+                publishedAt=eventPublished,
+                religionPriority=maxOf(candidate.religionPriority,religionPriority),
+                bestContentQuality=maxOf(candidate.bestContentQuality,incomingQuality)
             )
+            dao.putEvent(updated)
 
             dao.link(EventItemEntity(candidate.id,item.url))
             val nextVersion=(dao.maxEventVersion(candidate.id)?:1)+1
@@ -239,7 +256,7 @@ class ScanCoordinator(private val db:AppDatabase){
                     createdAt=now
                 )
             )
-            candidate.id
+            updated
         }
     }
 
