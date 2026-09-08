@@ -423,10 +423,6 @@ class GundemViewModel(context:Context):ViewModel(){
             }
         }
 
-        if(scanning){
-            LinearProgressIndicator(Modifier.fillMaxWidth().padding(top=12.dp))
-        }
-
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
             ScrollableTabRow(
                 selectedTabIndex=pagerState.currentPage,
@@ -493,6 +489,16 @@ class GundemViewModel(context:Context):ViewModel(){
                         onResearch={event->vm.research(event)}
                     )
                 }
+            }
+
+            if(scanning){
+                CircularProgressIndicator(
+                    modifier=Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start=12.dp,bottom=18.dp)
+                        .size(18.dp),
+                    strokeWidth=2.dp
+                )
             }
 
             OutlinedTextField(

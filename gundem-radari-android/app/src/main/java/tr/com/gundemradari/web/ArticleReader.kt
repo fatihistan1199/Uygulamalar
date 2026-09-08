@@ -24,7 +24,7 @@ class ArticleReader {
     suspend fun read(url:String):ArticleDetails?=withContext(Dispatchers.IO){
         runCatching{
             val first=Jsoup.connect(url)
-                .userAgent("Mozilla/5.0 (Android) GundemRadari/14")
+                .userAgent("Mozilla/5.0 (Android) GundemRadari/15")
                 .timeout(14000)
                 .followRedirects(true)
                 .get()
@@ -41,7 +41,7 @@ class ArticleReader {
                 if(external!=null){
                     runCatching{
                         Jsoup.connect(external)
-                            .userAgent("Mozilla/5.0 (Android) GundemRadari/14")
+                            .userAgent("Mozilla/5.0 (Android) GundemRadari/15")
                             .timeout(14000)
                             .followRedirects(true)
                             .get()
@@ -58,7 +58,10 @@ class ArticleReader {
             val description=listOf(
                 doc.selectFirst("meta[property=og:description]")?.attr("content").orEmpty(),
                 doc.selectFirst("meta[name=description]")?.attr("content").orEmpty()
-            ).firstOrNull{it.length>=45}.orEmpty().replace(Regex("\\s+")," ").trim()
+            )
+                .map(::cleanResearchText)
+                .firstOrNull{isUsefulResearchText(it)}
+                .orEmpty()
 
             val selectors=listOf(
                 "article p","[itemprop=articleBody] p",".article-body p",".article-content p",
@@ -91,22 +94,48 @@ class ArticleReader {
         }.getOrNull()
     }
 
-    private fun usableParagraph(text:String):Boolean{
-        if(text.length !in 50..1100)return false
-        val lower=text.lowercase(Locale("tr","TR"))
-        val blocked=listOf(
-            "çerez","cookie","reklam","abonelik","abone ol","bildirimleri aç","tüm hakları saklıdır",
-            "kişisel veriler","gizlilik politikası","üyelik","giriş yap","uygulamamızı indir"
-        )
-        return blocked.none{lower.contains(it)}
-    }
+    private fun usableParagraph(text:String):Boolean =
+        text.length in 50..1100 && isUsefulResearchText(text)
 }
 
-fun summarizeResearch(eventTitle:String,articles:List<ResearchedArticle>):ResearchSummary{
+fun cleanResearchText(text:String):String =
+    text
+        .replace(Regex("\\s+")," ")
+        .replace(' ',' ')
+        .trim()
+
+fun isUsefulResearchText(text:String):Boolean{
+    val clean=cleanResearchText(text)
+    if(clean.length<45)return false
+    if(!looksTurkish(clean))return false
+
+    val lower=clean.lowercase(Locale("tr","TR"))
+    val blocked=listOf(
+        "çerez","cookie","reklam","abonelik","abone ol","bildirimleri aç",
+        "tüm hakları saklıdır","kişisel veriler","gizlilik politikası",
+        "üyelik","giriş yap","uygulamamızı indir",
+        "comprehensive up-to-date news coverage",
+        "aggregated from sources all over the world",
+        "google news","news.google.com",
+        "javascript'i etkinleştirin","javascript etkinleştirin",
+        "tarayıcınız desteklenmiyor"
+    )
+    return blocked.none{lower.contains(it)}
+}
+
+fun summarizeResearch(
+    eventTitle:String,
+    eventSummary:String,
+    articles:List<ResearchedArticle>
+):ResearchSummary{
     val locale=Locale("tr","TR")
+    val queryStop=setOf(
+        "göre","değil","geldi","olan","oldu","için","ile","dedi","son",
+        "yeni","haber","açıklama","etti","eden","sonra","önce"
+    )
     val queryTerms=eventTitle.lowercase(locale)
         .split(Regex("[^\\p{L}\\p{N}]+"))
-        .filter{it.length>3}
+        .filter{it.length>3 && it !in queryStop}
         .toSet()
 
     val impactMarkers=listOf(
@@ -138,12 +167,20 @@ fun summarizeResearch(eventTitle:String,articles:List<ResearchedArticle>):Resear
         blocks.forEachIndexed{index,block->
             block.split(Regex("(?<=[.!?])\\s+"))
                 .map{it.replace(Regex("\\s+")," ").trim()}
-                .filter{it.length in 55..360}
+                .map(::cleanResearchText)
+                .filter{it.length in 55..360 && isUsefulResearchText(it)}
                 .forEach{sentence->
                     val lower=sentence.lowercase(locale)
-                    val terms=lower.split(Regex("[^\\p{L}\\p{N}]+")).filter{it.length>3}.toSet()
+                    val terms=lower
+                        .split(Regex("[^\\p{L}\\p{N}]+"))
+                        .filter{it.length>3}
+                        .toSet()
                     val overlap=terms.intersect(queryTerms).size
-                    val relevance=overlap*7 + if(index<4)4 else 0 + if(sentence.any(Char::isDigit))2 else 0
+                    if(overlap==0)return@forEach
+                    val relevance=
+                        overlap*9 +
+                        if(index<4)4 else 0 +
+                        if(sentence.any(Char::isDigit))2 else 0
                     candidates+=Candidate(
                         text=sentence,
                         relevance=relevance,
@@ -172,21 +209,42 @@ fun summarizeResearch(eventTitle:String,articles:List<ResearchedArticle>):Resear
         compareByDescending<Candidate>{it.relevance + (it.quality/12).toInt()}
             .thenByDescending{it.quality}
     )
+    val fallbackWhat=eventSummary
+        .split(Regex("(?<=[.!?])\\s+"))
+        .map(::cleanResearchText)
+        .filter{it.length in 45..360 && isUsefulResearchText(it)}
+        .take(2)
+
+    val titleFallback=articles
+        .map{cleanResearchText(it.title)}
+        .filter{it.length>=25 && looksTurkish(it)}
+        .filter{title->
+            val terms=title.lowercase(locale)
+                .split(Regex("[^\\p{L}\\p{N}]+"))
+                .filter{it.length>3}
+                .toSet()
+            terms.intersect(queryTerms).isNotEmpty()
+        }
+        .distinct()
+        .take(2)
+
     val what=distinctTake(ranked,2)
+        .ifEmpty{fallbackWhat}
+        .ifEmpty{titleFallback}
 
     val whyCandidates=candidates.filter{it.impact}.sortedWith(
         compareByDescending<Candidate>{it.relevance + (it.quality/10).toInt()}
             .thenByDescending{it.quality}
     )
-    val why=distinctTake(whyCandidates,2,what.toSet()).ifEmpty{
-        distinctTake(ranked,1,what.toSet())
-    }
+    val why=distinctTake(whyCandidates,2,what.toSet())
 
-    val latestCandidates=candidates.sortedWith(
-        compareByDescending<Candidate>{it.latest}
-            .thenByDescending{it.publishedAt?:0L}
-            .thenByDescending{it.relevance}
-    )
+    val latestCandidates=candidates
+        .filter{it.latest || it.publishedAt!=null}
+        .sortedWith(
+            compareByDescending<Candidate>{it.latest}
+                .thenByDescending{it.publishedAt?:0L}
+                .thenByDescending{it.relevance}
+        )
     val used=(what+why).toSet()
     val latest=distinctTake(latestCandidates,2,used)
 

@@ -18,6 +18,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.TimeZone
+import java.util.concurrent.ConcurrentHashMap
 
 data class WebNewsResult(
     val title:String,
@@ -27,61 +28,149 @@ data class WebNewsResult(
     val publishedAt:Long?
 )
 
+private data class NewsSearchCacheEntry(
+    val createdAt:Long,
+    val rows:List<WebNewsResult>
+)
+
+private const val NEWS_SEARCH_CACHE_TTL_MS=5L*60*1000
+private val newsSearchCache=ConcurrentHashMap<String,NewsSearchCacheEntry>()
+
 class NewsWebSearch {
-    suspend fun search(query:String,limit:Int=10,expandDescriptions:Boolean=false):List<WebNewsResult> =
-        withContext(Dispatchers.IO){
-            val compact=compactQuery(query)
-            if(compact.isBlank()) return@withContext emptyList()
-            val q=URLEncoder.encode(compact,StandardCharsets.UTF_8.toString())
-            val endpoint="https://news.google.com/rss/search?q=$q&hl=tr&gl=TR&ceid=TR:tr"
-            val xml=download(endpoint) ?: return@withContext emptyList()
-            val parsed=parse(xml).take(limit)
-            if(!expandDescriptions) return@withContext parsed
-            coroutineScope{
-                parsed.mapIndexed{index,row->
-                    async{
-                        if(index<4){
-                            val meta=fetchMetaDescription(row.url)
-                            if(!meta.isNullOrBlank()) row.copy(snippet=meta) else row
-                        } else row
-                    }
-                }.awaitAll()
+    suspend fun search(
+        query:String,
+        limit:Int=10,
+        expandDescriptions:Boolean=false
+    ):List<WebNewsResult>{
+        val compact=compactQuery(query)
+        if(compact.isBlank())return emptyList()
+
+        val cacheKey="${compact.lowercase(Locale("tr","TR"))}|$limit|$expandDescriptions"
+        val now=System.currentTimeMillis()
+        newsSearchCache[cacheKey]?.let{entry->
+            if(now-entry.createdAt<NEWS_SEARCH_CACHE_TTL_MS){
+                return entry.rows
             }
         }
+
+        val rows=withContext(Dispatchers.IO){
+            val q=URLEncoder.encode(
+                compact,
+                StandardCharsets.UTF_8.toString()
+            )
+            val endpoint="https://news.google.com/rss/search?q=$q&hl=tr&gl=TR&ceid=TR:tr"
+            val xml=download(endpoint)
+                ?: return@withContext emptyList()
+
+            val parsed=parse(xml).take(limit)
+
+            if(!expandDescriptions){
+                parsed
+            }else{
+                coroutineScope{
+                    parsed.mapIndexed{index,row->
+                        async{
+                            if(index<3){
+                                val meta=fetchMetaDescription(row.url)
+                                if(!meta.isNullOrBlank()){
+                                    row.copy(snippet=meta)
+                                }else{
+                                    row
+                                }
+                            }else{
+                                row
+                            }
+                        }
+                    }.awaitAll()
+                }
+            }
+        }
+
+        newsSearchCache[cacheKey]=
+            NewsSearchCacheEntry(now,rows)
+
+        if(newsSearchCache.size>48){
+            newsSearchCache.entries
+                .sortedBy{it.value.createdAt}
+                .take(newsSearchCache.size-36)
+                .forEach{
+                    newsSearchCache.remove(it.key)
+                }
+        }
+
+        return rows
+    }
 
     private fun compactQuery(query:String):String{
         val clean=query
             .replace(Regex("[“”\"'’]")," ")
-            .replace(Regex("[^\\p{L}\\p{N}\\s-]")," ")
+            .replace(
+                Regex("[^\\p{L}\\p{N}\\s-]"),
+                " "
+            )
             .replace(Regex("\\s+")," ")
             .trim()
+
         val stop=setOf(
-            "the","a","an","and","or","but","why","how","what","when","where","who",
-            "is","are","was","were","be","been","being","to","of","for","in","on","at",
-            "with","from","as","by","its","it","this","that","these","those",
-            "ve","veya","ile","için","bu","şu","neden","nasıl","olan","olarak","bir"
+            "the","a","an","and","or","but",
+            "why","how","what","when","where","who",
+            "is","are","was","were","be","been","being",
+            "to","of","for","in","on","at","with","from",
+            "as","by","its","it","this","that","these","those",
+            "ve","veya","ile","için","bu","şu",
+            "neden","nasıl","olan","olarak","bir"
         )
-        val tokens=clean.split(" ").filter{it.length>2 && it.lowercase(Locale.ROOT) !in stop}
-        return tokens.take(10).joinToString(" ").ifBlank{clean.take(140)}
+
+        val tokens=clean
+            .split(" ")
+            .filter{
+                it.length>2 &&
+                it.lowercase(Locale.ROOT) !in stop
+            }
+
+        return tokens
+            .take(10)
+            .joinToString(" ")
+            .ifBlank{clean.take(140)}
     }
 
     private fun download(url:String):String?{
-        val conn=(URL(url).openConnection() as HttpURLConnection).apply{
+        val conn=(
+            URL(url).openConnection()
+                as HttpURLConnection
+        ).apply{
             connectTimeout=12000
             readTimeout=12000
             instanceFollowRedirects=true
-            setRequestProperty("User-Agent","Mozilla/5.0 (Android) GundemRadari/14")
-            setRequestProperty("Accept","application/rss+xml,application/xml,text/xml,*/*")
+            setRequestProperty(
+                "User-Agent",
+                "Mozilla/5.0 (Android) GundemRadari/15"
+            )
+            setRequestProperty(
+                "Accept",
+                "application/rss+xml,application/xml,text/xml,*/*"
+            )
         }
+
         return try{
-            if(conn.responseCode !in 200..299) null
-            else conn.inputStream.bufferedReader().use{it.readText()}
-        }catch(_:Throwable){null}finally{conn.disconnect()}
+            if(conn.responseCode !in 200..299){
+                null
+            }else{
+                conn.inputStream
+                    .bufferedReader()
+                    .use{it.readText()}
+            }
+        }catch(_:Throwable){
+            null
+        }finally{
+            conn.disconnect()
+        }
     }
 
     private fun parse(xml:String):List<WebNewsResult>{
         val parser=Xml.newPullParser()
         parser.setInput(xml.reader())
+
         val out=mutableListOf<WebNewsResult>()
         var tag=""
         var title=""
@@ -91,153 +180,386 @@ class NewsWebSearch {
         var published=""
         var inItem=false
 
-        while(parser.eventType!=XmlPullParser.END_DOCUMENT){
+        while(
+            parser.eventType!=
+            XmlPullParser.END_DOCUMENT
+        ){
             when(parser.eventType){
                 XmlPullParser.START_TAG->{
                     tag=parser.name.lowercase(Locale.ROOT)
                     if(tag=="item"){
                         inItem=true
-                        title="";link="";description="";source="";published=""
+                        title=""
+                        link=""
+                        description=""
+                        source=""
+                        published=""
                     }
                 }
+
                 XmlPullParser.TEXT->if(inItem){
                     when(tag){
                         "title"->title+=parser.text
                         "link"->link+=parser.text
                         "description"->description+=parser.text
                         "source"->source+=parser.text
-                        "pubdate","published","updated"->published+=parser.text
+                        "pubdate","published","updated"->
+                            published+=parser.text
                     }
                 }
-                XmlPullParser.END_TAG->if(parser.name.equals("item",true)){
-                    val cleanTitle=clean(title).let{removeSourceSuffix(it,source)}
-                    val cleanSnippet=clean(description)
-                        .replace(cleanTitle,"",ignoreCase=true)
-                        .replace(source.trim(),"",ignoreCase=true)
-                        .trim(' ','-','·','|')
-                        .take(900)
-                    if(cleanTitle.isNotBlank()&&link.isNotBlank()){
-                        out+=WebNewsResult(
-                            title=cleanTitle,
-                            source=source.trim().ifBlank{publisherFromTitle(title)},
-                            url=link.trim(),
-                            snippet=cleanSnippet,
-                            publishedAt=parseDate(published.trim())
-                        )
+
+                XmlPullParser.END_TAG->
+                    if(parser.name.equals("item",true)){
+                        val cleanTitle=clean(title)
+                            .let{
+                                removeSourceSuffix(
+                                    it,
+                                    source
+                                )
+                            }
+
+                        val rawSnippet=
+                            clean(description)
+                                .replace(
+                                    cleanTitle,
+                                    "",
+                                    ignoreCase=true
+                                )
+                                .replace(
+                                    source.trim(),
+                                    "",
+                                    ignoreCase=true
+                                )
+                                .trim(
+                                    ' ',
+                                    '-',
+                                    '·',
+                                    '|'
+                                )
+                                .take(900)
+
+                        val cleanSnippet=
+                            cleanResearchText(rawSnippet)
+                                .takeIf(
+                                    ::isUsefulResearchText
+                                )
+                                .orEmpty()
+
+                        if(
+                            cleanTitle.isNotBlank() &&
+                            link.isNotBlank()
+                        ){
+                            out+=WebNewsResult(
+                                title=cleanTitle,
+                                source=source.trim()
+                                    .ifBlank{
+                                        publisherFromTitle(
+                                            title
+                                        )
+                                    },
+                                url=link.trim(),
+                                snippet=cleanSnippet,
+                                publishedAt=
+                                    parseDate(
+                                        published.trim()
+                                    )
+                            )
+                        }
+
+                        inItem=false
                     }
-                    inItem=false
-                }
             }
+
             parser.next()
         }
-        return out.distinctBy{it.title.lowercase(Locale("tr","TR"))}
+
+        return out.distinctBy{
+            it.title.lowercase(
+                Locale("tr","TR")
+            )
+        }
     }
 
-    private fun removeSourceSuffix(title:String,source:String):String{
+    private fun removeSourceSuffix(
+        title:String,
+        source:String
+    ):String{
         val src=source.trim()
-        if(src.isNotBlank()&&title.endsWith(" - $src",ignoreCase=true))
-            return title.dropLast(src.length+3).trim()
+
+        if(
+            src.isNotBlank() &&
+            title.endsWith(
+                " - $src",
+                ignoreCase=true
+            )
+        ){
+            return title
+                .dropLast(src.length+3)
+                .trim()
+        }
+
         return title
     }
 
-    private fun publisherFromTitle(title:String):String =
-        title.substringAfterLast(" - ","").trim()
+    private fun publisherFromTitle(
+        title:String
+    ):String =
+        title
+            .substringAfterLast(" - ","")
+            .trim()
 
-    private fun clean(text:String):String=
-        Html.fromHtml(text,Html.FROM_HTML_MODE_LEGACY).toString()
+    private fun clean(text:String):String =
+        Html.fromHtml(
+            text,
+            Html.FROM_HTML_MODE_LEGACY
+        )
+            .toString()
             .replace('\u00a0',' ')
             .replace(Regex("[ \\t]+")," ")
             .replace(Regex("\\n{2,}")," ")
             .trim()
 
-    private fun fetchMetaDescription(url:String):String?{
-        val conn=(URL(url).openConnection() as HttpURLConnection).apply{
+    private fun fetchMetaDescription(
+        url:String
+    ):String?{
+        val conn=(
+            URL(url).openConnection()
+                as HttpURLConnection
+        ).apply{
             connectTimeout=10000
             readTimeout=10000
             instanceFollowRedirects=true
-            setRequestProperty("User-Agent","Mozilla/5.0 (Android) GundemRadari/14")
-            setRequestProperty("Accept","text/html,application/xhtml+xml")
-        }
-        return try{
-            if(conn.responseCode !in 200..399)return null
-            val html=conn.inputStream.bufferedReader().use{reader->
-                val sb=StringBuilder()
-                val buf=CharArray(4096)
-                while(sb.length<180000){
-                    val n=reader.read(buf)
-                    if(n<=0)break
-                    sb.append(buf,0,n)
-                }
-                sb.toString()
-            }
-            val patterns=listOf(
-                Regex("""<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']""",RegexOption.IGNORE_CASE),
-                Regex("""<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']""",RegexOption.IGNORE_CASE),
-                Regex("""<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']""",RegexOption.IGNORE_CASE),
-                Regex("""<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']""",RegexOption.IGNORE_CASE)
+            setRequestProperty(
+                "User-Agent",
+                "Mozilla/5.0 (Android) GundemRadari/15"
             )
-            patterns.firstNotNullOfOrNull{it.find(html)?.groupValues?.getOrNull(1)}
-                ?.let(::clean)
-                ?.takeIf{it.length>=45}
+            setRequestProperty(
+                "Accept",
+                "text/html,application/xhtml+xml"
+            )
+        }
+
+        return try{
+            if(conn.responseCode !in 200..399){
+                return null
+            }
+
+            val html=
+                conn.inputStream
+                    .bufferedReader()
+                    .use{reader->
+                        val sb=StringBuilder()
+                        val buf=CharArray(4096)
+
+                        while(sb.length<180000){
+                            val n=reader.read(buf)
+                            if(n<=0)break
+                            sb.append(buf,0,n)
+                        }
+
+                        sb.toString()
+                    }
+
+            val patterns=listOf(
+                Regex(
+                    """<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']""",
+                    RegexOption.IGNORE_CASE
+                ),
+                Regex(
+                    """<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']""",
+                    RegexOption.IGNORE_CASE
+                ),
+                Regex(
+                    """<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']""",
+                    RegexOption.IGNORE_CASE
+                ),
+                Regex(
+                    """<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']""",
+                    RegexOption.IGNORE_CASE
+                )
+            )
+
+            patterns
+                .firstNotNullOfOrNull{
+                    it.find(html)
+                        ?.groupValues
+                        ?.getOrNull(1)
+                }
+                ?.let(::cleanResearchText)
+                ?.takeIf(::isUsefulResearchText)
                 ?.take(900)
-        }catch(_:Throwable){null}finally{conn.disconnect()}
+
+        }catch(_:Throwable){
+            null
+        }finally{
+            conn.disconnect()
+        }
     }
 
     private fun parseDate(raw:String):Long?{
         if(raw.isBlank())return null
-        runCatching{return ZonedDateTime.parse(raw,DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli()}
-        runCatching{return OffsetDateTime.parse(raw).toInstant().toEpochMilli()}
-        val patterns=listOf("EEE, dd MMM yyyy HH:mm:ss Z","EEE, dd MMM yyyy HH:mm Z")
+
+        runCatching{
+            return ZonedDateTime
+                .parse(
+                    raw,
+                    DateTimeFormatter.RFC_1123_DATE_TIME
+                )
+                .toInstant()
+                .toEpochMilli()
+        }
+
+        runCatching{
+            return OffsetDateTime
+                .parse(raw)
+                .toInstant()
+                .toEpochMilli()
+        }
+
+        val patterns=listOf(
+            "EEE, dd MMM yyyy HH:mm:ss Z",
+            "EEE, dd MMM yyyy HH:mm Z"
+        )
+
         for(pattern in patterns){
-            val f=SimpleDateFormat(pattern,Locale.ENGLISH).apply{
-                timeZone=TimeZone.getTimeZone("UTC")
+            val f=SimpleDateFormat(
+                pattern,
+                Locale.ENGLISH
+            ).apply{
+                timeZone=
+                    TimeZone.getTimeZone("UTC")
                 isLenient=true
             }
-            runCatching{f.parse(raw)?.time}.getOrNull()?.let{return it}
+
+            runCatching{
+                f.parse(raw)?.time
+            }
+                .getOrNull()
+                ?.let{
+                    return it
+                }
         }
+
         return null
     }
 }
 
 fun looksTurkish(text:String):Boolean{
-    if(text.any{it in "çğıöşüÇĞİÖŞÜ"})return true
-    val lower=" "+text.lowercase(Locale("tr","TR"))+" "
-    val common=listOf(" ve "," için "," ile "," bir "," bu "," son "," savaş "," başkanı "," açıklama "," türkiye "," iran "," israil ")
-    return common.count{lower.contains(it)}>=2
+    if(text.any{it in "çğıöşüÇĞİÖŞÜ"}){
+        return true
+    }
+
+    val lower=
+        " "+text.lowercase(
+            Locale("tr","TR")
+        )+" "
+
+    val common=listOf(
+        " ve "," için "," ile "," bir ",
+        " bu "," son "," göre "," değil ",
+        " olarak "," ancak "," başkanı ",
+        " açıklama "," türkiye "," iran ",
+        " israil "," oldu "," etti "," dedi "
+    )
+
+    return common.count{
+        lower.contains(it)
+    }>=2
 }
 
-fun buildExtractiveWebSummary(rows:List<WebNewsResult>):List<String>{
+fun buildExtractiveWebSummary(
+    rows:List<WebNewsResult>
+):List<String>{
     val candidates=mutableListOf<String>()
+
     rows.forEach{row->
-        val snippet=row.snippet
-            .replace(Regex("\\s+")," ")
-            .trim()
-        if(snippet.length>=55 && looksTurkish(snippet)){
-            snippet.split(Regex("(?<=[.!?])\\s+"))
-                .map{it.trim()}
-                .filter{it.length in 45..260}
-                .forEach{candidates+=it}
+        val snippet=
+            cleanResearchText(row.snippet)
+
+        if(
+            snippet.length>=55 &&
+            isUsefulResearchText(snippet)
+        ){
+            snippet
+                .split(
+                    Regex("(?<=[.!?])\\s+")
+                )
+                .map(::cleanResearchText)
+                .filter{
+                    it.length in 45..260 &&
+                    isUsefulResearchText(it)
+                }
+                .forEach{
+                    candidates+=it
+                }
         }
     }
+
     if(candidates.isEmpty()){
-        return rows.filter{looksTurkish(it.title)}
+        return rows
+            .filter{
+                looksTurkish(it.title)
+            }
             .map{it.title}
             .distinct()
             .take(4)
     }
-    val selected=mutableListOf<String>()
-    for(sentence in candidates.sortedByDescending{it.length}){
-        if(selected.none{simpleSimilarity(it,sentence)>.58}){
+
+    val selected=
+        mutableListOf<String>()
+
+    for(
+        sentence in
+        candidates.sortedByDescending{
+            it.length
+        }
+    ){
+        if(
+            selected.none{
+                simpleSimilarity(
+                    it,
+                    sentence
+                )>.58
+            }
+        ){
             selected+=sentence
             if(selected.size==4)break
         }
     }
+
     return selected
 }
 
-private fun simpleSimilarity(a:String,b:String):Double{
-    val x=a.lowercase(Locale("tr","TR")).split(Regex("[^\\p{L}\\p{N}]+")).filter{it.length>3}.toSet()
-    val y=b.lowercase(Locale("tr","TR")).split(Regex("[^\\p{L}\\p{N}]+")).filter{it.length>3}.toSet()
-    if(x.isEmpty()||y.isEmpty())return 0.0
-    return x.intersect(y).size.toDouble()/x.union(y).size
+private fun simpleSimilarity(
+    a:String,
+    b:String
+):Double{
+    val x=a
+        .lowercase(Locale("tr","TR"))
+        .split(
+            Regex("[^\\p{L}\\p{N}]+")
+        )
+        .filter{it.length>3}
+        .toSet()
+
+    val y=b
+        .lowercase(Locale("tr","TR"))
+        .split(
+            Regex("[^\\p{L}\\p{N}]+")
+        )
+        .filter{it.length>3}
+        .toSet()
+
+    if(
+        x.isEmpty() ||
+        y.isEmpty()
+    ){
+        return 0.0
+    }
+
+    return x
+        .intersect(y)
+        .size
+        .toDouble() /
+        x.union(y).size
 }

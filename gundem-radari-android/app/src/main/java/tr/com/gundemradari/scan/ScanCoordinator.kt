@@ -19,7 +19,8 @@ class ScanCoordinator(private val db:AppDatabase){
         if(!scanMutex.tryLock())return ScanOutcome(0,emptyList())
 
         try{
-            return coroutineScope{
+            return withContext(Dispatchers.Default){
+                coroutineScope{
                 val started=System.currentTimeMillis()
                 val sources=dao.scanSources(started)
                 val touchedEvents=linkedSetOf<String>()
@@ -71,6 +72,7 @@ class ScanCoordinator(private val db:AppDatabase){
 
                 onProgress("$count yeni kayıt")
                 ScanOutcome(count,failures)
+                }
             }
         }finally{
             scanMutex.unlock()
