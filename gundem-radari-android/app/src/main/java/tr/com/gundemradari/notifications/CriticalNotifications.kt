@@ -1,6 +1,7 @@
 package tr.com.gundemradari.notifications
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -196,7 +197,7 @@ object CriticalNotificationManager {
             .setContentIntent(pending)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_NEWS)
+            .setCategory(Notification.CATEGORY_EVENT)
             .setOnlyAlertOnce(false)
             .build()
 
