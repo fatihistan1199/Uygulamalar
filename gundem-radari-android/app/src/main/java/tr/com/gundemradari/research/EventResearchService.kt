@@ -137,7 +137,7 @@ class EventResearchService(
 
         // Teyit için paralel çoklu okuma yok. İlk güçlü yayıncı sayfası yeterliyse dur.
         for(row in rankedRows.take(2)){
-            val loaded=loadRow(row,religionAgeDays)
+            val loaded=loadRow(row,religionAgeDays)?:continue
             if(best==null || loaded.contentScore>best!!.contentScore){
                 best=loaded
             }
@@ -160,8 +160,20 @@ class EventResearchService(
                 )
             }.getOrElse{emptyList()}
 
-            for(row in webResults.take(2)){
+            for(row in webResults.take(3)){
+                if(row.url.contains("news.google.com"))continue
+
                 val details=articleReader.read(row.url)
+                val effectivePublished=
+                    details?.publishedAt ?: row.publishedAt
+
+                if(
+                    religionAgeDays!=null &&
+                    !ReligionTracker.isFresh(effectivePublished)
+                ){
+                    continue
+                }
+
                 val contentScore=details?.let(::articleContentQuality)?:0.0
 
                 val article=if(details!=null){
@@ -179,7 +191,7 @@ class EventResearchService(
                                 .takeIf(::isUsefulResearchText)
                             ?:"",
                         paragraphs=details.paragraphs,
-                        publishedAt=row.publishedAt,
+                        publishedAt=effectivePublished,
                         isPrimary=true,
                         quality=(sourceQuality*0.30+contentScore*0.70)
                             .coerceIn(0.0,100.0)
@@ -193,17 +205,23 @@ class EventResearchService(
                             .takeIf(::isUsefulResearchText)
                             ?:"",
                         paragraphs=emptyList(),
-                        publishedAt=row.publishedAt,
+                        publishedAt=effectivePublished,
                         isPrimary=true,
                         quality=webSourceQuality(row.source,row.url)*100.0
                     )
                 }
 
-                val candidate=LoadedArticle(article,contentScore)
+                val candidate=LoadedArticle(
+                    article=article,
+                    contentScore=maxOf(
+                        contentScore,
+                        if(article.description.length>=80)22.0 else 0.0
+                    )
+                )
                 if(best==null || candidate.contentScore>best!!.contentScore){
                     best=candidate
                 }
-                if(contentScore>=55.0)break
+                if(candidate.contentScore>=55.0)break
             }
         }
 
@@ -235,7 +253,7 @@ class EventResearchService(
     private suspend fun loadRow(
         row:ResearchItemRow,
         maxAgeDays:Int?
-    ):LoadedArticle{
+    ):LoadedArticle?{
         // Google News ara bağlantısı özet kaynağı olarak kabul edilmez.
         // Aynı başlığı doğrudan yayıncı URL'si veren aramada yeniden çöz.
         if(row.url.contains("news.google.com")){
@@ -253,6 +271,16 @@ class EventResearchService(
             var bestDirect:LoadedArticle?=null
             for(hit in direct.take(3)){
                 val d=articleReader.read(hit.url)
+                val effectivePublished=
+                    d?.publishedAt ?: hit.publishedAt ?: row.publishedAt
+
+                if(
+                    maxAgeDays!=null &&
+                    !ReligionTracker.isFresh(effectivePublished)
+                ){
+                    continue
+                }
+
                 val score=d?.let(::articleContentQuality)?:0.0
 
                 val article=if(d!=null){
@@ -272,7 +300,7 @@ class EventResearchService(
                                 .takeIf(::isUsefulResearchText)
                             ?:"",
                         paragraphs=d.paragraphs,
-                        publishedAt=hit.publishedAt?:row.publishedAt,
+                        publishedAt=effectivePublished,
                         isPrimary=true,
                         quality=(sourceQuality*0.30+score*0.70)
                             .coerceIn(0.0,100.0)
@@ -288,7 +316,7 @@ class EventResearchService(
                                 .takeIf(::isUsefulResearchText)
                             ?:"",
                         paragraphs=emptyList(),
-                        publishedAt=hit.publishedAt?:row.publishedAt,
+                        publishedAt=effectivePublished,
                         isPrimary=true,
                         quality=webSourceQuality(hit.source,hit.url)*100.0
                     )
@@ -314,6 +342,14 @@ class EventResearchService(
         }
 
         val details=articleReader.read(row.url)
+        val effectivePublished=details?.publishedAt ?: row.publishedAt
+
+        if(
+            maxAgeDays!=null &&
+            !ReligionTracker.isFresh(effectivePublished)
+        ){
+            return null
+        }
 
         if(details==null){
             return LoadedArticle(
@@ -336,7 +372,7 @@ class EventResearchService(
                         .takeIf(::isUsefulResearchText)
                     ?:"",
                 paragraphs=details.paragraphs,
-                publishedAt=row.publishedAt,
+                publishedAt=effectivePublished,
                 isPrimary=true,
                 quality=(sourceQuality*0.30+contentScore*0.70)
                     .coerceIn(0.0,100.0)
