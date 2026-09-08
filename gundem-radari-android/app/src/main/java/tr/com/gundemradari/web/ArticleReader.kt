@@ -336,13 +336,10 @@ private data class StructuredArticle(
 )
 
 private fun extractStructuredArticle(doc:Document):StructuredArticle{
-    val objects=mutableListOf<JSONObject>()
+    val candidates=mutableListOf<StructuredArticle>()
 
     doc.select("script[type=application/ld+json]").forEach{node->
-        val rawCandidates=listOf(
-            node.data(),
-            node.html()
-        )
+        val rawCandidates=listOf(node.data(),node.html())
             .map{raw->
                 raw.trim()
                     .removePrefix("<!--")
@@ -356,35 +353,44 @@ private fun extractStructuredArticle(doc:Document):StructuredArticle{
             .distinct()
 
         rawCandidates.forEach{raw->
+            val objects=mutableListOf<JSONObject>()
             val root=runCatching{
                 JSONTokener(raw).nextValue()
             }.getOrNull()
             collectJsonObjects(root,objects)
 
-            if(root==null){
-                fallbackStructuredObject(raw)?.let{objects+=it}
-            }
+            objects
+                .filter(::looksLikeArticleObject)
+                .map(::structuredFromObject)
+                .filter{it.hasUsefulData()}
+                .forEach{candidates+=it}
+
+            fallbackStructuredArticle(raw)
+                ?.takeIf{it.hasUsefulData()}
+                ?.let{candidates+=it}
         }
     }
 
-    val best=objects
-        .filter(::looksLikeArticleObject)
-        .maxByOrNull{obj->
-            jsonString(obj,"articleBody").length +
-            jsonString(obj,"description").length*2 +
-            jsonString(obj,"headline").length*3
-        }
-        ?:return StructuredArticle()
-
-    return StructuredArticle(
-        headline=jsonString(best,"headline"),
-        description=jsonString(best,"description"),
-        articleBody=jsonString(best,"articleBody"),
-        datePublished=jsonString(best,"datePublished")
-    )
+    return candidates.maxByOrNull{item->
+        item.articleBody.length+
+        item.description.length*2+
+        item.headline.length*3
+    } ?: StructuredArticle()
 }
 
-private fun fallbackStructuredObject(raw:String):JSONObject?{
+private fun StructuredArticle.hasUsefulData():Boolean=
+    headline.isNotBlank() ||
+    description.isNotBlank() ||
+    articleBody.isNotBlank()
+
+private fun structuredFromObject(obj:JSONObject)=StructuredArticle(
+    headline=jsonString(obj,"headline"),
+    description=jsonString(obj,"description"),
+    articleBody=jsonString(obj,"articleBody"),
+    datePublished=jsonString(obj,"datePublished")
+)
+
+private fun fallbackStructuredArticle(raw:String):StructuredArticle?{
     fun capture(key:String):String{
         val pattern=Regex(
             """["]${Regex.escape(key)}["]\s*:\s*["]((?:\\.|[^"])*)["]""",
@@ -393,25 +399,23 @@ private fun fallbackStructuredObject(raw:String):JSONObject?{
         val match=pattern.find(raw) ?: return ""
 
         val escaped=match.groupValues.getOrNull(1).orEmpty()
-        return runCatching{
-            JSONObject("{\"v\":\"$escaped\"}").optString("v","")
-        }.getOrDefault(escaped)
+        return escaped
+            .replace("\\n"," ")
+            .replace("\\r"," ")
+            .replace("\\t"," ")
+            .replace("\\"","\"")
+            .replace("\\/","/")
+            .let(::cleanResearchText)
     }
 
-    val headline=capture("headline")
-    val description=capture("description")
-    val body=capture("articleBody")
-    val date=capture("datePublished")
+    val item=StructuredArticle(
+        headline=capture("headline"),
+        description=capture("description"),
+        articleBody=capture("articleBody"),
+        datePublished=capture("datePublished")
+    )
 
-    if(headline.isBlank() && description.isBlank() && body.isBlank())return null
-
-    return JSONObject().apply{
-        put("@type","NewsArticle")
-        if(headline.isNotBlank())put("headline",headline)
-        if(description.isNotBlank())put("description",description)
-        if(body.isNotBlank())put("articleBody",body)
-        if(date.isNotBlank())put("datePublished",date)
-    }
+    return item.takeIf{it.hasUsefulData()}
 }
 
 private fun collectJsonObjects(value:Any?,out:MutableList<JSONObject>){
@@ -753,13 +757,13 @@ fun summarizeResearch(
             !it.lowercase(locale).contains("google news")
         }
         .distinct()
-        .take(2)
+        .take(1)
         .toList()
 
     val eventFallback=splitResearchSentences(eventSummary)
         .map(::polishResearchSentence)
         .filter{it.length>=35 && looksTurkish(it)}
-        .take(2)
+        .take(1)
 
     val titleFallback=articles
         .map{polishResearchSentence(it.title)}
@@ -767,7 +771,7 @@ fun summarizeResearch(
         .distinct()
         .take(1)
 
-    val what=takeDistinct(whatRanked,2)
+    val what=takeDistinct(whatRanked,1)
         .ifEmpty{articleLeadFallback}
         .ifEmpty{eventFallback}
         .ifEmpty{titleFallback}
