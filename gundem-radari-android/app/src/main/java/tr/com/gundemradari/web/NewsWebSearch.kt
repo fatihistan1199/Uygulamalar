@@ -211,6 +211,11 @@ class NewsWebSearch {
             .replace(Regex("[^\\p{L}\\p{N}]+")," ")
             .trim()
 
+    internal fun isSearchRelevantForTest(
+        query:String,
+        row:WebNewsResult
+    ):Boolean=isSearchRelevant(query,row)
+
     private fun isSearchRelevant(
         query:String,
         row:WebNewsResult
