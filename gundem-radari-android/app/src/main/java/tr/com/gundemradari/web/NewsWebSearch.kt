@@ -144,7 +144,7 @@ class NewsWebSearch {
             instanceFollowRedirects=true
             setRequestProperty(
                 "User-Agent",
-                "Mozilla/5.0 (Android) GundemRadari/15"
+                "Mozilla/5.0 (Android) GundemRadari/16"
             )
             setRequestProperty(
                 "Accept",
@@ -331,7 +331,7 @@ class NewsWebSearch {
             instanceFollowRedirects=true
             setRequestProperty(
                 "User-Agent",
-                "Mozilla/5.0 (Android) GundemRadari/15"
+                "Mozilla/5.0 (Android) GundemRadari/16"
             )
             setRequestProperty(
                 "Accept",

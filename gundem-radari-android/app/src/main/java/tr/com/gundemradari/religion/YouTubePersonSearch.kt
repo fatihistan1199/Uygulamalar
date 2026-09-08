@@ -17,7 +17,7 @@ class YouTubePersonSearch {
             runCatching{
                 val q=URLEncoder.encode(person,StandardCharsets.UTF_8.toString())
                 val html=Jsoup.connect("https://www.youtube.com/results?search_query=$q")
-                    .userAgent("Mozilla/5.0 (Android) GundemRadari/15")
+                    .userAgent("Mozilla/5.0 (Android) GundemRadari/16")
                     .timeout(12000)
                     .get()
                     .html()

@@ -3,6 +3,7 @@ package tr.com.gundemradari.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -150,12 +151,28 @@ class GundemViewModel(context:Context):ViewModel(){
                     now=now
                 )
 
-                val hits=rows
-                    .filter{row->
-                        val hay=normalizeSearch(row.searchText)
-                        terms.all{hay.contains(it)}
+                val scored=rows.mapNotNull{row->
+                    val score=searchMatchScore(
+                        terms=terms,
+                        title=row.event.title,
+                        summary=row.event.summary,
+                        fullText=row.searchText
+                    )
+                    if(score<=0.0)null else row.event to score
+                }
+
+                val minMatched=if(terms.size<=2)terms.size else terms.size-1
+                val hits=scored
+                    .filter{(event,_)->
+                        matchedSearchTerms(
+                            terms,
+                            event.title+" "+event.summary
+                        )>=minMatched
                     }
-                    .map{it.event}
+                    .sortedByDescending{(event,score)->
+                        score+searchRank(event,now)
+                    }
+                    .map{it.first}
 
                 if(hits.isNotEmpty()){
                     searchResults.value=mergeSearchEvents(
@@ -327,9 +344,85 @@ class GundemViewModel(context:Context):ViewModel(){
 
     private fun normalizeSearch(text:String):String=
         text.lowercase(Locale("tr","TR"))
+            .replace('ı','i')
+            .replace('ş','s')
+            .replace('ğ','g')
+            .replace('ü','u')
+            .replace('ö','o')
+            .replace('ç','c')
             .replace(Regex("[^\\p{L}\\p{N}]+")," ")
             .replace(Regex("\\s+")," ")
             .trim()
+
+    private fun matchedSearchTerms(
+        terms:List<String>,
+        text:String
+    ):Int{
+        val hay=normalizeSearch(text)
+        return terms.count{term->
+            hay.contains(term) ||
+            hay.split(" ").any{token->
+                token.length>=4 &&
+                term.length>=4 &&
+                (
+                    token.startsWith(term) ||
+                    term.startsWith(token)
+                )
+            }
+        }
+    }
+
+    private fun searchMatchScore(
+        terms:List<String>,
+        title:String,
+        summary:String,
+        fullText:String
+    ):Double{
+        val titleN=normalizeSearch(title)
+        val summaryN=normalizeSearch(summary)
+        val fullN=normalizeSearch(fullText)
+
+        var score=0.0
+        var matched=0
+
+        terms.forEach{term->
+            val titleHit=titleN.contains(term)
+            val summaryHit=summaryN.contains(term)
+            val fullHit=fullN.contains(term)
+
+            when{
+                titleHit->{
+                    score+=6.0
+                    matched++
+                }
+                summaryHit->{
+                    score+=3.0
+                    matched++
+                }
+                fullHit->{
+                    score+=1.5
+                    matched++
+                }
+                else->{
+                    val fuzzy=fullN.split(" ").any{token->
+                        token.length>=4 &&
+                        term.length>=4 &&
+                        (
+                            token.startsWith(term) ||
+                            term.startsWith(token)
+                        )
+                    }
+                    if(fuzzy){
+                        score+=0.8
+                        matched++
+                    }
+                }
+            }
+        }
+
+        if(matched==terms.size)score+=4.0
+        return score
+    }
 
     fun setSource(id:String,enabled:Boolean)=viewModelScope.launch{dao.setSource(id,enabled)}
     fun action(mode:Int)=viewModelScope.launch{dao.setAll(mode)}
@@ -709,27 +802,27 @@ class GundemViewModel(context:Context):ViewModel(){
 }
 
 private data class EventTone(
-    val background:Color,
-    val foreground:Color
+    val border:Color,
+    val borderWidth:androidx.compose.ui.unit.Dp
 )
 
 @Composable private fun eventTone(importance:Double):EventTone=
     when{
         importance>=90->EventTone(
-            background=Color(0xFF7A1616),
-            foreground=Color.White
+            border=Color(0xFF7A1616),
+            borderWidth=3.dp
         )
         importance>=80->EventTone(
-            background=Color(0xFFFFD7D7),
-            foreground=Color(0xFF4D1111)
+            border=Color(0xFFD75B5B),
+            borderWidth=2.dp
         )
         importance>=68->EventTone(
-            background=Color(0xFFFFF0A8),
-            foreground=Color(0xFF493B00)
+            border=Color(0xFFD4A900),
+            borderWidth=2.dp
         )
         else->EventTone(
-            background=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.50f),
-            foreground=MaterialTheme.colorScheme.onSurface
+            border=MaterialTheme.colorScheme.outlineVariant,
+            borderWidth=1.dp
         )
     }
 
@@ -744,8 +837,12 @@ private data class EventTone(
             .fillMaxWidth()
             .clickable(onClick=onResearch),
         colors=CardDefaults.cardColors(
-            containerColor=tone.background,
-            contentColor=tone.foreground
+            containerColor=Color.White,
+            contentColor=Color.Black
+        ),
+        border=BorderStroke(
+            tone.borderWidth,
+            tone.border
         ),
         elevation=CardDefaults.cardElevation(
             defaultElevation=if(e.importance>=80)3.dp else 1.dp
@@ -756,7 +853,7 @@ private data class EventTone(
                 Text(
                     e.title,
                     style=MaterialTheme.typography.titleMedium,
-                    color=tone.foreground
+                    color=Color.Black
                 )
 
                 if(e.summary.isNotBlank()){
@@ -765,7 +862,7 @@ private data class EventTone(
                         e.summary,
                         style=MaterialTheme.typography.bodyMedium,
                         maxLines=4,
-                        color=tone.foreground.copy(alpha=.88f)
+                        color=Color.Black.copy(alpha=.82f)
                     )
                 }
             }

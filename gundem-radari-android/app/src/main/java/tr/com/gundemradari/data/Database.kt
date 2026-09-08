@@ -17,13 +17,25 @@ import kotlinx.coroutines.flow.Flow
     val lastSuccessAt:Long?=null,
     val cooldownUntil:Long=0L)
 
-@Entity(tableName="raw_items") data class RawItemEntity(
+@Entity(
+    tableName="raw_items",
+    indices=[
+        Index(value=["sourceId"]),
+        Index(value=["firstSeenAt"])
+    ]
+) data class RawItemEntity(
     @PrimaryKey val url:String, val sourceId:String, val title:String, val summary:String,
     val publishedAt:Long?, val firstSeenAt:Long, val exactHash:String,
     @ColumnInfo(defaultValue="''") val originalTitle:String="",
     @ColumnInfo(defaultValue="''") val originalSummary:String="")
 
-@Entity(tableName="events") data class EventEntity(
+@Entity(
+    tableName="events",
+    indices=[
+        Index(value=["updatedAt"]),
+        Index(value=["scope","noise","updatedAt"])
+    ]
+) data class EventEntity(
     @PrimaryKey val id:String, val title:String, val summary:String, val scope:String,
     val importance:Double, val noise:Double, val verification:Int, val velocity:Double,
     val sourceCount:Int, val firstSeenAt:Long, val updatedAt:Long, val changeNote:String,
@@ -215,7 +227,7 @@ data class SearchEventRow(
         SourceEntity::class,SourceHealthEntity::class,RawItemEntity::class,EventEntity::class,
         EventItemEntity::class,EventVersionEntity::class,ScanHistoryEntity::class
     ],
-    version=12, exportSchema=false
+    version=13, exportSchema=false
 )
 abstract class AppDatabase:RoomDatabase(){
     abstract fun dao():GundemDao
@@ -274,9 +286,17 @@ abstract class AppDatabase:RoomDatabase(){
                 db.execSQL("DELETE FROM raw_items")
             }
         }
+        private val MIGRATION_12_13=object:Migration(12,13){
+            override fun migrate(db:SupportSQLiteDatabase){
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_raw_items_sourceId ON raw_items(sourceId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_raw_items_firstSeenAt ON raw_items(firstSeenAt)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_events_updatedAt ON events(updatedAt)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_events_scope_noise_updatedAt ON events(scope,noise,updatedAt)")
+            }
+        }
         fun get(context:Context)=INSTANCE?:synchronized(this){
             INSTANCE?:Room.databaseBuilder(context.applicationContext,AppDatabase::class.java,"gundem-radari.db")
-                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8,MIGRATION_8_9,MIGRATION_9_10,MIGRATION_10_11,MIGRATION_11_12)
+                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8,MIGRATION_8_9,MIGRATION_9_10,MIGRATION_10_11,MIGRATION_11_12,MIGRATION_12_13)
                 .build().also{INSTANCE=it}
         }
     }
