@@ -780,7 +780,7 @@ fun summarizeResearch(
         .filter{it.impact}
         .sortedByDescending{it.whyScore}
 
-    var why=takeDistinct(whyRanked,2,what)
+    var why=takeDistinct(whyRanked,1,what)
     if(why.isEmpty()){
         inferImportance(eventTitle,eventSummary,articles)?.let{
             why=listOf(it)
