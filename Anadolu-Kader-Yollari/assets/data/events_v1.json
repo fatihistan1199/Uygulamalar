@@ -3608,6 +3608,12 @@
             {
               "type": "queue_story",
               "storyId": "story_old_choice_returns"
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "selma_years_later",
+              "minDays": 600,
+              "maxDays": 900
             }
           ]
         }
@@ -4509,6 +4515,115 @@
               "memory": "Hazır olmadığını dürüstçe söyledi",
               "importance": 42,
               "decay": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "selma_years_later",
+      "category": "personal",
+      "title": "Yıllar Sonra Aynı Han",
+      "body": "Neredeyse iki yıl geçti. Selma Hatun'un hanına yeniden geldiğinde seni hiç tereddüt etmeden eski masaya çağırıyor. Yıllar önce karşılık istemediğin iyilik hâlâ onun hafızasında. Şimdi büyük bir kervan ortaklığında sana yer açabileceğini söylüyor. O gün verdiğin karar, yıllar sonra önüne gerçek bir kapı olarak dönmüş durumda.",
+      "weight": 100,
+      "major": false,
+      "cooldownDays": 999,
+      "scheduledOnly": true,
+      "chainId": "selma_personal",
+      "chainStage": 4,
+      "conditions": [
+        {
+          "type": "thread_status",
+          "thread": "selma_friendship",
+          "value": "yakın dostluk"
+        },
+        {
+          "type": "npc_alive",
+          "npc": "selma"
+        }
+      ],
+      "tags": [
+        "personal",
+        "friendship",
+        "years_later",
+        "memory",
+        "legacy"
+      ],
+      "choices": [
+        {
+          "id": "join",
+          "title": "Kervan ortaklığına katıl",
+          "hint": "Eski dostluğu uzun vadeli ekonomik bağa dönüştürürsün.",
+          "resultText": "Yıllar önce hesapsız bıraktığın iyilik, şimdi sana güçlü bir ticari kapı açtı.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "money",
+              "amount": 28
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "tuccar",
+              "amount": 5
+            },
+            {
+              "type": "npc_relation",
+              "npc": "selma",
+              "trust": 5,
+              "respect": 7,
+              "affection": 4,
+              "memory": "Yıllar sonra ortaklığıma katıldı; eski dostluğumuz yeni bir bağa dönüştü",
+              "importance": 90,
+              "decay": 0,
+              "permanent": true,
+              "tags": [
+                "friendship",
+                "years_later",
+                "permanent"
+              ]
+            },
+            {
+              "type": "story_thread",
+              "thread": "selma_friendship",
+              "status": "yıllanmış dostluk ve ortaklık"
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_old_choice_returns"
+            }
+          ]
+        },
+        {
+          "id": "decline",
+          "title": "Dostluğu ticaretten ayrı tut",
+          "hint": "Maddi fırsatı reddedersin; kişisel bağ korunur.",
+          "resultText": "Ortaklığı kabul etmedin. Selma bunu eski dostluğun değerini hesaba çevirmemek olarak yorumladı.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "selma",
+              "trust": 4,
+              "affection": 6,
+              "respect": 4,
+              "memory": "Yıllar sonra bile dostluğumuzu ticari hesaba çevirmedi",
+              "importance": 92,
+              "decay": 0,
+              "permanent": true,
+              "tags": [
+                "friendship",
+                "years_later",
+                "permanent"
+              ]
+            },
+            {
+              "type": "story_thread",
+              "thread": "selma_friendship",
+              "status": "yıllanmış yakın dostluk"
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_old_choice_returns"
             }
           ]
         }
