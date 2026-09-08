@@ -55,26 +55,53 @@ class NewsWebSearch {
         }
 
         val rows=withContext(Dispatchers.IO){
-            val searchText=if(maxAgeDays!=null){
-                "$compact when:${maxAgeDays.coerceIn(1,365)}d"
-            }else compact
-            val q=URLEncoder.encode(
-                searchText,
-                StandardCharsets.UTF_8.toString()
-            )
-            val endpoint="https://news.google.com/rss/search?q=$q&hl=tr&gl=TR&ceid=TR:tr"
-            val xml=download(endpoint)
-                ?: return@withContext emptyList()
-
             val cutoff=maxAgeDays?.let{
                 System.currentTimeMillis()-it.coerceIn(1,365)*24L*60*60*1000
             }
-            val parsed=parse(xml)
+
+            fun fresh(rows:List<WebNewsResult>)=rows
                 .filter{row->
                     cutoff==null ||
                     (row.publishedAt!=null && row.publishedAt>=cutoff)
                 }
+                .distinctBy{row->
+                    row.title.lowercase(Locale("tr","TR"))
+                }
                 .take(limit)
+
+            // Birincil arama: Bing News RSS. Bağlantılar doğrudan yayıncı
+            // sayfasına gider; böylece özetleyici Google News ara sayfasında kalmaz.
+            val bingQ=URLEncoder.encode(
+                compact,
+                StandardCharsets.UTF_8.toString()
+            )
+            val bingEndpoint=
+                "https://www.bing.com/news/search?q=$bingQ&format=rss"+
+                "&setmkt=tr-TR&cc=TR&qft=sortbydate%3d%221%22"
+            val bingRows=download(bingEndpoint)
+                ?.let(::parse)
+                ?.let(::fresh)
+                .orEmpty()
+
+            val parsed=if(bingRows.isNotEmpty()){
+                bingRows
+            }else{
+                // Bing sonuç vermezse Google News yalnız keşif yedeğidir.
+                // Tarih yine yerel olarak zorunlu denetlenir.
+                val searchText=if(maxAgeDays!=null){
+                    "$compact when:${maxAgeDays.coerceIn(1,365)}d"
+                }else compact
+                val googleQ=URLEncoder.encode(
+                    searchText,
+                    StandardCharsets.UTF_8.toString()
+                )
+                val googleEndpoint=
+                    "https://news.google.com/rss/search?q=$googleQ&hl=tr&gl=TR&ceid=TR:tr"
+                download(googleEndpoint)
+                    ?.let(::parse)
+                    ?.let(::fresh)
+                    .orEmpty()
+            }
 
             if(!expandDescriptions){
                 parsed
@@ -82,7 +109,7 @@ class NewsWebSearch {
                 coroutineScope{
                     parsed.mapIndexed{index,row->
                         async{
-                            if(index<3){
+                            if(index<4 && !row.url.contains("news.google.com")){
                                 val meta=fetchMetaDescription(row.url)
                                 if(!meta.isNullOrBlank()){
                                     row.copy(snippet=meta)
@@ -156,7 +183,7 @@ class NewsWebSearch {
             instanceFollowRedirects=true
             setRequestProperty(
                 "User-Agent",
-                "Mozilla/5.0 (Android) GundemRadari/16"
+                "Mozilla/5.0 (Android) GundemRadari/19"
             )
             setRequestProperty(
                 "Accept",
@@ -343,7 +370,7 @@ class NewsWebSearch {
             instanceFollowRedirects=true
             setRequestProperty(
                 "User-Agent",
-                "Mozilla/5.0 (Android) GundemRadari/16"
+                "Mozilla/5.0 (Android) GundemRadari/19"
             )
             setRequestProperty(
                 "Accept",
