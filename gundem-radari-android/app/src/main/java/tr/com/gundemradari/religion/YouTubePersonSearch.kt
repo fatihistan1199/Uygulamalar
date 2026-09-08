@@ -78,8 +78,8 @@ class YouTubePersonSearch {
             .html()
 
         val patterns=listOf(
-            Regex("\\"channelId\\":\\"(UC[A-Za-z0-9_-]{20,})\\""),
-            Regex("\\"externalId\\":\\"(UC[A-Za-z0-9_-]{20,})\\""),
+            Regex("\"channelId\":\"(UC[A-Za-z0-9_-]{20,})\""),
+            Regex("\"externalId\":\"(UC[A-Za-z0-9_-]{20,})\""),
             Regex("channel_id=(UC[A-Za-z0-9_-]{20,})")
         )
 
