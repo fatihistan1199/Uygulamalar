@@ -205,25 +205,53 @@ data class SearchEventRow(
     fun worldFeed(now:Long):Flow<List<EventEntity>>
 
     @Query("""
-        SELECT * FROM events
-        WHERE scope='religion'
-          AND religionPriority > 0
-          AND noise < 70
-          AND publishedAt IS NOT NULL
-          AND publishedAt>=:after
+        SELECT e.* FROM events e
+        WHERE e.scope='religion'
+          AND e.religionPriority > 0
+          AND e.noise < 70
+          AND EXISTS (
+              SELECT 1
+              FROM event_items ei
+              JOIN raw_items r ON r.url=ei.rawUrl
+              WHERE ei.eventId=e.id
+                AND r.publishedAt IS NOT NULL
+                AND r.publishedAt>=:after
+          )
         ORDER BY (
-            importance + religionPriority*5
-            - MIN(30.0, MAX(0.0, ((:now-updatedAt)/3600000.0)*0.55))
-        ) DESC, publishedAt DESC, updatedAt DESC LIMIT 70
+            e.importance + e.religionPriority*5
+            - MIN(30.0, MAX(0.0, ((:now-e.updatedAt)/3600000.0)*0.55))
+        ) DESC, e.publishedAt DESC, e.updatedAt DESC LIMIT 70
     """)
     fun religionFeed(now:Long,after:Long):Flow<List<EventEntity>>
 
     @Query("""
+        SELECT s.name AS sourceName, s.groupName AS groupName, r.url AS url,
+               r.title AS title, r.summary AS summary,
+               r.originalTitle AS originalTitle, r.originalSummary AS originalSummary,
+               r.publishedAt AS publishedAt, r.firstSeenAt AS firstSeenAt, s.trust AS trust
+        FROM event_items ei
+        JOIN raw_items r ON r.url=ei.rawUrl
+        JOIN sources s ON s.id=r.sourceId
+        WHERE ei.eventId=:eventId
+          AND r.publishedAt IS NOT NULL
+          AND r.publishedAt>=:after
+        ORDER BY s.trust DESC, r.publishedAt DESC
+    """)
+    suspend fun researchItemsFresh(eventId:String,after:Long):List<ResearchItemRow>
+
+    @Query("""
         DELETE FROM event_enrichment
         WHERE eventId IN (
-            SELECT id FROM events
-            WHERE scope='religion'
-              AND (publishedAt IS NULL OR publishedAt<:after)
+            SELECT e.id FROM events e
+            WHERE (e.scope='religion' OR e.religionPriority>0)
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM event_items ei
+                  JOIN raw_items r ON r.url=ei.rawUrl
+                  WHERE ei.eventId=e.id
+                    AND r.publishedAt IS NOT NULL
+                    AND r.publishedAt>=:after
+              )
         )
     """)
     suspend fun deleteOldReligionEnrichment(after:Long)
@@ -231,9 +259,16 @@ data class SearchEventRow(
     @Query("""
         DELETE FROM event_versions
         WHERE eventId IN (
-            SELECT id FROM events
-            WHERE scope='religion'
-              AND (publishedAt IS NULL OR publishedAt<:after)
+            SELECT e.id FROM events e
+            WHERE (e.scope='religion' OR e.religionPriority>0)
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM event_items ei
+                  JOIN raw_items r ON r.url=ei.rawUrl
+                  WHERE ei.eventId=e.id
+                    AND r.publishedAt IS NOT NULL
+                    AND r.publishedAt>=:after
+              )
         )
     """)
     suspend fun deleteOldReligionVersions(after:Long)
@@ -241,17 +276,31 @@ data class SearchEventRow(
     @Query("""
         DELETE FROM event_items
         WHERE eventId IN (
-            SELECT id FROM events
-            WHERE scope='religion'
-              AND (publishedAt IS NULL OR publishedAt<:after)
+            SELECT e.id FROM events e
+            WHERE (e.scope='religion' OR e.religionPriority>0)
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM event_items fresh_ei
+                  JOIN raw_items fresh_r ON fresh_r.url=fresh_ei.rawUrl
+                  WHERE fresh_ei.eventId=e.id
+                    AND fresh_r.publishedAt IS NOT NULL
+                    AND fresh_r.publishedAt>=:after
+              )
         )
     """)
     suspend fun deleteOldReligionLinks(after:Long)
 
     @Query("""
         DELETE FROM events
-        WHERE scope='religion'
-          AND (publishedAt IS NULL OR publishedAt<:after)
+        WHERE (scope='religion' OR religionPriority>0)
+          AND NOT EXISTS (
+              SELECT 1
+              FROM event_items ei
+              JOIN raw_items r ON r.url=ei.rawUrl
+              WHERE ei.eventId=events.id
+                AND r.publishedAt IS NOT NULL
+                AND r.publishedAt>=:after
+          )
     """)
     suspend fun deleteOldReligionEvents(after:Long)
 
