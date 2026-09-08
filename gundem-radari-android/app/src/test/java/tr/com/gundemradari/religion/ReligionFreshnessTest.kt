@@ -36,4 +36,26 @@ class ReligionFreshnessTest {
         assertTrue(profile!!.xUrl.contains("okuyanmehmet"))
         assertTrue(profile.instagramUrl.contains("okuyanmehmet"))
     }
+
+    @Test
+    fun screenshotOldDatesAreRejectedInSeptember2026(){
+        val now=java.time.ZonedDateTime
+            .of(2026,9,9,0,30,0,0,java.time.ZoneId.of("Europe/Istanbul"))
+            .toInstant()
+            .toEpochMilli()
+
+        val november2022=java.time.ZonedDateTime
+            .of(2022,11,7,11,0,0,0,java.time.ZoneId.of("Europe/Istanbul"))
+            .toInstant()
+            .toEpochMilli()
+
+        val march2026=java.time.ZonedDateTime
+            .of(2026,3,4,11,0,0,0,java.time.ZoneId.of("Europe/Istanbul"))
+            .toInstant()
+            .toEpochMilli()
+
+        assertFalse(ReligionTracker.isFresh(november2022,now))
+        assertFalse(ReligionTracker.isFresh(march2026,now))
+    }
+
 }
