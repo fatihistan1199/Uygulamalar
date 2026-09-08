@@ -6,6 +6,7 @@ import tr.com.gundemradari.data.EventEnrichmentEntity
 import tr.com.gundemradari.data.EventEntity
 import tr.com.gundemradari.data.GundemDao
 import tr.com.gundemradari.data.ResearchItemRow
+import tr.com.gundemradari.religion.RELIGION_MAX_AGE_DAYS
 import tr.com.gundemradari.religion.ReligionTracker
 import tr.com.gundemradari.web.ArticleReader
 import tr.com.gundemradari.web.NewsWebSearch
@@ -139,7 +140,14 @@ class EventResearchService(
         // Mevcut kaynaklar içerik vermediyse web araması yalnız teknik yedek olarak devreye girer.
         if(best==null || best!!.contentScore<28.0){
             val webResults=runCatching{
-                webSearch.search(query,limit=4,expandDescriptions=false)
+                webSearch.search(
+                    query=query,
+                    limit=4,
+                    expandDescriptions=false,
+                    maxAgeDays=if(event.scope=="religion" || event.religionPriority>0){
+                        RELIGION_MAX_AGE_DAYS
+                    }else null
+                )
             }.getOrElse{emptyList()}
 
             for(row in webResults.take(2)){
