@@ -6,7 +6,7 @@ plugins {
     id("com.google.devtools.ksp")
 }
 android { namespace = "tr.com.gundemradari"; compileSdk = 35
-    defaultConfig { applicationId = "tr.com.gundemradari"; minSdk = 26; targetSdk = 35; versionCode = 19; versionName = "18" }
+    defaultConfig { applicationId = "tr.com.gundemradari"; minSdk = 26; targetSdk = 35; versionCode = 20; versionName = "19" }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
