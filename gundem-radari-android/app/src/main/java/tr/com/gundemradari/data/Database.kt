@@ -206,13 +206,54 @@ data class SearchEventRow(
 
     @Query("""
         SELECT * FROM events
-        WHERE scope='religion' AND religionPriority > 0 AND noise < 70
+        WHERE scope='religion'
+          AND religionPriority > 0
+          AND noise < 70
+          AND publishedAt IS NOT NULL
+          AND publishedAt>=:after
         ORDER BY (
             importance + religionPriority*5
             - MIN(30.0, MAX(0.0, ((:now-updatedAt)/3600000.0)*0.55))
-        ) DESC, updatedAt DESC LIMIT 70
+        ) DESC, publishedAt DESC, updatedAt DESC LIMIT 70
     """)
-    fun religionFeed(now:Long):Flow<List<EventEntity>>
+    fun religionFeed(now:Long,after:Long):Flow<List<EventEntity>>
+
+    @Query("""
+        DELETE FROM event_enrichment
+        WHERE eventId IN (
+            SELECT id FROM events
+            WHERE scope='religion'
+              AND (publishedAt IS NULL OR publishedAt<:after)
+        )
+    """)
+    suspend fun deleteOldReligionEnrichment(after:Long)
+
+    @Query("""
+        DELETE FROM event_versions
+        WHERE eventId IN (
+            SELECT id FROM events
+            WHERE scope='religion'
+              AND (publishedAt IS NULL OR publishedAt<:after)
+        )
+    """)
+    suspend fun deleteOldReligionVersions(after:Long)
+
+    @Query("""
+        DELETE FROM event_items
+        WHERE eventId IN (
+            SELECT id FROM events
+            WHERE scope='religion'
+              AND (publishedAt IS NULL OR publishedAt<:after)
+        )
+    """)
+    suspend fun deleteOldReligionLinks(after:Long)
+
+    @Query("""
+        DELETE FROM events
+        WHERE scope='religion'
+          AND (publishedAt IS NULL OR publishedAt<:after)
+    """)
+    suspend fun deleteOldReligionEvents(after:Long)
 
     @Query("""
         SELECT s.name AS sourceName, s.groupName AS groupName, r.url AS url,
