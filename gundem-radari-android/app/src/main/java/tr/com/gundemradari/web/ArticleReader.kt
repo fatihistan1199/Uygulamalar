@@ -427,9 +427,26 @@ fun summarizeResearch(
             .thenByDescending{it.quality}
     )
 
+    val articleFallback=articles
+        .asSequence()
+        .flatMap{article->
+            sequenceOf(article.description)+
+                article.paragraphs.take(4).asSequence()
+        }
+        .flatMap{splitResearchSentences(it).asSequence()}
+        .map(::polishResearchSentence)
+        .filter{
+            it.length in 30..420 &&
+            looksTurkish(it) &&
+            !it.lowercase(locale).contains("google news")
+        }
+        .distinct()
+        .take(2)
+        .toList()
+
     val fallbackWhat=splitResearchSentences(eventSummary)
         .map(::polishResearchSentence)
-        .filter{it.length>=35 && looksTurkish(it)}
+        .filter{it.length>=30 && looksTurkish(it)}
         .take(2)
 
     val titleFallback=articles
@@ -439,6 +456,7 @@ fun summarizeResearch(
         .take(1)
 
     val what=distinctTake(ranked,2)
+        .ifEmpty{articleFallback}
         .ifEmpty{fallbackWhat}
         .ifEmpty{titleFallback}
 
