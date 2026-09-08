@@ -42,6 +42,7 @@ jobs:
           rm -rf buildsrc
           mkdir -p buildsrc
           unzip -q Kazanim_v1_Kaynak.fixed.zip -d buildsrc
+          sed -i 's/\.setTextAllCaps(false)/.setAllCaps(false)/g' buildsrc/Kazanim_v1/app/src/main/java/com/kazanim/app/MainActivity.java
 
       - name: Build debug APK
         working-directory: buildsrc/Kazanim_v1
