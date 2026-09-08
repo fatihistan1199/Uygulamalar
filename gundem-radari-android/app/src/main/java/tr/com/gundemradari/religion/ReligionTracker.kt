@@ -102,6 +102,56 @@ object ReligionTracker {
         .trim()
 }
 
+object ReligionTopicFilter {
+    private val locale=Locale("tr","TR")
+
+    private val strongTerms=listOf(
+        "kur'an","kuran","ayet","sure","hadis","sünnet","tefsir","fıkıh","fikih",
+        "akaid","kelam","ilahiyat","islâm","islam","müslüman","müslümanlık",
+        "namaz","oruç","ramazan","hac","umre","zekât","zekat","kurban",
+        "cami","mescit","hutbe","vaaz","imam","müftü","müftülük","diyanet",
+        "fetva","dua","peygamber","sahabe","mezhep","tarikat","tasavvuf",
+        "şeriat","helal","haram","caiz","kandil","mevlid","ezan","abdest",
+        "cenaze namazı","nikâh","nikah","hafız","hafizlik","hafızlık",
+        "kur'an kursu","kuran kursu","din görevlisi","dini nikah","dinî nikâh"
+    )
+
+    private val supportingTerms=listOf(
+        "dinî","dini","inanç","iman","ibadet","manevi","maneviyat","ahlak",
+        "ahlâk","cemaat","itikad","itikât","mukabele","mahya","minare",
+        "müezzin","kıble","secde","oruclu","oruçlu","iftar","sahur",
+        "bayram namazı","cuma namazı","cuma hutbesi","kutsal","vahiy"
+    )
+
+    private fun normalize(text:String)=text
+        .lowercase(locale)
+        .replace('’','\'')
+        .replace(Regex("\\s+")," ")
+        .trim()
+
+    private fun countDistinct(text:String,terms:List<String>):Int=
+        terms.count{term->text.contains(term)}
+
+    fun isRelevant(title:String,summary:String):Boolean{
+        val titleN=normalize(title)
+        val summaryN=normalize(summary)
+
+        val titleStrong=countDistinct(titleN,strongTerms)
+        if(titleStrong>=1)return true
+
+        val titleSupport=countDistinct(titleN,supportingTerms)
+        if(titleSupport>=2)return true
+
+        val bodyStrong=countDistinct(summaryN,strongTerms)
+        val bodySupport=countDistinct(summaryN,supportingTerms)
+
+        // Özet tek başına daha sık gürültü taşıdığı için burada daha sıkı eşik.
+        return bodyStrong>=2 ||
+            (bodyStrong>=1 && bodySupport>=1) ||
+            bodySupport>=3
+    }
+}
+
 data class ReligionMatch(
     val accepted:Boolean,
     val priority:Int,
