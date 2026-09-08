@@ -111,8 +111,20 @@ class EventResearchService(
     }
 
     private suspend fun buildFresh(event:EventEntity):EventResearchReport{
-        val rows=dao.researchItems(event.id)
-        val times=rows.map{it.publishedAt?:it.firstSeenAt}
+        val religionAgeDays=
+            if(event.scope=="religion" || event.religionPriority>0){
+                RELIGION_MAX_AGE_DAYS
+            }else null
+
+        val rows=if(religionAgeDays!=null){
+            dao.researchItemsFresh(
+                event.id,
+                ReligionTracker.cutoff()
+            )
+        }else{
+            dao.researchItems(event.id)
+        }
+        val times=rows.mapNotNull{it.publishedAt?:it.firstSeenAt}
         val rankedRows=rows
             .distinctBy{it.url}
             .sortedWith(
@@ -125,7 +137,7 @@ class EventResearchService(
 
         // Teyit için paralel çoklu okuma yok. İlk güçlü yayıncı sayfası yeterliyse dur.
         for(row in rankedRows.take(2)){
-            val loaded=loadRow(row)
+            val loaded=loadRow(row,religionAgeDays)
             if(best==null || loaded.contentScore>best!!.contentScore){
                 best=loaded
             }
@@ -143,10 +155,8 @@ class EventResearchService(
                 webSearch.search(
                     query=query,
                     limit=4,
-                    expandDescriptions=false,
-                    maxAgeDays=if(event.scope=="religion" || event.religionPriority>0){
-                        RELIGION_MAX_AGE_DAYS
-                    }else null
+                    expandDescriptions=true,
+                    maxAgeDays=religionAgeDays
                 )
             }.getOrElse{emptyList()}
 
@@ -222,7 +232,87 @@ class EventResearchService(
         )
     }
 
-    private suspend fun loadRow(row:ResearchItemRow):LoadedArticle{
+    private suspend fun loadRow(
+        row:ResearchItemRow,
+        maxAgeDays:Int?
+    ):LoadedArticle{
+        // Google News ara bağlantısı özet kaynağı olarak kabul edilmez.
+        // Aynı başlığı doğrudan yayıncı URL'si veren aramada yeniden çöz.
+        if(row.url.contains("news.google.com")){
+            val query=row.originalTitle.ifBlank{row.title}
+            val direct=runCatching{
+                webSearch.search(
+                    query=query,
+                    limit=4,
+                    expandDescriptions=true,
+                    maxAgeDays=maxAgeDays
+                )
+            }.getOrElse{emptyList()}
+                .filterNot{it.url.contains("news.google.com")}
+
+            var bestDirect:LoadedArticle?=null
+            for(hit in direct.take(3)){
+                val d=articleReader.read(hit.url)
+                val score=d?.let(::articleContentQuality)?:0.0
+
+                val article=if(d!=null){
+                    val sourceQuality=webSourceQuality(
+                        hit.source.ifBlank{d.host},
+                        d.finalUrl.ifBlank{hit.url}
+                    )*100.0
+                    ResearchedArticle(
+                        sourceName=hit.source.ifBlank{d.host.ifBlank{"Haber kaynağı"}},
+                        title=d.title.ifBlank{hit.title.ifBlank{row.title}},
+                        url=d.finalUrl.ifBlank{hit.url},
+                        description=cleanResearchText(d.description)
+                            .takeIf(::isUsefulResearchText)
+                            ?:cleanResearchText(hit.snippet)
+                                .takeIf(::isUsefulResearchText)
+                            ?:cleanResearchText(row.summary)
+                                .takeIf(::isUsefulResearchText)
+                            ?:"",
+                        paragraphs=d.paragraphs,
+                        publishedAt=hit.publishedAt?:row.publishedAt,
+                        isPrimary=true,
+                        quality=(sourceQuality*0.30+score*0.70)
+                            .coerceIn(0.0,100.0)
+                    )
+                }else{
+                    ResearchedArticle(
+                        sourceName=hit.source.ifBlank{"Haber kaynağı"},
+                        title=hit.title.ifBlank{row.title},
+                        url=hit.url,
+                        description=cleanResearchText(hit.snippet)
+                            .takeIf(::isUsefulResearchText)
+                            ?:cleanResearchText(row.summary)
+                                .takeIf(::isUsefulResearchText)
+                            ?:"",
+                        paragraphs=emptyList(),
+                        publishedAt=hit.publishedAt?:row.publishedAt,
+                        isPrimary=true,
+                        quality=webSourceQuality(hit.source,hit.url)*100.0
+                    )
+                }
+
+                val candidate=LoadedArticle(
+                    article=article,
+                    contentScore=maxOf(
+                        score,
+                        if(article.description.length>=80)22.0 else 0.0
+                    )
+                )
+                if(
+                    bestDirect==null ||
+                    candidate.contentScore>bestDirect!!.contentScore
+                ){
+                    bestDirect=candidate
+                }
+                if(candidate.contentScore>=55.0)break
+            }
+
+            if(bestDirect!=null)return bestDirect!!
+        }
+
         val details=articleReader.read(row.url)
 
         if(details==null){
@@ -313,8 +403,12 @@ class EventResearchService(
         event:EventEntity,
         saved:EventEnrichmentEntity
     ):EventResearchReport{
-        val rows=dao.researchItems(event.id)
-        val times=rows.map{it.publishedAt?:it.firstSeenAt}
+        val rows=if(event.scope=="religion" || event.religionPriority>0){
+            dao.researchItemsFresh(event.id,ReligionTracker.cutoff())
+        }else{
+            dao.researchItems(event.id)
+        }
+        val times=rows.mapNotNull{it.publishedAt?:it.firstSeenAt}
         val source=if(saved.sourceUrl.isNotBlank()){
             listOf(
                 ResearchedArticle(
