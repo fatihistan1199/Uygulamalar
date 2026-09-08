@@ -326,10 +326,32 @@ private fun extractStructuredArticle(doc:Document):StructuredArticle{
     val objects=mutableListOf<JSONObject>()
 
     doc.select("script[type=application/ld+json]").forEach{node->
-        val raw=node.data().ifBlank{node.html()}.trim()
-        if(raw.isBlank())return@forEach
-        val root=runCatching{JSONTokener(raw).nextValue()}.getOrNull()
-        collectJsonObjects(root,objects)
+        val rawCandidates=listOf(
+            node.data(),
+            node.html()
+        )
+            .map{raw->
+                raw.trim()
+                    .removePrefix("<!--")
+                    .removeSuffix("-->")
+                    .replace("&quot;","\"")
+                    .replace("&#34;","\"")
+                    .replace("&amp;","&")
+                    .trim()
+            }
+            .filter{it.isNotBlank()}
+            .distinct()
+
+        rawCandidates.forEach{raw->
+            val root=runCatching{
+                JSONTokener(raw).nextValue()
+            }.getOrNull()
+            collectJsonObjects(root,objects)
+
+            if(root==null){
+                fallbackStructuredObject(raw)?.let{objects+=it}
+            }
+        }
     }
 
     val best=objects
@@ -347,6 +369,35 @@ private fun extractStructuredArticle(doc:Document):StructuredArticle{
         articleBody=jsonString(best,"articleBody"),
         datePublished=jsonString(best,"datePublished")
     )
+}
+
+private fun fallbackStructuredObject(raw:String):JSONObject?{
+    fun capture(key:String):String{
+        val match=Regex(
+            "\\""+Regex.escape(key)+"\\"\\s*:\\s*\\"((?:\\\\.|[^\\"])*)\\"",
+            setOf(RegexOption.IGNORE_CASE,RegexOption.DOT_MATCHES_ALL)
+        ).find(raw) ?: return ""
+
+        val escaped=match.groupValues.getOrNull(1).orEmpty()
+        return runCatching{
+            JSONObject("{\\"v\\":\\"$escaped\\"}").optString("v","")
+        }.getOrDefault(escaped)
+    }
+
+    val headline=capture("headline")
+    val description=capture("description")
+    val body=capture("articleBody")
+    val date=capture("datePublished")
+
+    if(headline.isBlank() && description.isBlank() && body.isBlank())return null
+
+    return JSONObject().apply{
+        put("@type","NewsArticle")
+        if(headline.isNotBlank())put("headline",headline)
+        if(description.isNotBlank())put("description",description)
+        if(body.isNotBlank())put("articleBody",body)
+        if(date.isNotBlank())put("datePublished",date)
+    }
 }
 
 private fun collectJsonObjects(value:Any?,out:MutableList<JSONObject>){
@@ -522,8 +573,10 @@ fun summarizeResearch(
         "risk","can kaybı","yaralı","hayatını kaybetti","ölü","iptal","kapatıldı",
         "yasak","ekonomi","piyasa","faiz","enflasyon","zam","vergi","seçim",
         "ülke genelinde","milyon","bin kişi","yıkım","hasar","kriz","güvenlik",
-        "ulaşım","eğitim","sağlık","yürürlüğe","değişiklik","maliyet","hak",
-        "yükümlülük","fiyat","ücret","gelir","işsizlik","erişim","hizmet"
+        "ulaşım","eğitim","sağlık","yürürlüğe","değişiklik","değiştirecek",
+        "değiştiriyor","değiştirdi","etkilenecek","kapsayacak","kapsıyor",
+        "maliyet","hak","yükümlülük","fiyat","ücret","gelir","işsizlik",
+        "erişim","hizmet"
     )
 
     val causalMarkers=listOf(
