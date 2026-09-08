@@ -45,4 +45,57 @@ class ResearchSummaryQualityTest {
             }
         )
     }
+
+    @Test
+    fun earlyArticleFactDoesNotRequireTitleWordOverlap(){
+        val article=ResearchedArticle(
+            sourceName="Haber",
+            title="Yeni düzenleme duyuruldu",
+            url="https://example.com/b",
+            description="Düzenlemeyle birlikte başvurular 15 Eylül tarihinde başlayacak ve işlemler e-Devlet üzerinden yürütülecek.",
+            paragraphs=listOf(
+                "Yetkililer uygulamanın ilk aşamada yaklaşık iki milyon kişiyi kapsamasının beklendiğini bildirdi."
+            ),
+            publishedAt=2L,
+            isPrimary=true,
+            quality=85.0
+        )
+
+        val summary=summarizeResearch(
+            eventTitle="Bakanlıktan vatandaşları ilgilendiren yeni karar",
+            eventSummary="",
+            articles=listOf(article)
+        )
+
+        assertTrue(summary.whatHappened.isNotEmpty())
+        assertTrue(
+            summary.whatHappened.joinToString(" ").contains("15 Eylül") ||
+            summary.whatHappened.joinToString(" ").contains("iki milyon")
+        )
+    }
+
+    @Test
+    fun importanceAnalysisIsProducedWhenArticleHasEconomicContext(){
+        val article=ResearchedArticle(
+            sourceName="Ekonomi",
+            title="Merkez Bankası faiz kararını açıkladı",
+            url="https://example.com/c",
+            description="Merkez Bankası politika faizini sabit tuttuğunu ve enflasyon görünümünü yakından izlemeyi sürdüreceğini açıkladı.",
+            paragraphs=listOf(
+                "Kararın ardından piyasalarda döviz ve tahvil fiyatlamaları yakından takip edildi."
+            ),
+            publishedAt=3L,
+            isPrimary=true,
+            quality=90.0
+        )
+
+        val summary=summarizeResearch(
+            eventTitle="Merkez Bankası faiz kararını açıkladı",
+            eventSummary="",
+            articles=listOf(article)
+        )
+
+        assertTrue(summary.whyImportant.isNotEmpty())
+    }
+
 }
