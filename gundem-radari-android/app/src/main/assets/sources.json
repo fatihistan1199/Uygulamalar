@@ -11,9 +11,9 @@
   {"id":"haberturk_dunya","name":"Habertürk Dünya","group":"world_tr","endpoint":"https://www.haberturk.com/rss/kategori/dunya.xml","kind":"rss","trust":0.68,"enabled":true,"staged":false,"note":"Türkçe dünya RSS"},
   {"id":"sozcu_dunya","name":"Sözcü Dünya","group":"world_tr","endpoint":"https://www.sozcu.com.tr/feeds-rss-category-dunya","kind":"rss","trust":0.62,"enabled":true,"staged":false,"note":"Türkçe dünya RSS"},
 
-  {"id":"diyanet_haber","name":"Diyanet Haber","group":"religion_direct","endpoint":"https://www.diyanethaber.com.tr/rss","kind":"rss","trust":0.90,"enabled":true,"staged":false,"note":"Yalnız takip edilen kişilerle açık eşleşen içerikler Din'e alınır"},
-  {"id":"religion_people_google","name":"Din takip kişileri · Google News","group":"religion_search","endpoint":"","kind":"religion_watch","trust":0.62,"enabled":true,"staged":false,"note":"Yalnız takip edilen kişilerin haber eşleşmeleri"},
-  {"id":"religion_people_youtube","name":"Din takip kişileri · YouTube","group":"religion_search","endpoint":"","kind":"religion_youtube","trust":0.48,"enabled":true,"staged":false,"note":"Yalnız takip edilen kişilerin ilgili video/açıklamaları"},
+  {"id":"diyanet_haber","name":"Diyanet Haber","group":"religion_direct","endpoint":"https://www.diyanethaber.com.tr/rss","kind":"rss","trust":0.90,"enabled":true,"staged":false,"note":"Genel Din gündemi · yalnız son 30 gün"},
+  {"id":"religion_people_google","name":"Din takip kişileri · Google News","group":"religion_search","endpoint":"","kind":"religion_watch","trust":0.62,"enabled":true,"staged":false,"note":"En son aşama · takip edilen kişiler · son 30 gün"},
+  {"id":"religion_people_youtube","name":"Din takip kişileri · YouTube","group":"religion_search","endpoint":"","kind":"religion_youtube","trust":0.78,"enabled":true,"staged":false,"note":"Doğrudan kişi kanalları · son 30 gün"},
 
   {"id":"ibrahim_haskologlu","name":"İbrahim Haskoloğlu","group":"social","endpoint":"https://t.me/s/ibrahimhaskologlu","kind":"telegram","trust":0.45,"enabled":true,"staged":false,"note":"Telegram erken haber sinyali"}
 ]
