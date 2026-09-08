@@ -109,6 +109,11 @@ object EventClassifier {
         worldInstitutions.forEach{if(has(combined,it))worldScore+=2}
 
         val sourceGroups=items.map{it.groupName}
+        if(sourceGroups.any{it=="religion_direct"}){
+            return ClassificationDecision(
+                "religion","religion",0,0,"doğrudan din kaynağı"
+            )
+        }
         if(sourceGroups.any{it=="world_tr"})worldScore+=1
         if(sourceGroups.any{it=="turkey"})turkeyScore+=1
 
