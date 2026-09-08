@@ -241,4 +241,38 @@ class ResearchSummaryQualityTest {
         )
     }
 
+
+    @Test
+    fun searchRelevanceRejectsUnrelatedFreshResult(){
+        val search=NewsWebSearch()
+
+        val relevant=WebNewsResult(
+            title="Merkez hattında yeni sefer düzeni açıklandı",
+            source="Test",
+            url="https://example.com/relevant",
+            snippet="Belediye hafta sonu sefer tarifesini değiştirdi.",
+            publishedAt=1L
+        )
+        val unrelated=WebNewsResult(
+            title="Milli takım hazırlık maçına çıkıyor",
+            source="Test",
+            url="https://example.com/unrelated",
+            snippet="Takım akşam saatlerinde sahaya çıkacak.",
+            publishedAt=1L
+        )
+
+        assertTrue(
+            search.isSearchRelevantForTest(
+                "merkez hattı yeni sefer düzeni",
+                relevant
+            )
+        )
+        assertFalse(
+            search.isSearchRelevantForTest(
+                "merkez hattı yeni sefer düzeni",
+                unrelated
+            )
+        )
+    }
+
 }
