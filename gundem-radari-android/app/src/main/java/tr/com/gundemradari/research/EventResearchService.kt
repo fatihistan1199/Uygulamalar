@@ -335,7 +335,7 @@ class EventResearchService(
     private fun pack(lines:List<String>):String=
         lines.map{it.trim()}.filter{it.isNotBlank()}.joinToString("\n")
 
-    private fun unpack(value:String):List<String>=
+    private fun unpack(value:String):List<String> =
         value.lineSequence().map{it.trim()}.filter{it.isNotBlank()}.toList()
 
     private fun trimCache(){
