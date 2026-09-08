@@ -479,7 +479,8 @@ fun summarizeResearch(
     val locale=Locale("tr","TR")
     val stop=setOf(
         "göre","değil","geldi","olan","oldu","için","ile","dedi","son","yeni",
-        "haber","açıklama","etti","eden","sonra","önce","olarak","daha","ancak"
+        "haber","açıklama","etti","eden","sonra","önce","olarak","daha","ancak",
+        "bugün","şimdi","üzerine","ilişkin"
     )
 
     fun terms(text:String)=text.lowercase(locale)
@@ -487,33 +488,54 @@ fun summarizeResearch(
         .filter{it.length>3 && it !in stop}
         .toSet()
 
-    val queryTerms=terms(eventTitle+" "+eventSummary.take(220))
+    val queryTerms=terms(eventTitle+" "+eventSummary.take(260))
+
+    val actionMarkers=listOf(
+        "açıkladı","duyurdu","bildirdi","söyledi","belirtti","karar verdi",
+        "kabul edildi","reddedildi","başladı","başlatıldı","sona erdi","tamamlandı",
+        "arttı","azaldı","yükseldi","düştü","ulaştı","imzalandı","yürürlüğe girdi",
+        "gözaltına alındı","tutuklandı","serbest bırakıldı","iptal edildi",
+        "kapatıldı","açıldı","gerçekleşti","meydana geldi","hayatını kaybetti",
+        "yaralandı","seçildi","atandı","görevden alındı"
+    )
 
     val impactMarkers=listOf(
         "etkiledi","etkileyecek","etkileyebilir","sonuç","sonucunda","nedeniyle",
         "risk","can kaybı","yaralı","hayatını kaybetti","ölü","iptal","kapatıldı",
         "yasak","ekonomi","piyasa","faiz","enflasyon","zam","vergi","seçim",
         "ülke genelinde","milyon","bin kişi","yıkım","hasar","kriz","güvenlik",
-        "ulaşım","eğitim","sağlık","yürürlüğe","değişiklik","maliyet"
+        "ulaşım","eğitim","sağlık","yürürlüğe","değişiklik","maliyet","hak",
+        "yükümlülük","fiyat","ücret","gelir","işsizlik","erişim","hizmet"
     )
+
     val causalMarkers=listOf(
         "bu nedenle","bu yüzden","dolayısıyla","böylece","sonucunda","nedeniyle",
-        "etkisi","etkileri","yol aç","sebep","anlamına geliyor"
+        "etkisi","etkileri","yol aç","sebep","anlamına geliyor","sonuç olarak"
     )
+
     val latestMarkers=listOf(
-        "son durum","son olarak","bugün","şu anda","halen","hâlen","devam ediyor",
+        "son durum","son olarak","şu anda","halen","hâlen","devam ediyor",
         "devam etmekte","açıklandı","duyurdu","bildirdi","güncel","son açıklama",
         "arttı","yükseldi","düştü","ulaştı","başladı","sona erdi","tamamlandı",
-        "gözaltına alındı","tutuklandı","serbest bırakıldı"
+        "gözaltına alındı","tutuklandı","serbest bırakıldı","bekleniyor",
+        "sürüyor","sürdürüyor","yeniden","bu sabah","bu akşam"
+    )
+
+    val contextDependentPrefixes=listOf(
+        "bu ","bunun ","bunların ","buna ","bunu ","bunları ",
+        "ayrıca ","ancak ","öte yandan ","böylece ","dolayısıyla ",
+        "söz konusu ","aynı zamanda ","bununla birlikte "
     )
 
     data class Candidate(
         val text:String,
-        val score:Double,
+        val whatScore:Double,
+        val whyScore:Double,
+        val latestScore:Double,
+        val action:Boolean,
         val impact:Boolean,
         val latest:Boolean,
         val position:Int,
-        val quality:Double,
         val publishedAt:Long?
     )
 
@@ -522,76 +544,126 @@ fun summarizeResearch(
     articles.forEach{article->
         val blocks=buildList{
             if(article.description.isNotBlank())add(article.description)
-            addAll(article.paragraphs.take(22))
+            addAll(article.paragraphs.take(26))
         }
 
         blocks.forEachIndexed{index,block->
-            splitResearchSentences(block).forEach{sentence->
-                if(sentence.length !in 45..420 || !isUsefulResearchText(sentence))return@forEach
+            splitResearchSentences(block).forEach sentenceLoop@{sentence->
+                if(sentence.length !in 45..420)return@sentenceLoop
+                if(!isUsefulResearchText(sentence))return@sentenceLoop
 
-                val lower=sentence.lowercase(locale)
-                val overlap=terms(sentence).intersect(queryTerms).size
+                val polished=polishResearchSentence(sentence)
+                if(polished.length<40)return@sentenceLoop
+
+                val lower=polished.lowercase(locale)
+                val sentenceTerms=terms(polished)
+                val overlap=sentenceTerms.intersect(queryTerms).size
+
+                val action=actionMarkers.any{lower.contains(it)}
+                val impact=
+                    impactMarkers.any{lower.contains(it)} ||
+                    causalMarkers.any{lower.contains(it)}
+                val latest=latestMarkers.any{lower.contains(it)}
+
                 val positionBonus=when{
-                    index==0->12.0
-                    index<=3->8.0
-                    index<=7->4.0
+                    index==0->13.0
+                    index<=2->10.0
+                    index<=5->7.0
+                    index<=10->3.5
                     else->1.0
                 }
-                val numericBonus=if(sentence.any(Char::isDigit))2.5 else 0.0
-                val lengthBonus=if(sentence.length in 75..260)2.0 else 0.0
-                val qualityBonus=(article.quality.coerceIn(0.0,100.0)/10.0)
-                val score=overlap*8.0+positionBonus+numericBonus+lengthBonus+qualityBonus
 
-                // Tam başlık tekrarını özet diye göstermemek için küçük ceza.
-                val titlePenalty=if(sentenceSimilarity(sentence,eventTitle)>.78)7.0 else 0.0
+                val qualityBonus=article.quality
+                    .coerceIn(0.0,100.0)/11.0
+                val numericBonus=if(polished.any(Char::isDigit))3.0 else 0.0
+                val lengthBonus=when(polished.length){
+                    in 70..260->3.0
+                    in 45..320->1.5
+                    else->0.0
+                }
+                val contextPenalty=if(
+                    contextDependentPrefixes.any{lower.startsWith(it)}
+                ) 7.0 else 0.0
+
+                val titleSimilarity=sentenceSimilarity(polished,eventTitle)
+                val titlePenalty=when{
+                    titleSimilarity>.86->10.0
+                    titleSimilarity>.72->5.0
+                    else->0.0
+                }
+
+                val base=
+                    overlap*8.5+
+                    positionBonus+
+                    qualityBonus+
+                    numericBonus+
+                    lengthBonus-
+                    contextPenalty-
+                    titlePenalty
+
+                val whatScore=
+                    base+
+                    (if(action)9.0 else 0.0)+
+                    (if(overlap>0)3.0 else 0.0)
+
+                val whyScore=
+                    base*0.48+
+                    (if(impact)20.0 else 0.0)+
+                    (if(causalMarkers.any{lower.contains(it)})8.0 else 0.0)
+
+                val latestScore=
+                    base*0.55+
+                    (if(latest)19.0 else 0.0)+
+                    (if(action)6.0 else 0.0)+
+                    (if(index<=8)3.0 else 0.0)
 
                 candidates+=Candidate(
-                    text=polishResearchSentence(sentence),
-                    score=score-titlePenalty,
-                    impact=impactMarkers.any{lower.contains(it)} ||
-                        causalMarkers.any{lower.contains(it)},
-                    latest=latestMarkers.any{lower.contains(it)},
+                    text=polished,
+                    whatScore=whatScore,
+                    whyScore=whyScore,
+                    latestScore=latestScore,
+                    action=action,
+                    impact=impact,
+                    latest=latest,
                     position=index,
-                    quality=article.quality,
                     publishedAt=article.publishedAt
                 )
             }
         }
     }
 
-    fun distinctTake(
+    fun takeDistinct(
         input:List<Candidate>,
         count:Int,
         used:List<String> = emptyList()
     ):List<String>{
         val out=mutableListOf<String>()
-        for(c in input){
-            if(c.text.isBlank())continue
-            if(used.any{sentenceSimilarity(it,c.text)>.54})continue
-            if(out.none{sentenceSimilarity(it,c.text)>.54}){
-                out+=c.text
+        for(candidate in input){
+            if(candidate.text.isBlank())continue
+            if(used.any{sentenceSimilarity(it,candidate.text)>.50})continue
+            if(out.none{sentenceSimilarity(it,candidate.text)>.50}){
+                out+=candidate.text
                 if(out.size>=count)break
             }
         }
         return out
     }
 
-    val ranked=candidates.sortedWith(
-        compareByDescending<Candidate>{it.score}
+    val whatRanked=candidates.sortedWith(
+        compareByDescending<Candidate>{it.whatScore}
             .thenBy{it.position}
-            .thenByDescending{it.quality}
     )
 
-    val articleFallback=articles
+    val articleLeadFallback=articles
         .asSequence()
         .flatMap{article->
             sequenceOf(article.description)+
-                article.paragraphs.take(4).asSequence()
+                article.paragraphs.take(5).asSequence()
         }
         .flatMap{splitResearchSentences(it).asSequence()}
         .map(::polishResearchSentence)
         .filter{
-            it.length in 30..420 &&
+            it.length in 40..420 &&
             looksTurkish(it) &&
             !it.lowercase(locale).contains("google news")
         }
@@ -599,9 +671,9 @@ fun summarizeResearch(
         .take(2)
         .toList()
 
-    val fallbackWhat=splitResearchSentences(eventSummary)
+    val eventFallback=splitResearchSentences(eventSummary)
         .map(::polishResearchSentence)
-        .filter{it.length>=30 && looksTurkish(it)}
+        .filter{it.length>=35 && looksTurkish(it)}
         .take(2)
 
     val titleFallback=articles
@@ -610,41 +682,44 @@ fun summarizeResearch(
         .distinct()
         .take(1)
 
-    val what=distinctTake(ranked,2)
-        .ifEmpty{articleFallback}
-        .ifEmpty{fallbackWhat}
+    val what=takeDistinct(whatRanked,2)
+        .ifEmpty{articleLeadFallback}
+        .ifEmpty{eventFallback}
         .ifEmpty{titleFallback}
 
-    val whyCandidates=candidates
+    val whyRanked=candidates
         .filter{it.impact}
-        .sortedWith(
-            compareByDescending<Candidate>{it.score+4.0}
-                .thenBy{it.position}
-        )
-    var why=distinctTake(whyCandidates,2,what)
+        .sortedByDescending{it.whyScore}
+
+    var why=takeDistinct(whyRanked,2,what)
     if(why.isEmpty()){
-        inferImportance(eventTitle,eventSummary,articles)?.let{why=listOf(it)}
+        inferImportance(eventTitle,eventSummary,articles)?.let{
+            why=listOf(it)
+        }
     }
 
-    val used=what+why
-    val latestCandidates=candidates
+    val usedForLatest=what+why
+    val latestExplicit=candidates
         .filter{it.latest}
         .sortedWith(
             compareByDescending<Candidate>{it.publishedAt?:0L}
-                .thenByDescending{it.score}
+                .thenByDescending{it.latestScore}
                 .thenBy{it.position}
         )
 
-    var latest=distinctTake(latestCandidates,2,used)
+    var latest=takeDistinct(latestExplicit,2,usedForLatest)
 
-    // Açık "son durum" işareti yoksa aynı güncel makaledeki güçlü, kullanılmamış
-    // ek bilgiyi göster; boş bir bölüm bırakmaktan daha yararlıdır.
     if(latest.isEmpty()){
-        latest=distinctTake(
-            ranked.filter{it.position<=8},
-            1,
-            used
-        )
+        val currentAction=candidates
+            .filter{it.action}
+            .sortedByDescending{it.latestScore}
+        latest=takeDistinct(currentAction,1,usedForLatest)
+    }
+
+    if(latest.isEmpty()){
+        val unusedFactual=candidates
+            .sortedByDescending{it.latestScore}
+        latest=takeDistinct(unusedFactual,1,usedForLatest)
     }
 
     return ResearchSummary(
