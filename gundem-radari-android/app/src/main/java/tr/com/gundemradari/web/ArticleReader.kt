@@ -3,6 +3,10 @@ package tr.com.gundemradari.web
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
+import org.json.JSONArray
+import org.json.JSONObject
+import org.json.JSONTokener
 import java.net.URI
 import java.util.Locale
 
@@ -24,7 +28,7 @@ class ArticleReader {
     suspend fun read(url:String):ArticleDetails?=withContext(Dispatchers.IO){
         runCatching{
             val first=Jsoup.connect(url)
-                .userAgent("Mozilla/5.0 (Android) GundemRadari/16")
+                .userAgent("Mozilla/5.0 (Android) GundemRadari/17")
                 .timeout(14000)
                 .followRedirects(true)
                 .get()
@@ -41,7 +45,7 @@ class ArticleReader {
                 if(external!=null){
                     runCatching{
                         Jsoup.connect(external)
-                            .userAgent("Mozilla/5.0 (Android) GundemRadari/16")
+                            .userAgent("Mozilla/5.0 (Android) GundemRadari/17")
                             .timeout(14000)
                             .followRedirects(true)
                             .get()
@@ -49,13 +53,24 @@ class ArticleReader {
                 }else first
             }else first
 
-            doc.select("script,style,nav,aside,footer,form,noscript,header,.advertisement,.ad,.ads,.cookie,.newsletter").remove()
+            // JSON-LD çoğu haber sitesinde görsel DOM'dan daha temiz ve eksiksiz gövde taşır.
+            val structured=extractStructuredArticle(doc)
+
+            doc.select(
+                "script,style,nav,aside,footer,form,noscript,header,"+
+                ".advertisement,.ad,.ads,.cookie,.newsletter,.social-share,"+
+                ".related-news,.related-content,.recommendation"
+            ).remove()
 
             val ogTitle=doc.selectFirst("meta[property=og:title]")?.attr("content").orEmpty()
             val h1=doc.selectFirst("h1")?.text().orEmpty()
-            val title=listOf(ogTitle,h1,doc.title()).firstOrNull{it.isNotBlank()}.orEmpty().trim()
+            val title=listOf(structured.headline,ogTitle,h1,doc.title())
+                .map(::cleanResearchText)
+                .firstOrNull{it.isNotBlank()}
+                .orEmpty()
 
             val description=listOf(
+                structured.description,
                 doc.selectFirst("meta[property=og:description]")?.attr("content").orEmpty(),
                 doc.selectFirst("meta[name=description]")?.attr("content").orEmpty()
             )
@@ -64,38 +79,166 @@ class ArticleReader {
                 .orEmpty()
 
             val selectors=listOf(
-                "article p","[itemprop=articleBody] p",".article-body p",".article-content p",
-                ".news-content p",".story-body p",".content-detail p",".detail-content p","main p"
+                "[itemprop=articleBody] p",
+                "article p",
+                ".article-body p",".article-content p",".article__body p",
+                ".news-content p",".news-detail p",".news-detail-content p",
+                ".story-body p",".story-content p",
+                ".content-detail p",".detail-content p",".detail__content p",
+                "[class*=articleBody] p","[class*=article-body] p",
+                "[class*=articleContent] p","[class*=article-content] p",
+                "main p"
             )
 
-            val paras=selectors.asSequence()
+            val structuredParas=structuredBodyParagraphs(structured.articleBody)
+                .filter(::usableParagraph)
+
+            val selectedParas=selectors.asSequence()
                 .flatMap{sel->doc.select(sel).asSequence()}
                 .map{it.text().replace(Regex("\\s+")," ").trim()}
                 .filter{usableParagraph(it)}
                 .distinct()
-                .take(24)
+                .take(28)
                 .toList()
-                .ifEmpty{
-                    doc.select("body p").asSequence()
-                        .map{it.text().replace(Regex("\\s+")," ").trim()}
-                        .filter{usableParagraph(it)}
-                        .distinct()
-                        .take(16)
-                        .toList()
-                }
+
+            val broadParas=if(structuredParas.isEmpty() && selectedParas.size<2){
+                doc.select("p").asSequence()
+                    .map{it.text().replace(Regex("\\s+")," ").trim()}
+                    .filter{usableParagraph(it)}
+                    .distinct()
+                    .sortedByDescending{paragraphDensityScore(it)}
+                    .take(20)
+                    .toList()
+            }else emptyList()
+
+            val paras=(structuredParas+selectedParas+broadParas)
+                .distinctBy{normalizeForDedup(it)}
+                .take(30)
 
             ArticleDetails(
                 title=title,
                 description=description,
                 paragraphs=paras,
                 finalUrl=doc.location(),
-                host=runCatching{URI(doc.location()).host.orEmpty().removePrefix("www.")}.getOrDefault("")
+                host=runCatching{
+                    URI(doc.location()).host.orEmpty().removePrefix("www.")
+                }.getOrDefault("")
             )
         }.getOrNull()
     }
 
     private fun usableParagraph(text:String):Boolean =
-        text.length in 50..1100 && isUsefulResearchText(text)
+        text.length in 50..1800 && isUsefulResearchText(text)
+
+    private fun paragraphDensityScore(text:String):Int{
+        val punctuation=text.count{it=='.'||it==','||it==';'||it==':'}
+        val words=text.split(Regex("\\s+")).size
+        return words + punctuation*3
+    }
+}
+
+private data class StructuredArticle(
+    val headline:String="",
+    val description:String="",
+    val articleBody:String=""
+)
+
+private fun extractStructuredArticle(doc:Document):StructuredArticle{
+    val objects=mutableListOf<JSONObject>()
+
+    doc.select("script[type=application/ld+json]").forEach{node->
+        val raw=node.data().ifBlank{node.html()}.trim()
+        if(raw.isBlank())return@forEach
+        val root=runCatching{JSONTokener(raw).nextValue()}.getOrNull()
+        collectJsonObjects(root,objects)
+    }
+
+    val best=objects
+        .filter(::looksLikeArticleObject)
+        .maxByOrNull{obj->
+            jsonString(obj,"articleBody").length +
+            jsonString(obj,"description").length*2 +
+            jsonString(obj,"headline").length*3
+        }
+        ?:return StructuredArticle()
+
+    return StructuredArticle(
+        headline=jsonString(best,"headline"),
+        description=jsonString(best,"description"),
+        articleBody=jsonString(best,"articleBody")
+    )
+}
+
+private fun collectJsonObjects(value:Any?,out:MutableList<JSONObject>){
+    when(value){
+        is JSONObject->{
+            out+=value
+            val keys=value.keys()
+            while(keys.hasNext()){
+                val key=keys.next()
+                collectJsonObjects(value.opt(key),out)
+            }
+        }
+        is JSONArray->{
+            for(i in 0 until value.length()){
+                collectJsonObjects(value.opt(i),out)
+            }
+        }
+    }
+}
+
+private fun looksLikeArticleObject(obj:JSONObject):Boolean{
+    val type=obj.opt("@type")
+    val types=when(type){
+        is JSONArray->(0 until type.length()).mapNotNull{type.optString(it,null)}
+        is String->listOf(type)
+        else->emptyList()
+    }
+    return types.any{
+        val x=it.lowercase(Locale.ROOT)
+        x=="article" || x.contains("newsarticle") || x.contains("reportagenewsarticle")
+    } || jsonString(obj,"articleBody").length>=180
+}
+
+private fun jsonString(obj:JSONObject,key:String):String=
+    obj.optString(key,"").let(::cleanResearchText)
+
+private fun structuredBodyParagraphs(body:String):List<String>{
+    val clean=body
+        .replace("\\r","\n")
+        .replace(Regex("[\\t ]+")," ")
+        .trim()
+    if(clean.isBlank())return emptyList()
+
+    val byLine=clean.split(Regex("\\n+"))
+        .map(::cleanResearchText)
+        .filter{it.length>=45}
+
+    if(byLine.size>=2)return byLine.take(30)
+
+    return clean
+        .split(Regex("(?<=[.!?])\\s+"))
+        .map(::cleanResearchText)
+        .filter{it.length>=45}
+        .chunked(2)
+        .map{it.joinToString(" ")}
+        .take(24)
+}
+
+private fun normalizeForDedup(text:String):String=
+    cleanResearchText(text)
+        .lowercase(Locale("tr","TR"))
+        .replace(Regex("[^\\p{L}\\p{N}]+")," ")
+        .take(220)
+
+fun articleContentQuality(details:ArticleDetails):Double{
+    val chars=details.paragraphs.sumOf{it.length}
+    val usefulParagraphs=details.paragraphs.count{it.length>=90}
+    val bodyScore=(chars/45.0).coerceAtMost(65.0)
+    val paragraphScore=(usefulParagraphs*4.0).coerceAtMost(24.0)
+    val descriptionScore=if(details.description.length>=90)8.0 else 0.0
+    val titleScore=if(details.title.length>=20)3.0 else 0.0
+    return (bodyScore+paragraphScore+descriptionScore+titleScore).coerceIn(0.0,100.0)
 }
 
 fun cleanResearchText(text:String):String =
@@ -129,75 +272,98 @@ fun summarizeResearch(
     articles:List<ResearchedArticle>
 ):ResearchSummary{
     val locale=Locale("tr","TR")
-    val queryStop=setOf(
-        "göre","değil","geldi","olan","oldu","için","ile","dedi","son",
-        "yeni","haber","açıklama","etti","eden","sonra","önce"
+    val stop=setOf(
+        "göre","değil","geldi","olan","oldu","için","ile","dedi","son","yeni",
+        "haber","açıklama","etti","eden","sonra","önce","olarak","daha","ancak"
     )
-    val queryTerms=eventTitle.lowercase(locale)
+
+    fun terms(text:String)=text.lowercase(locale)
         .split(Regex("[^\\p{L}\\p{N}]+"))
-        .filter{it.length>3 && it !in queryStop}
+        .filter{it.length>3 && it !in stop}
         .toSet()
 
+    val queryTerms=terms(eventTitle+" "+eventSummary.take(220))
+
     val impactMarkers=listOf(
-        "etkiledi","etkileyecek","sonuç","nedeniyle","risk","can kaybı","yaralı","ölü",
-        "iptal","kapatıldı","yasak","ekonomi","piyasa","faiz","seçim","ülke genelinde",
-        "milyon","bin kişi","yıkım","hasar","kriz","güvenlik"
+        "etkiledi","etkileyecek","etkileyebilir","sonuç","sonucunda","nedeniyle",
+        "risk","can kaybı","yaralı","hayatını kaybetti","ölü","iptal","kapatıldı",
+        "yasak","ekonomi","piyasa","faiz","enflasyon","zam","vergi","seçim",
+        "ülke genelinde","milyon","bin kişi","yıkım","hasar","kriz","güvenlik",
+        "ulaşım","eğitim","sağlık","yürürlüğe","değişiklik","maliyet"
+    )
+    val causalMarkers=listOf(
+        "bu nedenle","bu yüzden","dolayısıyla","böylece","sonucunda","nedeniyle",
+        "etkisi","etkileri","yol aç","sebep","anlamına geliyor"
     )
     val latestMarkers=listOf(
-        "son durum","son olarak","bugün","şu anda","halen","devam ediyor","açıklandı",
-        "duyurdu","bildirdi","güncel","son açıklama","arttı","yükseldi","düştü","ulaştı"
+        "son durum","son olarak","bugün","şu anda","halen","hâlen","devam ediyor",
+        "devam etmekte","açıklandı","duyurdu","bildirdi","güncel","son açıklama",
+        "arttı","yükseldi","düştü","ulaştı","başladı","sona erdi","tamamlandı",
+        "gözaltına alındı","tutuklandı","serbest bırakıldı"
     )
 
     data class Candidate(
         val text:String,
-        val relevance:Int,
+        val score:Double,
         val impact:Boolean,
         val latest:Boolean,
+        val position:Int,
         val quality:Double,
         val publishedAt:Long?
     )
 
     val candidates=mutableListOf<Candidate>()
+
     articles.forEach{article->
         val blocks=buildList{
             if(article.description.isNotBlank())add(article.description)
-            addAll(article.paragraphs.take(14))
+            addAll(article.paragraphs.take(22))
         }
 
         blocks.forEachIndexed{index,block->
-            block.split(Regex("(?<=[.!?])\\s+"))
-                .map{it.replace(Regex("\\s+")," ").trim()}
-                .map(::cleanResearchText)
-                .filter{it.length in 55..360 && isUsefulResearchText(it)}
-                .forEach{sentence->
-                    val lower=sentence.lowercase(locale)
-                    val terms=lower
-                        .split(Regex("[^\\p{L}\\p{N}]+"))
-                        .filter{it.length>3}
-                        .toSet()
-                    val overlap=terms.intersect(queryTerms).size
-                    if(overlap==0)return@forEach
-                    val relevance=
-                        overlap*9 +
-                        if(index<4)4 else 0 +
-                        if(sentence.any(Char::isDigit))2 else 0
-                    candidates+=Candidate(
-                        text=sentence,
-                        relevance=relevance,
-                        impact=impactMarkers.any{lower.contains(it)},
-                        latest=latestMarkers.any{lower.contains(it)},
-                        quality=article.quality,
-                        publishedAt=article.publishedAt
-                    )
+            splitResearchSentences(block).forEach{sentence->
+                if(sentence.length !in 45..420 || !isUsefulResearchText(sentence))return@forEach
+
+                val lower=sentence.lowercase(locale)
+                val overlap=terms(sentence).intersect(queryTerms).size
+                val positionBonus=when{
+                    index==0->12.0
+                    index<=3->8.0
+                    index<=7->4.0
+                    else->1.0
                 }
+                val numericBonus=if(sentence.any(Char::isDigit))2.5 else 0.0
+                val lengthBonus=if(sentence.length in 75..260)2.0 else 0.0
+                val qualityBonus=(article.quality.coerceIn(0.0,100.0)/10.0)
+                val score=overlap*8.0+positionBonus+numericBonus+lengthBonus+qualityBonus
+
+                // Tam başlık tekrarını özet diye göstermemek için küçük ceza.
+                val titlePenalty=if(sentenceSimilarity(sentence,eventTitle)>.78)7.0 else 0.0
+
+                candidates+=Candidate(
+                    text=polishResearchSentence(sentence),
+                    score=score-titlePenalty,
+                    impact=impactMarkers.any{lower.contains(it)} ||
+                        causalMarkers.any{lower.contains(it)},
+                    latest=latestMarkers.any{lower.contains(it)},
+                    position=index,
+                    quality=article.quality,
+                    publishedAt=article.publishedAt
+                )
+            }
         }
     }
 
-    fun distinctTake(input:List<Candidate>,count:Int,used:Set<String> = emptySet()):List<String>{
+    fun distinctTake(
+        input:List<Candidate>,
+        count:Int,
+        used:List<String> = emptyList()
+    ):List<String>{
         val out=mutableListOf<String>()
         for(c in input){
-            if(c.text in used)continue
-            if(out.none{sentenceSimilarity(it,c.text)>.50}){
+            if(c.text.isBlank())continue
+            if(used.any{sentenceSimilarity(it,c.text)>.54})continue
+            if(out.none{sentenceSimilarity(it,c.text)>.54}){
                 out+=c.text
                 if(out.size>=count)break
             }
@@ -206,49 +372,120 @@ fun summarizeResearch(
     }
 
     val ranked=candidates.sortedWith(
-        compareByDescending<Candidate>{it.relevance + (it.quality/12).toInt()}
+        compareByDescending<Candidate>{it.score}
+            .thenBy{it.position}
             .thenByDescending{it.quality}
     )
-    val fallbackWhat=eventSummary
-        .split(Regex("(?<=[.!?])\\s+"))
-        .map(::cleanResearchText)
-        .filter{it.length in 45..360 && isUsefulResearchText(it)}
+
+    val fallbackWhat=splitResearchSentences(eventSummary)
+        .map(::polishResearchSentence)
+        .filter{it.length>=35 && looksTurkish(it)}
         .take(2)
 
     val titleFallback=articles
-        .map{cleanResearchText(it.title)}
-        .filter{it.length>=25 && looksTurkish(it)}
-        .filter{title->
-            val terms=title.lowercase(locale)
-                .split(Regex("[^\\p{L}\\p{N}]+"))
-                .filter{it.length>3}
-                .toSet()
-            terms.intersect(queryTerms).isNotEmpty()
-        }
+        .map{polishResearchSentence(it.title)}
+        .filter{it.length>=24 && looksTurkish(it)}
         .distinct()
-        .take(2)
+        .take(1)
 
     val what=distinctTake(ranked,2)
         .ifEmpty{fallbackWhat}
         .ifEmpty{titleFallback}
 
-    val whyCandidates=candidates.filter{it.impact}.sortedWith(
-        compareByDescending<Candidate>{it.relevance + (it.quality/10).toInt()}
-            .thenByDescending{it.quality}
-    )
-    val why=distinctTake(whyCandidates,2,what.toSet())
-
-    val latestCandidates=candidates
-        .filter{it.latest || it.publishedAt!=null}
+    val whyCandidates=candidates
+        .filter{it.impact}
         .sortedWith(
-            compareByDescending<Candidate>{it.latest}
-                .thenByDescending{it.publishedAt?:0L}
-                .thenByDescending{it.relevance}
+            compareByDescending<Candidate>{it.score+4.0}
+                .thenBy{it.position}
         )
-    val used=(what+why).toSet()
-    val latest=distinctTake(latestCandidates,2,used)
+    var why=distinctTake(whyCandidates,2,what)
+    if(why.isEmpty()){
+        inferImportance(eventTitle,eventSummary,articles)?.let{why=listOf(it)}
+    }
 
-    return ResearchSummary(whatHappened=what,whyImportant=why,latestSituation=latest)
+    val used=what+why
+    val latestCandidates=candidates
+        .filter{it.latest}
+        .sortedWith(
+            compareByDescending<Candidate>{it.publishedAt?:0L}
+                .thenByDescending{it.score}
+                .thenBy{it.position}
+        )
+
+    var latest=distinctTake(latestCandidates,2,used)
+
+    // Açık "son durum" işareti yoksa aynı güncel makaledeki güçlü, kullanılmamış
+    // ek bilgiyi göster; boş bir bölüm bırakmaktan daha yararlıdır.
+    if(latest.isEmpty()){
+        latest=distinctTake(
+            ranked.filter{it.position<=8},
+            1,
+            used
+        )
+    }
+
+    return ResearchSummary(
+        whatHappened=what,
+        whyImportant=why,
+        latestSituation=latest
+    )
+}
+
+private fun splitResearchSentences(text:String):List<String> =
+    cleanResearchText(text)
+        .split(Regex("(?<=[.!?])\\s+|(?<=;)\\s+"))
+        .map(::cleanResearchText)
+        .filter{it.isNotBlank()}
+
+private fun polishResearchSentence(text:String):String{
+    var out=cleanResearchText(text)
+        .replace(Regex("^[-•–—]+\\s*"),"")
+        .replace(Regex("\\s+([,.;:!?])"),"$1")
+        .trim()
+
+    // Yaygın editoryal önekleri yalnız cümle başındaysa temizle.
+    out=out.replace(
+        Regex("^(son dakika|haber merkezi|editörün notu)\\s*[:|-]\\s*",
+            RegexOption.IGNORE_CASE),
+        ""
+    ).trim()
+
+    if(out.length>420)out=out.take(417).trimEnd()+"..."
+    return out
+}
+
+private fun inferImportance(
+    eventTitle:String,
+    eventSummary:String,
+    articles:List<ResearchedArticle>
+):String?{
+    val all=(eventTitle+" "+eventSummary+" "+
+        articles.joinToString(" "){it.description+" "+it.paragraphs.take(8).joinToString(" ")})
+        .lowercase(Locale("tr","TR"))
+
+    return when{
+        listOf("deprem","sel","yangın","heyelan","fırtına","can kaybı","yaralı")
+            .any{all.contains(it)}->
+            "Analiz: Gelişme, can güvenliği, ulaşım ve günlük yaşam üzerindeki doğrudan etkileri nedeniyle önem taşıyor."
+
+        listOf("faiz","enflasyon","döviz","vergi","zam","bütçe","piyasa","asgari ücret")
+            .any{all.contains(it)}->
+            "Analiz: Gelişme, fiyatlar, piyasalar veya hane ve işletme maliyetleri üzerinde etkili olabileceği için önem taşıyor."
+
+        listOf("yasa","kanun","yönetmelik","kararname","yürürlüğe","düzenleme")
+            .any{all.contains(it)}->
+            "Analiz: Gelişme, yürürlükteki kural veya uygulamaları etkileyebileceği için ilgili kişi ve kurumlar açısından önem taşıyor."
+
+        listOf("seçim","oylama","meclis","hükümet","bakan","cumhurbaşkanı","başbakan")
+            .any{all.contains(it)}->
+            "Analiz: Gelişme, siyasi karar alma süreci ve tarafların sonraki adımları açısından önem taşıyor."
+
+        listOf("saldırı","savaş","çatışma","ateşkes","operasyon","güvenlik")
+            .any{all.contains(it)}->
+            "Analiz: Gelişme, güvenlik durumu ve bölgedeki sonraki gelişmeler açısından önem taşıyor."
+
+        else->null
+    }
 }
 
 private fun sentenceSimilarity(a:String,b:String):Double{
