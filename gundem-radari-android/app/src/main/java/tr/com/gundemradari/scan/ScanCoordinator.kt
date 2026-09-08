@@ -4,7 +4,6 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import tr.com.gundemradari.data.*
-import tr.com.gundemradari.religion.ReligionTopicFilter
 import tr.com.gundemradari.religion.ReligionTracker
 import tr.com.gundemradari.religion.ReligionWatchEngine
 import tr.com.gundemradari.research.EventResearchService
@@ -249,20 +248,15 @@ class ScanCoordinator(private val db:AppDatabase){
             return@withTransaction null
         }
 
-        // Bir kaynağın "Din" kaynağı olması tek başına yeterli değildir.
-        // Diyanet Haber gibi sitelerdeki heyelan, yangın, eğitim, spor vb.
-        // genel içerikler yalnızca kaynak adına bakılarak Din'e giremez.
-        if(
-            religionDirect &&
-            !religionMatch.accepted &&
-            !ReligionTopicFilter.isRelevant(item.title,item.summary)
-        ){
+        // Din kanalına yalnız takip edilen kişiler veya başlığında
+        // "tarikat/cemaat" bulunan haberler kabul edilir.
+        // Bu sözcüklerin yalnız özet/içerikte geçmesi kabul sebebi değildir.
+        if(religionDirect && !religionMatch.accepted){
             return@withTransaction null
         }
 
         val religionPriority=when{
             religionMatch.accepted->religionMatch.priority
-            religionDirect->1
             else->0
         }
         val incomingQuality=contentQuality(item)
