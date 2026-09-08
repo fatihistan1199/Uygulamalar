@@ -33,126 +33,281 @@ data class ResearchSummary(
 class ArticleReader {
     suspend fun read(url:String):ArticleDetails?=withContext(Dispatchers.IO){
         runCatching{
-            val first=Jsoup.connect(url)
-                .userAgent("Mozilla/5.0 (Android) GundemRadari/19")
-                .timeout(14000)
-                .followRedirects(true)
-                .get()
+            val first=fetchDocument(url) ?: return@runCatching null
+            val resolved=resolveIntermediary(first)
+            val alternateUrls=extractAlternateUrls(resolved)
 
-            val doc=if(first.location().contains("news.google.com")){
-                val external=first.select("a[href]").asSequence()
-                    .map{it.absUrl("href")}
-                    .firstOrNull{href->
-                        href.startsWith("http") &&
-                        !href.contains("google.com") &&
-                        !href.contains("gstatic.com") &&
-                        !href.contains("youtube.com")
+            var best=extractDetails(resolved)
+            var bestScore=articleContentQuality(best)
+
+            // İlk HTML yeterli metin vermiyorsa aynı makalenin canonical/AMP
+            // sürümünü dener. Bu teyit değildir; aynı yayıncıdaki aynı haberin
+            // daha okunabilir temsilini bulma adımıdır.
+            if(bestScore<58.0){
+                for(alt in alternateUrls.take(2)){
+                    val altDoc=fetchDocument(alt) ?: continue
+                    val candidate=extractDetails(altDoc)
+                    val score=articleContentQuality(candidate)
+
+                    if(score>bestScore+2.0){
+                        best=candidate
+                        bestScore=score
                     }
-                if(external!=null){
-                    runCatching{
-                        Jsoup.connect(external)
-                            .userAgent("Mozilla/5.0 (Android) GundemRadari/19")
-                            .timeout(14000)
-                            .followRedirects(true)
-                            .get()
-                    }.getOrElse{first}
-                }else first
-            }else first
+                    if(bestScore>=72.0)break
+                }
+            }
 
-            // JSON-LD çoğu haber sitesinde görsel DOM'dan daha temiz ve eksiksiz gövde taşır.
-            val structured=extractStructuredArticle(doc)
-
-            doc.select(
-                "script,style,nav,aside,footer,form,noscript,header,"+
-                ".advertisement,.ad,.ads,.cookie,.newsletter,.social-share,"+
-                ".related-news,.related-content,.recommendation"
-            ).remove()
-
-            val ogTitle=doc.selectFirst("meta[property=og:title]")?.attr("content").orEmpty()
-            val h1=doc.selectFirst("h1")?.text().orEmpty()
-            val title=listOf(structured.headline,ogTitle,h1,doc.title())
-                .map(::cleanResearchText)
-                .firstOrNull{it.isNotBlank()}
-                .orEmpty()
-
-            val description=listOf(
-                structured.description,
-                doc.selectFirst("meta[property=og:description]")?.attr("content").orEmpty(),
-                doc.selectFirst("meta[name=description]")?.attr("content").orEmpty()
-            )
-                .map(::cleanResearchText)
-                .firstOrNull{isUsefulResearchText(it)}
-                .orEmpty()
-
-            val selectors=listOf(
-                "[itemprop=articleBody] p",
-                "article p",
-                ".article-body p",".article-content p",".article__body p",
-                ".news-content p",".news-detail p",".news-detail-content p",
-                ".story-body p",".story-content p",
-                ".content-detail p",".detail-content p",".detail__content p",
-                "[class*=articleBody] p","[class*=article-body] p",
-                "[class*=articleContent] p","[class*=article-content] p",
-                "main p"
-            )
-
-            val structuredParas=structuredBodyParagraphs(structured.articleBody)
-                .filter(::usableParagraph)
-
-            val selectedParas=selectors.asSequence()
-                .flatMap{sel->doc.select(sel).asSequence()}
-                .map{it.text().replace(Regex("\\s+")," ").trim()}
-                .filter{usableParagraph(it)}
-                .distinct()
-                .take(28)
-                .toList()
-
-            val broadParas=if(structuredParas.isEmpty() && selectedParas.size<2){
-                doc.select("p").asSequence()
-                    .map{it.text().replace(Regex("\\s+")," ").trim()}
-                    .filter{usableParagraph(it)}
-                    .distinct()
-                    .sortedByDescending{paragraphDensityScore(it)}
-                    .take(20)
-                    .toList()
-            }else emptyList()
-
-            val paras=(structuredParas+selectedParas+broadParas)
-                .distinctBy{normalizeForDedup(it)}
-                .take(30)
-
-            val publishedAt=listOf(
-                structured.datePublished,
-                doc.selectFirst("meta[property=article:published_time]")?.attr("content").orEmpty(),
-                doc.selectFirst("meta[itemprop=datePublished]")?.attr("content").orEmpty(),
-                doc.selectFirst("time[datetime]")?.attr("datetime").orEmpty()
-            )
-                .asSequence()
-                .mapNotNull(::parseArticleDate)
-                .firstOrNull()
-
-            ArticleDetails(
-                title=title,
-                description=description,
-                paragraphs=paras,
-                finalUrl=doc.location(),
-                host=runCatching{
-                    URI(doc.location()).host.orEmpty().removePrefix("www.")
-                }.getOrDefault(""),
-                publishedAt=publishedAt
-            )
+            best
         }.getOrNull()
     }
 
-    private fun usableParagraph(text:String):Boolean =
-        text.length in 50..1800 && isUsefulResearchText(text)
+    private fun fetchDocument(url:String):Document?=
+        runCatching{
+            Jsoup.connect(url)
+                .userAgent("Mozilla/5.0 (Android) GundemRadari/21")
+                .timeout(14000)
+                .followRedirects(true)
+                .maxBodySize(2_500_000)
+                .header("Accept-Language","tr-TR,tr;q=0.9,en;q=0.4")
+                .get()
+        }.getOrNull()
 
-    private fun paragraphDensityScore(text:String):Int{
-        val punctuation=text.count{it=='.'||it==','||it==';'||it==':'}
-        val words=text.split(Regex("\\s+")).size
-        return words + punctuation*3
+    private fun resolveIntermediary(first:Document):Document{
+        if(!first.location().contains("news.google.com"))return first
+
+        val external=first.select("a[href]").asSequence()
+            .map{it.absUrl("href")}
+            .filter{it.startsWith("http")}
+            .filterNot{
+                it.contains("google.com") ||
+                it.contains("gstatic.com") ||
+                it.contains("youtube.com")
+            }
+            .maxByOrNull{href->
+                val path=runCatching{URI(href).path.orEmpty()}.getOrDefault("")
+                path.length
+            }
+
+        return external?.let(::fetchDocument) ?: first
+    }
+
+    private fun extractAlternateUrls(doc:Document):List<String>{
+        val current=doc.location()
+        val currentHost=runCatching{
+            URI(current).host.orEmpty().removePrefix("www.")
+        }.getOrDefault("")
+
+        val raw=listOf(
+            doc.selectFirst("link[rel=amphtml]")?.absUrl("href").orEmpty(),
+            doc.selectFirst("link[rel=canonical]")?.absUrl("href").orEmpty(),
+            doc.selectFirst("meta[property=og:url]")?.attr("content").orEmpty()
+        )
+
+        return raw.asSequence()
+            .map{it.trim()}
+            .filter{it.startsWith("http")}
+            .filterNot{sameNormalizedUrl(it,current)}
+            .filter{candidate->
+                val host=runCatching{
+                    URI(candidate).host.orEmpty().removePrefix("www.")
+                }.getOrDefault("")
+                host.isNotBlank() &&
+                (
+                    currentHost.isBlank() ||
+                    host==currentHost ||
+                    host.endsWith("."+currentHost) ||
+                    currentHost.endsWith("."+host)
+                )
+            }
+            .distinct()
+            .toList()
+    }
+
+    private fun extractDetails(doc:Document):ArticleDetails{
+        val structured=extractStructuredArticle(doc)
+        val working=doc.clone()
+
+        val publishedAt=listOf(
+            structured.datePublished,
+            doc.selectFirst("meta[property=article:published_time]")?.attr("content").orEmpty(),
+            doc.selectFirst("meta[itemprop=datePublished]")?.attr("content").orEmpty(),
+            doc.selectFirst("meta[name=pubdate]")?.attr("content").orEmpty(),
+            doc.selectFirst("meta[name=publish-date]")?.attr("content").orEmpty(),
+            doc.selectFirst("meta[name=date]")?.attr("content").orEmpty(),
+            doc.selectFirst("time[datetime]")?.attr("datetime").orEmpty()
+        )
+            .asSequence()
+            .mapNotNull(::parseArticleDate)
+            .firstOrNull()
+
+        working.select(
+            "script,style,nav,aside,footer,form,noscript,header,iframe,svg,"+
+            ".advertisement,.advert,.ad,.ads,.cookie,.cookies,.newsletter,"+
+            ".social-share,.share,.sharing,.related-news,.related-content,"+
+            ".recommendation,.recommended,.most-read,.mostread,.sidebar,"+
+            ".breadcrumb,.breadcrumbs,.tags,.tag-list,.author-box,.comments"
+        ).remove()
+
+        val ogTitle=doc.selectFirst("meta[property=og:title]")?.attr("content").orEmpty()
+        val h1=working.selectFirst("h1")?.text().orEmpty()
+        val title=listOf(structured.headline,ogTitle,h1,doc.title())
+            .map(::cleanResearchText)
+            .firstOrNull{it.length>=8}
+            .orEmpty()
+
+        val description=listOf(
+            structured.description,
+            doc.selectFirst("meta[property=og:description]")?.attr("content").orEmpty(),
+            doc.selectFirst("meta[name=description]")?.attr("content").orEmpty(),
+            working.selectFirst("article > p")?.text().orEmpty()
+        )
+            .map(::cleanResearchText)
+            .firstOrNull{isUsefulResearchText(it)}
+            .orEmpty()
+
+        val structuredParas=structuredBodyParagraphs(structured.articleBody)
+            .filter(::usableParagraph)
+
+        val combinedSelector=listOf(
+            "[itemprop=articleBody] p",
+            "[itemprop=articleBody] li",
+            "article p",
+            "article li",
+            ".article-body p",".article-content p",".article__body p",".article__content p",
+            ".article-text p",".article-detail p",".article-detail-content p",
+            ".news-content p",".news-detail p",".news-detail-content p",".news-text p",
+            ".story-body p",".story-content p",".story__body p",
+            ".entry-content p",".post-content p",".post__content p",
+            ".content-detail p",".detail-content p",".detail__content p",
+            "[class*=articleBody] p","[class*=article-body] p",
+            "[class*=articleContent] p","[class*=article-content] p",
+            "[class*=storyBody] p","[class*=story-body] p",
+            "[data-testid*=article] p",
+            "main p"
+        ).joinToString(",")
+
+        val selectedParas=working.select(combinedSelector)
+            .asSequence()
+            .map{cleanResearchText(it.text())}
+            .filter(::usableParagraph)
+            .distinctBy(::normalizeForDedup)
+            .take(32)
+            .toList()
+
+        val denseParas=bestDenseContainerParagraphs(working)
+
+        val broadParas=if(
+            structuredParas.isEmpty() &&
+            selectedParas.size<2 &&
+            denseParas.size<2
+        ){
+            working.select("p").asSequence()
+                .map{cleanResearchText(it.text())}
+                .filter(::usableParagraph)
+                .filterNot(::looksLikePeripheralParagraph)
+                .distinctBy(::normalizeForDedup)
+                .take(20)
+                .toList()
+        }else emptyList()
+
+        val paras=(structuredParas+selectedParas+denseParas+broadParas)
+            .filterNot(::looksLikePeripheralParagraph)
+            .distinctBy(::normalizeForDedup)
+            .take(34)
+
+        val canonical=doc.selectFirst("link[rel=canonical]")
+            ?.absUrl("href")
+            .orEmpty()
+            .takeIf{it.startsWith("http")}
+            ?:doc.location()
+
+        return ArticleDetails(
+            title=title,
+            description=description,
+            paragraphs=paras,
+            finalUrl=canonical,
+            host=runCatching{
+                URI(canonical).host.orEmpty().removePrefix("www.")
+            }.getOrDefault(""),
+            publishedAt=publishedAt
+        )
+    }
+
+    private fun bestDenseContainerParagraphs(doc:Document):List<String>{
+        val candidates=doc.select(
+            "article,main,[role=main],[itemprop=articleBody],"+
+            "div[class*=article],div[class*=content],div[class*=story],"+
+            "div[class*=news],div[class*=detail],div[class*=post],"+
+            "section[class*=article],section[class*=content],section[class*=story]"
+        )
+
+        val best=candidates
+            .asSequence()
+            .map{container->
+                val paragraphs=container.select("p").asSequence()
+                    .map{cleanResearchText(it.text())}
+                    .filter(::usableParagraph)
+                    .filterNot(::looksLikePeripheralParagraph)
+                    .distinctBy(::normalizeForDedup)
+                    .take(32)
+                    .toList()
+
+                val chars=paragraphs.sumOf{it.length}
+                val linkChars=container.select("a").sumOf{
+                    cleanResearchText(it.text()).length
+                }
+                val score=
+                    chars +
+                    paragraphs.size*140 -
+                    (linkChars*0.65).toInt()
+
+                Triple(container,paragraphs,score)
+            }
+            .filter{(_,paragraphs,score)->
+                paragraphs.size>=2 && score>=450
+            }
+            .maxByOrNull{it.third}
+
+        return best?.second.orEmpty()
+    }
+
+    private fun usableParagraph(text:String):Boolean =
+        text.length in 50..1800 &&
+        isUsefulResearchText(text) &&
+        !looksLikePeripheralParagraph(text)
+
+    private fun looksLikePeripheralParagraph(text:String):Boolean{
+        val lower=cleanResearchText(text)
+            .lowercase(Locale("tr","TR"))
+
+        val blocked=listOf(
+            "ilgili haberler","diğer haberler","benzer haberler","çok okunanlar",
+            "en çok okunanlar","son dakika haberleri","haberin devamı",
+            "bu haber ilginizi çekebilir","etiketler:","kaynak:",
+            "fotoğraf:","editör:","muhabir:","reklamdan sonra",
+            "yorum yapmak için","yorumlarınızı","bizi takip edin",
+            "whatsapp kanalımıza","telegram kanalımıza","google news'te"
+        )
+
+        if(blocked.any{lower.contains(it)})return true
+
+        val words=lower.split(Regex("\\s+"))
+        val linkish=words.count{
+            it=="tıkla" || it=="oku" || it=="paylaş" || it=="takip"
+        }
+
+        return linkish>=3
+    }
+
+    private fun sameNormalizedUrl(a:String,b:String):Boolean{
+        fun n(x:String)=x
+            .substringBefore('#')
+            .trimEnd('/')
+            .replace(Regex("[?&](utm_[^=]+|fbclid|gclid)=[^&]+"),"")
+        return n(a)==n(b)
     }
 }
+
 
 private data class StructuredArticle(
     val headline:String="",
