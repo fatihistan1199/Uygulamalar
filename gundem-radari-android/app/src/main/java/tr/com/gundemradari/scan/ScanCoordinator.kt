@@ -317,7 +317,15 @@ class ScanCoordinator(private val db:AppDatabase){
             val (importance,noise)=scores(item.title,item.source,nextSourceCount,item.summary)
             val eventPublished=listOfNotNull(candidate.publishedAt,item.publishedAt).maxOrNull()
 
+            val forceFreshReligionText=
+                dedicatedReligionSource &&
+                (
+                    candidate.publishedAt==null ||
+                    candidate.publishedAt<ReligionTracker.cutoff(now)
+                )
+
             val useIncoming=
+                forceFreshReligionText ||
                 incomingQuality>candidate.bestContentQuality+1.5 ||
                 candidate.title.contains("[OBJ]",true) ||
                 candidate.summary.contains("[OBJ]",true)
