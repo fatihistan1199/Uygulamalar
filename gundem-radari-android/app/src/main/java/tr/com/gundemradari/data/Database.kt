@@ -51,6 +51,18 @@ data class EventItemEntity(val eventId:String,val rawUrl:String)
     @PrimaryKey(autoGenerate=true) val id:Long=0, val eventId:String, val version:Int,
     val title:String, val summary:String, val changeNote:String, val createdAt:Long)
 
+@Entity(tableName="event_enrichment") data class EventEnrichmentEntity(
+    @PrimaryKey val eventId:String,
+    val sourceName:String,
+    val sourceUrl:String,
+    val sourceTitle:String,
+    val shortSummary:String,
+    val whatHappened:String,
+    val whyImportant:String,
+    val latestSituation:String,
+    val contentQuality:Double,
+    val enrichedAt:Long)
+
 @Entity(tableName="scan_history") data class ScanHistoryEntity(
     @PrimaryKey(autoGenerate=true) val id:Long=0, val startedAt:Long, val finishedAt:Long?,
     val newItems:Int, val failedSources:Int)
@@ -159,6 +171,23 @@ data class SearchEventRow(
     @Insert
     suspend fun addVersion(row:EventVersionEntity)
 
+    @Query("SELECT * FROM event_enrichment WHERE eventId=:eventId LIMIT 1")
+    suspend fun enrichment(eventId:String):EventEnrichmentEntity?
+
+    @Insert(onConflict=OnConflictStrategy.REPLACE)
+    suspend fun putEnrichment(row:EventEnrichmentEntity)
+
+    @Query("""
+        UPDATE events
+        SET summary=:summary,
+            bestContentQuality=CASE
+                WHEN bestContentQuality>:quality THEN bestContentQuality
+                ELSE :quality
+            END
+        WHERE id=:eventId
+    """)
+    suspend fun updateEnrichedSummary(eventId:String,summary:String,quality:Double)
+
     @Query("""
         SELECT * FROM events WHERE scope='turkey' AND noise < 50
         ORDER BY (
@@ -225,9 +254,10 @@ data class SearchEventRow(
 @Database(
     entities=[
         SourceEntity::class,SourceHealthEntity::class,RawItemEntity::class,EventEntity::class,
-        EventItemEntity::class,EventVersionEntity::class,ScanHistoryEntity::class
+        EventItemEntity::class,EventVersionEntity::class,EventEnrichmentEntity::class,
+        ScanHistoryEntity::class
     ],
-    version=13, exportSchema=false
+    version=14, exportSchema=false
 )
 abstract class AppDatabase:RoomDatabase(){
     abstract fun dao():GundemDao
@@ -294,9 +324,28 @@ abstract class AppDatabase:RoomDatabase(){
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_events_scope_noise_updatedAt ON events(scope,noise,updatedAt)")
             }
         }
+        private val MIGRATION_13_14=object:Migration(13,14){
+            override fun migrate(db:SupportSQLiteDatabase){
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS event_enrichment (
+                        eventId TEXT NOT NULL,
+                        sourceName TEXT NOT NULL,
+                        sourceUrl TEXT NOT NULL,
+                        sourceTitle TEXT NOT NULL,
+                        shortSummary TEXT NOT NULL,
+                        whatHappened TEXT NOT NULL,
+                        whyImportant TEXT NOT NULL,
+                        latestSituation TEXT NOT NULL,
+                        contentQuality REAL NOT NULL,
+                        enrichedAt INTEGER NOT NULL,
+                        PRIMARY KEY(eventId)
+                    )
+                """.trimIndent())
+            }
+        }
         fun get(context:Context)=INSTANCE?:synchronized(this){
             INSTANCE?:Room.databaseBuilder(context.applicationContext,AppDatabase::class.java,"gundem-radari.db")
-                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8,MIGRATION_8_9,MIGRATION_9_10,MIGRATION_10_11,MIGRATION_11_12,MIGRATION_12_13)
+                .addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8,MIGRATION_8_9,MIGRATION_9_10,MIGRATION_10_11,MIGRATION_11_12,MIGRATION_12_13,MIGRATION_13_14)
                 .build().also{INSTANCE=it}
         }
     }
