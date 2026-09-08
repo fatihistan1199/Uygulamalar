@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "events": [
     {
       "id": "grain",
@@ -2988,6 +2988,1505 @@
               "eventId": "grain_followup",
               "minDays": 12,
               "maxDays": 24
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "work_patron_offer",
+      "category": "livelihood",
+      "title": "Düzenli İş Teklifi",
+      "body": "Son haftalarda yaptığın işler fark edilmiş. {{city}}'de seni {{work_identity}} olarak tanıyan biri, arada bir değil düzenli biçimde çalışmanı teklif ediyor. Kabul etmek gelirini daha güvenli kılabilir; ama seni belirli bir çevreye bağlayabilir.",
+      "weight": 100,
+      "major": false,
+      "cooldownDays": 999,
+      "scheduledOnly": true,
+      "chainId": "livelihood_path",
+      "chainStage": 1,
+      "conditions": [
+        {
+          "type": "work_count_at_least",
+          "value": 3
+        }
+      ],
+      "tags": [
+        "personal",
+        "work",
+        "social"
+      ],
+      "choices": [
+        {
+          "id": "accept",
+          "title": "Düzenli çalışmayı kabul et",
+          "hint": "Daha güvenli bir geçim yolu; daha fazla toplumsal bağ.",
+          "resultText": "Teklifi kabul ettin. Artık yaptığın işler tesadüfî günlük kazançtan daha düzenli bir geçim yoluna dönüşüyor.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "story_thread",
+              "thread": "livelihood",
+              "status": "düzenli iş ağı — {{work_identity}}"
+            },
+            {
+              "type": "money",
+              "amount": 8
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "tuccar",
+              "amount": 2
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "work_patron_return",
+              "minDays": 120,
+              "maxDays": 210
+            }
+          ]
+        },
+        {
+          "id": "independent",
+          "title": "Bağımsız kal",
+          "hint": "Daha az güvence; daha fazla hareket serbestisi.",
+          "resultText": "Düzenli bağlanmayı reddettin. İnsanlar yine seni tanıyor ama hangi işi kabul edeceğine kendin karar vereceksin.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "story_thread",
+              "thread": "livelihood",
+              "status": "bağımsız — {{work_identity}}"
+            }
+          ]
+        },
+        {
+          "id": "negotiate",
+          "title": "Şartları pazarlık et",
+          "hint": "Daha iyi koşullar elde etmeyi deneyebilirsin.",
+          "resultText": "Şartları kendi lehine düzenledin ve düzenli çalışma ağına girdin.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "story_thread",
+              "thread": "livelihood",
+              "status": "pazarlıkla kurulan iş ağı — {{work_identity}}"
+            },
+            {
+              "type": "money",
+              "amount": 12
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "work_patron_return",
+              "minDays": 120,
+              "maxDays": 210
+            }
+          ],
+          "challenge": {
+            "attribute": "rhetoric",
+            "skill": "diplomacy",
+            "difficulty": 38,
+            "partialText": "Bazı şartları iyileştirdin ama beklediğin kadar değil.",
+            "failureText": "Pazarlık sonuç vermedi; teklif geri çekildi.",
+            "criticalFailureText": "Pazarlık sertleşti ve çevrede huysuz biri olduğun konuşuldu.",
+            "partialEffects": [
+              {
+                "type": "story_thread",
+                "thread": "livelihood",
+                "status": "sınırlı düzenli iş — {{work_identity}}"
+              },
+              {
+                "type": "money",
+                "amount": 6
+              },
+              {
+                "type": "schedule_event",
+                "eventId": "work_patron_return",
+                "minDays": 150,
+                "maxDays": 240
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "story_thread",
+                "thread": "livelihood",
+                "status": "bağımsız — {{work_identity}}"
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "story_thread",
+                "thread": "livelihood",
+                "status": "bağımsız — {{work_identity}}"
+              },
+              {
+                "type": "faction_reputation",
+                "faction": "tuccar",
+                "amount": -2
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "work_patron_return",
+      "category": "livelihood",
+      "title": "Eski İş Bağlantısı Geri Dönüyor",
+      "body": "Aylar önce kurduğun düzenli iş ağı şimdi senden daha zor bir sorumluluk istiyor. Sana güvenmelerinin nedeni o zamandan beri verdiğin emeğin unutulmamış olması.",
+      "weight": 100,
+      "major": false,
+      "cooldownDays": 999,
+      "scheduledOnly": true,
+      "chainId": "livelihood_path",
+      "chainStage": 2,
+      "conditions": [],
+      "tags": [
+        "personal",
+        "work",
+        "memory"
+      ],
+      "choices": [
+        {
+          "id": "take",
+          "title": "Sorumluluğu üstlen",
+          "hint": "Daha büyük kazanç, daha büyük risk.",
+          "resultText": "Eski iş bağlantın sayesinde daha önemli bir sorumluluk aldın.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "money",
+              "amount": 15
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_old_choice_returns"
+            },
+            {
+              "type": "story_thread",
+              "thread": "livelihood",
+              "status": "güvenilen iş ağı — {{work_identity}}"
+            }
+          ],
+          "challenge": {
+            "attribute": "willpower",
+            "skill": "leadership",
+            "secondarySkill": "localCulture",
+            "difficulty": 42,
+            "partialText": "İşi tamamladın ama bazı eksikler yüzünden kazancın sınırlı kaldı.",
+            "failureText": "Sorumluluk beklediğinden ağır geldi; çevrenin güveni biraz sarsıldı.",
+            "criticalFailureText": "İş ciddi biçimde aksadı ve bağlantının sana duyduğu güven zarar gördü.",
+            "partialEffects": [
+              {
+                "type": "money",
+                "amount": 7
+              },
+              {
+                "type": "queue_story",
+                "storyId": "story_old_choice_returns"
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "faction_reputation",
+                "faction": "tuccar",
+                "amount": -2
+              },
+              {
+                "type": "queue_story",
+                "storyId": "story_old_choice_returns"
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "faction_reputation",
+                "faction": "tuccar",
+                "amount": -4
+              },
+              {
+                "type": "tension",
+                "amount": 2
+              },
+              {
+                "type": "queue_story",
+                "storyId": "story_old_choice_returns"
+              }
+            ]
+          }
+        },
+        {
+          "id": "refuse",
+          "title": "Bu kez geri çevir",
+          "hint": "Bağlantıyı korursun ama yükselme fırsatını kaçırırsın.",
+          "resultText": "Bu sorumluluğu almadın. İş ağı tamamen kopmadı ama seni eskisi kadar merkezde görmeyebilir.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "story_thread",
+              "thread": "livelihood",
+              "status": "mesafeli iş ağı — {{work_identity}}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "selma_han_acquaintance",
+      "category": "personal",
+      "title": "Selma Hatun'un Hanında Zor Bir Akşam",
+      "body": "Kayseri'de Selma Hatun'un hanına uğradığında iki kervan aynı anda kapıya dayanıyor. Yatak, yem ve depo yeri kavgası büyümek üzere. Selma seni görünce, 'Madem buradasın, şu kalabalığı ayırmama yardım et,' diyor.",
+      "weight": 52,
+      "major": false,
+      "cooldownDays": 999,
+      "chainId": "selma_personal",
+      "chainStage": 1,
+      "conditions": [
+        {
+          "type": "city_is",
+          "value": "kayseri"
+        },
+        {
+          "type": "flag_equals",
+          "key": "first_task_done",
+          "value": true
+        },
+        {
+          "type": "thread_not_set",
+          "thread": "selma_friendship"
+        },
+        {
+          "type": "npc_alive",
+          "npc": "selma"
+        },
+        {
+          "type": "npc_in_current_city",
+          "npc": "selma"
+        }
+      ],
+      "tags": [
+        "personal",
+        "friendship",
+        "social",
+        "memory"
+      ],
+      "choices": [
+        {
+          "id": "help",
+          "title": "Selma'ya yardım et",
+          "hint": "Kalabalığı yatıştırmayı dene.",
+          "resultText": "Akşamın yükünü birlikte taşıdınız. Selma seni artık yalnız müşteri olarak görmüyor.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "selma",
+              "trust": 7,
+              "respect": 4,
+              "affection": 5,
+              "memory": "Han karıştığında yanımda kaldı",
+              "importance": 52,
+              "decay": 1,
+              "tags": [
+                "friendship",
+                "help"
+              ]
+            },
+            {
+              "type": "story_thread",
+              "thread": "selma_friendship",
+              "status": "tanışıklık derinleşiyor"
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "selma_han_return",
+              "minDays": 35,
+              "maxDays": 70
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_selma_bond"
+            }
+          ],
+          "challenge": {
+            "attribute": "rhetoric",
+            "skill": "leadership",
+            "secondarySkill": "localCulture",
+            "difficulty": 37,
+            "partialText": "Kavga büyümedi ama hanın düzeni ancak gece yarısına doğru sağlandı.",
+            "failureText": "Kalabalığı yönetemedin; Selma işi sonunda kendi adamlarıyla toparladı.",
+            "criticalFailureText": "Araya girmen işleri daha da karıştırdı ve Selma senden uzak durmanı istedi.",
+            "alwaysEffects": [
+              {
+                "type": "schedule_event",
+                "eventId": "selma_han_return",
+                "minDays": 45,
+                "maxDays": 85
+              }
+            ],
+            "partialEffects": [
+              {
+                "type": "npc_relation",
+                "npc": "selma",
+                "trust": 3,
+                "respect": 2,
+                "affection": 2,
+                "memory": "Han karmaşasında en azından yardım etmeye çalıştı",
+                "importance": 38,
+                "decay": 2,
+                "tags": [
+                  "friendship"
+                ]
+              },
+              {
+                "type": "story_thread",
+                "thread": "selma_friendship",
+                "status": "temkinli tanışıklık"
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "story_thread",
+                "thread": "selma_friendship",
+                "status": "mesafeli tanışıklık"
+              },
+              {
+                "type": "npc_relation",
+                "npc": "selma",
+                "trust": -1,
+                "suspicion": 2,
+                "memory": "Han işine karıştı ama faydası olmadı",
+                "importance": 26,
+                "decay": 3
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "story_thread",
+                "thread": "selma_friendship",
+                "status": "gergin tanışıklık"
+              },
+              {
+                "type": "npc_relation",
+                "npc": "selma",
+                "trust": -4,
+                "respect": -2,
+                "suspicion": 5,
+                "memory": "Hanı daha da karıştırdı",
+                "importance": 42,
+                "decay": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "decline",
+          "title": "Bu işe karışma",
+          "hint": "İlişkiyi mesafeli tutarsın.",
+          "resultText": "Selma başını sallayıp kendi işine döndü. Aranızdaki ilişki han sahibi ile yolcu arasındaki sınırda kaldı.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "story_thread",
+              "thread": "selma_friendship",
+              "status": "mesafeli tanışıklık"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "selma_han_return",
+      "category": "personal",
+      "title": "Selma'nın Sana Ayırdığı Oda",
+      "body": "Kayseri'ye yeniden geldiğinde Selma Hatun seni hanın kalabalığından ayrı bir masaya çağırıyor. Bir kervan sahibinin borcu yüzünden zor durumda. 'Geçen sefer yanımda durdun. Şimdi sana güvenebileceğimi düşünüyorum,' diyor.",
+      "weight": 100,
+      "major": false,
+      "cooldownDays": 999,
+      "scheduledOnly": true,
+      "chainId": "selma_personal",
+      "chainStage": 2,
+      "conditions": [
+        {
+          "type": "npc_alive",
+          "npc": "selma"
+        },
+        {
+          "type": "npc_in_current_city",
+          "npc": "selma"
+        }
+      ],
+      "tags": [
+        "personal",
+        "friendship",
+        "debt",
+        "memory"
+      ],
+      "choices": [
+        {
+          "id": "stand_by",
+          "title": "Selma'nın yanında dur",
+          "hint": "İlişkiyi dostluğa dönüştürebilir.",
+          "resultText": "Bu kez mesele yalnız iş değildi. Selma sana kişisel bir güven göstermeye başladı.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "selma",
+              "trust": 10,
+              "respect": 5,
+              "affection": 8,
+              "debt": 7,
+              "memory": "Zor borç meselesinde beni yalnız bırakmadı",
+              "importance": 78,
+              "decay": 1,
+              "permanent": true,
+              "tags": [
+                "friendship",
+                "debt",
+                "permanent"
+              ]
+            },
+            {
+              "type": "story_thread",
+              "thread": "selma_friendship",
+              "status": "dostluk"
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "selma_old_favor",
+              "minDays": 190,
+              "maxDays": 300
+            }
+          ]
+        },
+        {
+          "id": "business",
+          "title": "Yalnız ticari çözüm öner",
+          "hint": "Yardım edersin ama duygusal mesafeyi korursun.",
+          "resultText": "Soruna bir yol gösterdin fakat aranızdaki çizgiyi özellikle korudun.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "selma",
+              "trust": 4,
+              "respect": 5,
+              "memory": "Borç meselesinde akıl verdi ama mesafesini korudu",
+              "importance": 40,
+              "decay": 2
+            },
+            {
+              "type": "story_thread",
+              "thread": "selma_friendship",
+              "status": "iş dostluğu"
+            }
+          ]
+        },
+        {
+          "id": "refuse",
+          "title": "Bu yükü alma",
+          "hint": "Sorumluluktan kaçınırsın; Selma bunu hatırlar.",
+          "resultText": "Selma ısrar etmedi. Fakat konuşmanın sonunda aranızdaki eski sıcaklık azalmıştı.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "selma",
+              "trust": -7,
+              "affection": -5,
+              "suspicion": 3,
+              "memory": "Kendisine güvendiğim anda geri çekildi",
+              "importance": 62,
+              "decay": 1,
+              "permanent": true,
+              "tags": [
+                "broken_trust"
+              ]
+            },
+            {
+              "type": "story_thread",
+              "thread": "selma_friendship",
+              "status": "kırılmış güven"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "selma_old_favor",
+      "category": "personal",
+      "title": "Yıllanmaya Başlayan Bir İyilik",
+      "body": "Aradan aylar geçti. Selma Hatun, geçmişte yaptığın yardımı hâlâ hatırlıyor. Şimdi senin bir işin için hanın kervan ağını kullanabileceğini söylüyor. Eski bir karar, bugünün imkânına dönüşmüş durumda.",
+      "weight": 100,
+      "major": false,
+      "cooldownDays": 999,
+      "scheduledOnly": true,
+      "chainId": "selma_personal",
+      "chainStage": 3,
+      "conditions": [
+        {
+          "type": "thread_status",
+          "thread": "selma_friendship",
+          "value": "dostluk"
+        },
+        {
+          "type": "npc_alive",
+          "npc": "selma"
+        }
+      ],
+      "tags": [
+        "personal",
+        "friendship",
+        "long_term",
+        "memory"
+      ],
+      "choices": [
+        {
+          "id": "use_favor",
+          "title": "Eski iyiliğin karşılığını iste",
+          "hint": "Somut fayda elde edersin; borç dengesi değişir.",
+          "resultText": "Selma kervan ağını senin için kullandı. Aylar önceki yardımın somut bir karşılığa dönüştü.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "money",
+              "amount": 18
+            },
+            {
+              "type": "npc_relation",
+              "npc": "selma",
+              "debt": -7,
+              "trust": 2,
+              "memory": "Eski iyiliğinin karşılığını açıkça istedi",
+              "importance": 45,
+              "decay": 2
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_old_choice_returns"
+            }
+          ]
+        },
+        {
+          "id": "waive",
+          "title": "Karşılık istemediğini söyle",
+          "hint": "Maddi fırsatı bırakırsın; dostluk daha da derinleşebilir.",
+          "resultText": "Selma bir an sustu, sonra gülümsedi. Aranızdaki bağ artık hesap defterine sığmıyor.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "selma",
+              "trust": 7,
+              "affection": 8,
+              "respect": 5,
+              "debt": 0,
+              "memory": "Aylar önceki iyiliğini borç saymadı",
+              "importance": 85,
+              "decay": 0,
+              "permanent": true,
+              "tags": [
+                "friendship",
+                "permanent"
+              ]
+            },
+            {
+              "type": "story_thread",
+              "thread": "selma_friendship",
+              "status": "yakın dostluk"
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_old_choice_returns"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nasir_offer",
+      "category": "personal",
+      "title": "Nâsır Kâtip'in Teklifi",
+      "body": "Konya'da Nâsır Kâtip seni bir kahvehanenin arka tarafında konuşmaya çağırıyor. Saraya sunulacak bir dilekçedeki bilgileri önceden öğrenmek istiyor. 'Benimle çalışırsan ikimiz de fayda görürüz,' diyor. Yardım etmek seni onun yükselişine bağlayabilir; reddetmekse dikkatini üzerine çekebilir.",
+      "weight": 48,
+      "major": false,
+      "cooldownDays": 999,
+      "chainId": "nasir_personal",
+      "chainStage": 1,
+      "conditions": [
+        {
+          "type": "city_is",
+          "value": "konya"
+        },
+        {
+          "type": "flag_equals",
+          "key": "first_task_done",
+          "value": true
+        },
+        {
+          "type": "thread_not_set",
+          "thread": "nasir_relation"
+        },
+        {
+          "type": "npc_alive",
+          "npc": "nasir"
+        },
+        {
+          "type": "npc_in_current_city",
+          "npc": "nasir"
+        }
+      ],
+      "tags": [
+        "personal",
+        "rivalry",
+        "politics",
+        "memory"
+      ],
+      "choices": [
+        {
+          "id": "ally",
+          "title": "Nâsır'la çalış",
+          "hint": "Saray çevresinde bir müttefik kazanabilirsin.",
+          "resultText": "Nâsır seni kendi çevresine biraz daha yaklaştırdı. Bunun bedelini ileride isteyebilir.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "nasir",
+              "trust": 7,
+              "respect": 5,
+              "debt": 5,
+              "memory": "Teklifimi kabul edip benimle çalıştı",
+              "importance": 58,
+              "decay": 2
+            },
+            {
+              "type": "story_thread",
+              "thread": "nasir_relation",
+              "status": "kırılgan ittifak"
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "nasir_alliance_return",
+              "minDays": 100,
+              "maxDays": 180
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_nasir_rivalry"
+            }
+          ]
+        },
+        {
+          "id": "refuse",
+          "title": "Teklifi reddet",
+          "hint": "Bağımsız kalırsın; Nâsır seni rakip görebilir.",
+          "resultText": "Nâsır gülümsedi ama gözleri değişmedi. Bundan sonra seni hesaba katacağını anladın.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "nasir",
+              "respect": 3,
+              "trust": -4,
+              "suspicion": 5,
+              "memory": "Teklifimi reddetti; kendi yolunu seçti",
+              "importance": 55,
+              "decay": 1,
+              "permanent": true,
+              "tags": [
+                "rivalry"
+              ]
+            },
+            {
+              "type": "story_thread",
+              "thread": "nasir_relation",
+              "status": "rekabet"
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "nasir_rivalry_return",
+              "minDays": 100,
+              "maxDays": 180
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_nasir_rivalry"
+            }
+          ]
+        },
+        {
+          "id": "expose",
+          "title": "Teklifi başkalarına anlat",
+          "hint": "Nâsır'ın planını bozarsın; açık husumet doğabilir.",
+          "resultText": "Nâsır'ın teklifi çevreye yayıldı. O da bunun kimden çıktığını anlamakta zorlanmadı.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "nasir",
+              "trust": -12,
+              "respect": -3,
+              "suspicion": 14,
+              "memory": "Gizli teklifimi başkalarına anlattı",
+              "importance": 90,
+              "decay": 0,
+              "permanent": true,
+              "tags": [
+                "enemy",
+                "betrayal"
+              ]
+            },
+            {
+              "type": "story_thread",
+              "thread": "nasir_relation",
+              "status": "husumet"
+            },
+            {
+              "type": "faction_reputation",
+              "faction": "yonetim",
+              "amount": -2
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "nasir_rivalry_return",
+              "minDays": 70,
+              "maxDays": 140
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_nasir_rivalry"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nasir_alliance_return",
+      "category": "personal",
+      "title": "Nâsır'ın Karşılık İstediği Gün",
+      "body": "Aylar sonra Nâsır senden eski işbirliğini hatırlatan bir ricada bulunuyor. Bu kez istediği şey daha ağır: şehirde onun aleyhine konuşan bir kişiyi ikna etmeni istiyor. İttifakın gerçekten ne kadar süreceği şimdi belli olacak.",
+      "weight": 100,
+      "major": false,
+      "cooldownDays": 999,
+      "scheduledOnly": true,
+      "chainId": "nasir_personal",
+      "chainStage": 2,
+      "conditions": [
+        {
+          "type": "thread_status",
+          "thread": "nasir_relation",
+          "value": "kırılgan ittifak"
+        },
+        {
+          "type": "npc_alive",
+          "npc": "nasir"
+        }
+      ],
+      "tags": [
+        "personal",
+        "politics",
+        "debt",
+        "long_term"
+      ],
+      "choices": [
+        {
+          "id": "honor",
+          "title": "Eski ittifakı koru",
+          "hint": "Nâsır'a borcunu ödersin; bağ güçlenir.",
+          "resultText": "Nâsır istediğini aldı ve seni artık geçici bir yardımcı değil, gerçek bir ortak olarak görmeye başladı.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "nasir",
+              "trust": 8,
+              "respect": 7,
+              "debt": -5,
+              "memory": "Aylar sonra sözünün arkasında durdu",
+              "importance": 76,
+              "decay": 1,
+              "permanent": true,
+              "tags": [
+                "alliance"
+              ]
+            },
+            {
+              "type": "story_thread",
+              "thread": "nasir_relation",
+              "status": "siyasi ittifak"
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_old_choice_returns"
+            }
+          ]
+        },
+        {
+          "id": "break",
+          "title": "Bu kez hayır de",
+          "hint": "Eski borcu tanımadığını göstermiş olursun.",
+          "resultText": "Nâsır bunu bir fikir ayrılığı değil, ittifakın sonu olarak gördü.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "nasir",
+              "trust": -10,
+              "suspicion": 8,
+              "memory": "İttifakın karşılığını ödeme zamanı gelince geri çekildi",
+              "importance": 80,
+              "decay": 0,
+              "permanent": true,
+              "tags": [
+                "broken_alliance"
+              ]
+            },
+            {
+              "type": "story_thread",
+              "thread": "nasir_relation",
+              "status": "bozulmuş ittifak"
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_old_choice_returns"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nasir_rivalry_return",
+      "category": "personal",
+      "title": "Nâsır'ın Sessiz Hamlesi",
+      "body": "Konya'ya geldiğinde bir iş kapısının sana gerekçe gösterilmeden kapandığını fark ediyorsun. Kısa süre sonra bunun Nâsır'ın çevresinden yayılan bir sözle bağlantılı olduğunu öğreniyorsun. Eski gerilim artık somut sonuç üretiyor.",
+      "weight": 100,
+      "major": false,
+      "cooldownDays": 999,
+      "scheduledOnly": true,
+      "chainId": "nasir_personal",
+      "chainStage": 2,
+      "conditions": [
+        {
+          "type": "npc_alive",
+          "npc": "nasir"
+        }
+      ],
+      "tags": [
+        "personal",
+        "rivalry",
+        "long_term",
+        "consequence"
+      ],
+      "choices": [
+        {
+          "id": "confront",
+          "title": "Nâsır'la yüzleş",
+          "hint": "Gerilimi açık çatışmaya çevirebilir veya sınır çizebilirsin.",
+          "resultText": "Nâsır'la açıkça konuştun. Bundan sonra ikiniz de ilişkinizin adını biliyorsunuz.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "nasir",
+              "respect": 5,
+              "trust": -3,
+              "suspicion": 3,
+              "memory": "Hamlemi fark edip yüzüme karşı geldi",
+              "importance": 72,
+              "decay": 1,
+              "permanent": true,
+              "tags": [
+                "rivalry"
+              ]
+            },
+            {
+              "type": "story_thread",
+              "thread": "nasir_relation",
+              "status": "açık rekabet"
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_old_choice_returns"
+            }
+          ]
+        },
+        {
+          "id": "outmaneuver",
+          "title": "Karşı hamle yap",
+          "hint": "Sosyal ağları kullanarak etkisini kırmayı dene.",
+          "resultText": "Nâsır'ın kurduğu engeli başka bir çevre üzerinden aşmayı başardın.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "story_thread",
+              "thread": "nasir_relation",
+              "status": "açık rekabet"
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_old_choice_returns"
+            }
+          ],
+          "challenge": {
+            "attribute": "intuition",
+            "skill": "diplomacy",
+            "secondarySkill": "localCulture",
+            "difficulty": 44,
+            "partialText": "Engelin bir kısmını aştın ama Nâsır'ın etkisi tamamen kırılmadı.",
+            "failureText": "Karşı hamlen sonuç vermedi; Nâsır'ın çevresi seni bir süre daha dışarıda tuttu.",
+            "criticalFailureText": "Karşı hamlen açığa çıktı ve Nâsır bundan yeni bir koz çıkardı.",
+            "partialEffects": [
+              {
+                "type": "faction_reputation",
+                "faction": "yonetim",
+                "amount": 1
+              },
+              {
+                "type": "queue_story",
+                "storyId": "story_old_choice_returns"
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "faction_reputation",
+                "faction": "yonetim",
+                "amount": -2
+              },
+              {
+                "type": "queue_story",
+                "storyId": "story_old_choice_returns"
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "faction_reputation",
+                "faction": "yonetim",
+                "amount": -4
+              },
+              {
+                "type": "npc_relation",
+                "npc": "nasir",
+                "suspicion": 5,
+                "respect": -2,
+                "memory": "Bana karşı gizli karşı hamle yaptı ama başarısız oldu",
+                "importance": 65,
+                "decay": 1
+              },
+              {
+                "type": "queue_story",
+                "storyId": "story_old_choice_returns"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "leyla_acquaintance",
+      "category": "personal",
+      "title": "Limanın Tercümanı Leyla",
+      "body": "Antalya limanında bir yabancı tüccarla gümrük görevlisi arasında çeviri yapan Leyla Hanım'la birkaç kez karşılaşıyorsun. İş bittikten sonra konuşmanız bu kez ticaretten günlük hayata kayıyor. Aranızda sıradan tanışıklıktan daha sıcak bir yakınlık doğabilir.",
+      "weight": 38,
+      "major": false,
+      "cooldownDays": 999,
+      "chainId": "leyla_romance",
+      "chainStage": 1,
+      "conditions": [
+        {
+          "type": "city_is",
+          "value": "antalya"
+        },
+        {
+          "type": "player_gender_is",
+          "value": "male"
+        },
+        {
+          "type": "player_no_spouse"
+        },
+        {
+          "type": "thread_not_set",
+          "thread": "leyla_romance"
+        },
+        {
+          "type": "npc_alive",
+          "npc": "leyla"
+        },
+        {
+          "type": "npc_unmarried",
+          "npc": "leyla"
+        },
+        {
+          "type": "npc_in_current_city",
+          "npc": "leyla"
+        }
+      ],
+      "tags": [
+        "personal",
+        "romance",
+        "social"
+      ],
+      "choices": [
+        {
+          "id": "closer",
+          "title": "Konuşmayı sürdür",
+          "hint": "Yakınlaşmayı doğal akışına bırak.",
+          "resultText": "Sohbet uzadı. Leyla seni limandaki yüzlerden biri değil, yeniden konuşmak isteyeceği biri olarak görmeye başladı.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "leyla",
+              "trust": 4,
+              "affection": 8,
+              "respect": 3,
+              "memory": "Liman işi bittikten sonra benimle kalıp uzun uzun konuştu",
+              "importance": 55,
+              "decay": 2,
+              "tags": [
+                "romance"
+              ]
+            },
+            {
+              "type": "story_thread",
+              "thread": "leyla_romance",
+              "status": "yakınlık"
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "leyla_courtship",
+              "minDays": 50,
+              "maxDays": 100
+            }
+          ]
+        },
+        {
+          "id": "friend",
+          "title": "Dostça ama mesafeli kal",
+          "hint": "Yakınlığı dostluk sınırında tutarsın.",
+          "resultText": "Leyla'yla iyi bir tanışıklık kurdun fakat ilişkinin yönünü özellikle değiştirmedin.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "leyla",
+              "trust": 4,
+              "respect": 4,
+              "affection": 2,
+              "memory": "Benimle samimi ama ölçülü konuştu",
+              "importance": 35,
+              "decay": 3
+            },
+            {
+              "type": "story_thread",
+              "thread": "leyla_romance",
+              "status": "dostça tanışıklık"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "leyla_courtship",
+      "category": "personal",
+      "title": "Leyla'nın Açık Sorusu",
+      "body": "Bir süredir aranızdaki yakınlık sürüyor. Leyla bu kez dolaylı konuşmuyor: 'Yollar arasında yaşayıp duracak mısın, yoksa bir yerde hayat kurmayı düşünüyor musun?' diye soruyor. Vereceğin cevap ilişkinizin yönünü belirleyecek.",
+      "weight": 100,
+      "major": false,
+      "cooldownDays": 999,
+      "scheduledOnly": true,
+      "chainId": "leyla_romance",
+      "chainStage": 2,
+      "conditions": [
+        {
+          "type": "thread_status",
+          "thread": "leyla_romance",
+          "value": "yakınlık"
+        },
+        {
+          "type": "player_no_spouse"
+        },
+        {
+          "type": "npc_unmarried",
+          "npc": "leyla"
+        },
+        {
+          "type": "npc_alive",
+          "npc": "leyla"
+        }
+      ],
+      "tags": [
+        "personal",
+        "romance",
+        "family"
+      ],
+      "choices": [
+        {
+          "id": "marry",
+          "title": "Onunla hayat kurmak istediğini söyle",
+          "hint": "Yakınlığı evliliğe dönüştürmeyi dene.",
+          "resultText": "Leyla teklifini kabul etti. İkinizin hikâyesi artık aynı hanenin hikâyesine dönüşüyor.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "marry_npc",
+              "npc": "leyla",
+              "thread": "leyla_romance"
+            },
+            {
+              "type": "npc_relation",
+              "npc": "leyla",
+              "trust": 8,
+              "affection": 12,
+              "respect": 5,
+              "memory": "Benimle bir hayat kurmayı açıkça seçti",
+              "importance": 100,
+              "decay": 0,
+              "permanent": true,
+              "tags": [
+                "marriage",
+                "permanent"
+              ]
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_named_marriage"
+            }
+          ],
+          "challenge": {
+            "attribute": "rhetoric",
+            "skill": "diplomacy",
+            "difficulty": 35,
+            "partialText": "Leyla duygularını reddetmedi ama hemen evlenmek yerine biraz daha zaman istedi.",
+            "failureText": "Leyla sana değer verdiğini ama evlilik için aynı yerde olmadığını söyledi.",
+            "criticalFailureText": "Sözlerin aceleci geldi; aranızdaki yakınlık bir süreliğine soğudu.",
+            "partialEffects": [
+              {
+                "type": "npc_relation",
+                "npc": "leyla",
+                "trust": 2,
+                "affection": 3,
+                "memory": "Evlilikten söz etti ama acele etmemeyi kabul etti",
+                "importance": 52,
+                "decay": 2
+              },
+              {
+                "type": "schedule_event",
+                "eventId": "leyla_courtship",
+                "minDays": 60,
+                "maxDays": 110
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "story_thread",
+                "thread": "leyla_romance",
+                "status": "dostluk"
+              },
+              {
+                "type": "npc_relation",
+                "npc": "leyla",
+                "affection": -3,
+                "trust": 1,
+                "memory": "Evlilik teklifini kabul etmedim ama ilişkiyi koparmadık",
+                "importance": 45,
+                "decay": 2
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "story_thread",
+                "thread": "leyla_romance",
+                "status": "soğuyan yakınlık"
+              },
+              {
+                "type": "npc_relation",
+                "npc": "leyla",
+                "affection": -8,
+                "trust": -4,
+                "suspicion": 3,
+                "memory": "Beni acele bir karara zorladı",
+                "importance": 62,
+                "decay": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "not_ready",
+          "title": "Henüz hazır olmadığını söyle",
+          "hint": "İlişkiyi bitirmeden evliliği ertelersin.",
+          "resultText": "Leyla cevabını kabul etti. Yakınlığınız sürüyor ama yolun nereye gideceği belirsiz.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "story_thread",
+              "thread": "leyla_romance",
+              "status": "bekleyen yakınlık"
+            },
+            {
+              "type": "npc_relation",
+              "npc": "leyla",
+              "trust": 3,
+              "affection": 2,
+              "memory": "Hazır olmadığını dürüstçe söyledi",
+              "importance": 42,
+              "decay": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "halil_acquaintance",
+      "category": "personal",
+      "title": "Liman Tüccarı Halil",
+      "body": "Antalya limanında Halil Tüccar'la birkaç iş vesilesiyle karşılaşıyorsun. Bir akşam gemilerin hareketini izlerken sohbetiniz ticaretin dışına taşıyor. Aranızdaki tanışıklığın başka bir yöne gitmesi mümkün.",
+      "weight": 38,
+      "major": false,
+      "cooldownDays": 999,
+      "chainId": "halil_romance",
+      "chainStage": 1,
+      "conditions": [
+        {
+          "type": "city_is",
+          "value": "antalya"
+        },
+        {
+          "type": "player_gender_is",
+          "value": "female"
+        },
+        {
+          "type": "player_no_spouse"
+        },
+        {
+          "type": "thread_not_set",
+          "thread": "halil_romance"
+        },
+        {
+          "type": "npc_alive",
+          "npc": "halil"
+        },
+        {
+          "type": "npc_unmarried",
+          "npc": "halil"
+        },
+        {
+          "type": "npc_in_current_city",
+          "npc": "halil"
+        }
+      ],
+      "tags": [
+        "personal",
+        "romance",
+        "social"
+      ],
+      "choices": [
+        {
+          "id": "closer",
+          "title": "Sohbeti sürdür",
+          "hint": "Yakınlaşmayı doğal akışına bırak.",
+          "resultText": "Sohbet uzadı. Halil seni yalnız limandaki tanıdıklardan biri olarak görmemeye başladı.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "halil",
+              "trust": 4,
+              "affection": 8,
+              "respect": 3,
+              "memory": "İş bittikten sonra benimle kalıp uzun uzun konuştu",
+              "importance": 55,
+              "decay": 2,
+              "tags": [
+                "romance"
+              ]
+            },
+            {
+              "type": "story_thread",
+              "thread": "halil_romance",
+              "status": "yakınlık"
+            },
+            {
+              "type": "schedule_event",
+              "eventId": "halil_courtship",
+              "minDays": 50,
+              "maxDays": 100
+            }
+          ]
+        },
+        {
+          "id": "friend",
+          "title": "Dostça ama mesafeli kal",
+          "hint": "Yakınlığı dostluk sınırında tutarsın.",
+          "resultText": "Halil'le iyi bir tanışıklık kurdun fakat ilişkinin yönünü özellikle değiştirmedin.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "npc_relation",
+              "npc": "halil",
+              "trust": 4,
+              "respect": 4,
+              "affection": 2,
+              "memory": "Benimle samimi ama ölçülü konuştu",
+              "importance": 35,
+              "decay": 3
+            },
+            {
+              "type": "story_thread",
+              "thread": "halil_romance",
+              "status": "dostça tanışıklık"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "halil_courtship",
+      "category": "personal",
+      "title": "Halil'in Gelecek Sorusu",
+      "body": "Bir süredir aranızdaki yakınlık devam ediyor. Halil bu kez doğrudan, yolculuklarla dolu bir hayat mı yoksa birlikte kurulacak bir hane mi istediğini soruyor.",
+      "weight": 100,
+      "major": false,
+      "cooldownDays": 999,
+      "scheduledOnly": true,
+      "chainId": "halil_romance",
+      "chainStage": 2,
+      "conditions": [
+        {
+          "type": "thread_status",
+          "thread": "halil_romance",
+          "value": "yakınlık"
+        },
+        {
+          "type": "player_no_spouse"
+        },
+        {
+          "type": "npc_unmarried",
+          "npc": "halil"
+        },
+        {
+          "type": "npc_alive",
+          "npc": "halil"
+        }
+      ],
+      "tags": [
+        "personal",
+        "romance",
+        "family"
+      ],
+      "choices": [
+        {
+          "id": "marry",
+          "title": "Onunla hayat kurmak istediğini söyle",
+          "hint": "Yakınlığı evliliğe dönüştürmeyi dene.",
+          "resultText": "Halil teklifini kabul etti. İkinizin hikâyesi artık aynı hanenin hikâyesi.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "marry_npc",
+              "npc": "halil",
+              "thread": "halil_romance"
+            },
+            {
+              "type": "npc_relation",
+              "npc": "halil",
+              "trust": 8,
+              "affection": 12,
+              "respect": 5,
+              "memory": "Benimle bir hayat kurmayı açıkça seçti",
+              "importance": 100,
+              "decay": 0,
+              "permanent": true,
+              "tags": [
+                "marriage",
+                "permanent"
+              ]
+            },
+            {
+              "type": "queue_story",
+              "storyId": "story_named_marriage"
+            }
+          ],
+          "challenge": {
+            "attribute": "rhetoric",
+            "skill": "diplomacy",
+            "difficulty": 35,
+            "partialText": "Halil duygularını reddetmedi ama evlilik için biraz daha zaman istedi.",
+            "failureText": "Halil sana değer verdiğini ama evlilik için hazır olmadığını söyledi.",
+            "criticalFailureText": "Konuşma beklediğinden sert geçti; yakınlığınız soğudu.",
+            "partialEffects": [
+              {
+                "type": "npc_relation",
+                "npc": "halil",
+                "trust": 2,
+                "affection": 3,
+                "memory": "Evlilikten söz etti ama acele etmemeyi kabul etti",
+                "importance": 52,
+                "decay": 2
+              },
+              {
+                "type": "schedule_event",
+                "eventId": "halil_courtship",
+                "minDays": 60,
+                "maxDays": 110
+              }
+            ],
+            "failureEffects": [
+              {
+                "type": "story_thread",
+                "thread": "halil_romance",
+                "status": "dostluk"
+              },
+              {
+                "type": "npc_relation",
+                "npc": "halil",
+                "affection": -3,
+                "trust": 1,
+                "memory": "Evlilik teklifini kabul etmedim ama ilişkiyi koparmadık",
+                "importance": 45,
+                "decay": 2
+              }
+            ],
+            "criticalFailureEffects": [
+              {
+                "type": "story_thread",
+                "thread": "halil_romance",
+                "status": "soğuyan yakınlık"
+              },
+              {
+                "type": "npc_relation",
+                "npc": "halil",
+                "affection": -8,
+                "trust": -4,
+                "suspicion": 3,
+                "memory": "Beni acele bir karara zorladı",
+                "importance": 62,
+                "decay": 1
+              }
+            ]
+          }
+        },
+        {
+          "id": "not_ready",
+          "title": "Henüz hazır olmadığını söyle",
+          "hint": "İlişkiyi bitirmeden evliliği ertelersin.",
+          "resultText": "Halil cevabını kabul etti. Yakınlığınız sürüyor ama yolun nereye gideceği belirsiz.",
+          "requirements": [],
+          "effects": [
+            {
+              "type": "story_thread",
+              "thread": "halil_romance",
+              "status": "bekleyen yakınlık"
+            },
+            {
+              "type": "npc_relation",
+              "npc": "halil",
+              "trust": 3,
+              "affection": 2,
+              "memory": "Hazır olmadığını dürüstçe söyledi",
+              "importance": 42,
+              "decay": 2
             }
           ]
         }
