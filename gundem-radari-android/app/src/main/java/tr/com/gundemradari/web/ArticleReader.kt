@@ -182,8 +182,7 @@ class ArticleReader {
             "[class*=articleBody] p","[class*=article-body] p",
             "[class*=articleContent] p","[class*=article-content] p",
             "[class*=storyBody] p","[class*=story-body] p",
-            "[data-testid*=article] p",
-            "main p"
+            "[data-testid*=article] p"
         ).joinToString(",")
 
         val selectedParas=working.select(combinedSelector)
@@ -196,10 +195,24 @@ class ArticleReader {
 
         val denseParas=bestDenseContainerParagraphs(working)
 
+        val mainParas=if(
+            structuredParas.isEmpty() &&
+            selectedParas.size<2
+        ){
+            working.select("main p").asSequence()
+                .map{cleanResearchText(it.text())}
+                .filter(::usableParagraph)
+                .filterNot(::looksLikePeripheralParagraph)
+                .distinctBy(::normalizeForDedup)
+                .take(24)
+                .toList()
+        }else emptyList()
+
         val broadParas=if(
             structuredParas.isEmpty() &&
             selectedParas.size<2 &&
-            denseParas.size<2
+            denseParas.size<2 &&
+            mainParas.size<2
         ){
             working.select("p").asSequence()
                 .map{cleanResearchText(it.text())}
@@ -210,7 +223,7 @@ class ArticleReader {
                 .toList()
         }else emptyList()
 
-        val paras=(structuredParas+selectedParas+denseParas+broadParas)
+        val paras=(structuredParas+selectedParas+denseParas+mainParas+broadParas)
             .filterNot(::looksLikePeripheralParagraph)
             .distinctBy(::normalizeForDedup)
             .take(34)
