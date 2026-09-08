@@ -34,11 +34,14 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Unpack project
+      - name: Reconstruct and unpack project
+        shell: bash
         run: |
+          cat .ci/kazanim_zip_b64/part-01 .ci/kazanim_zip_b64/part-02 .ci/kazanim_zip_b64/part-03 .ci/kazanim_zip_b64/part-04 | base64 --decode > Kazanim_v1_Kaynak.fixed.zip
+          unzip -t Kazanim_v1_Kaynak.fixed.zip
           rm -rf buildsrc
           mkdir -p buildsrc
-          unzip -q Kazanim_v1_Kaynak.zip -d buildsrc
+          unzip -q Kazanim_v1_Kaynak.fixed.zip -d buildsrc
 
       - name: Build debug APK
         working-directory: buildsrc/Kazanim_v1
