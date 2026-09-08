@@ -233,6 +233,12 @@ class ArticleReader {
         )
     }
 
+    internal fun extractHtmlForTest(
+        html:String,
+        baseUrl:String="https://example.com/haber"
+    ):ArticleDetails=
+        extractDetails(Jsoup.parse(html,baseUrl))
+
     private fun bestDenseContainerParagraphs(doc:Document):List<String>{
         val candidates=doc.select(
             "article,main,[role=main],[itemprop=articleBody],"+
@@ -374,8 +380,14 @@ private fun looksLikeArticleObject(obj:JSONObject):Boolean{
     } || jsonString(obj,"articleBody").length>=180
 }
 
-private fun jsonString(obj:JSONObject,key:String):String=
-    obj.optString(key,"").let(::cleanResearchText)
+private fun jsonString(obj:JSONObject,key:String):String{
+    val raw=obj.optString(key,"")
+    if(raw.isBlank())return ""
+    val plain=if(raw.contains("<") && raw.contains(">")){
+        Jsoup.parse(raw).text()
+    }else raw
+    return cleanResearchText(plain)
+}
 
 private fun structuredBodyParagraphs(body:String):List<String>{
     val clean=body
@@ -411,6 +423,12 @@ private fun parseArticleDate(raw:String):Long?{
     }
     runCatching{
         return ZonedDateTime.parse(clean).toInstant().toEpochMilli()
+    }
+    runCatching{
+        return ZonedDateTime
+            .parse(clean,DateTimeFormatter.RFC_1123_DATE_TIME)
+            .toInstant()
+            .toEpochMilli()
     }
 
     val localPatterns=listOf(
