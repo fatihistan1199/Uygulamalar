@@ -28,7 +28,12 @@ class ScanCoordinator(private val db:AppDatabase){
                     cleanupOldReligion(started)
 
                     val sources=dao.scanSources(started)
-                    val mainSources=sources.filterNot{
+                    val coreNewsSources=sources.filter{
+                        it.groupName=="turkey" || it.groupName=="world_tr"
+                    }
+                    val supportingSources=sources.filterNot{
+                        it.groupName=="turkey" ||
+                        it.groupName=="world_tr" ||
                         it.groupName=="religion_direct" ||
                         it.groupName=="religion_search"
                     }
@@ -87,14 +92,20 @@ class ScanCoordinator(private val db:AppDatabase){
 
                     // 1) Türkiye/Dünya ve genel erken sinyaller tamamlanmadan
                     // Din taraması başlamaz.
-                    val mainFetched=processStage(
-                        mainSources,
+                    val coreNewsFetched=processStage(
+                        coreNewsSources,
                         "Türkiye ve dünya gündemi taranıyor"
                     )
 
-                    // Ana kaynaklar gerçekten haber döndürdüyse Din aşamasına geç.
-                    // Yeni kayıt şart değildir; var olan güncel haberlerin bulunması yeterlidir.
-                    if(mainFetched>0){
+                    // Din aşamasını yalnız Türkiye/Dünya haber kaynakları açabilir.
+                    // Yeni kayıt şart değildir; güncel akışın sonuç döndürmesi yeterlidir.
+                    if(coreNewsFetched>0){
+                        // Genel sosyal/erken sinyal kaynakları ana haberlerden sonra işlenir.
+                        processStage(
+                            supportingSources,
+                            "Ek gündem kaynakları taranıyor"
+                        )
+
                         // 2) Genel Din gündemi.
                         processStage(
                             religionDirect,
@@ -107,7 +118,7 @@ class ScanCoordinator(private val db:AppDatabase){
                             "Takip edilen kişiler aranıyor"
                         )
                     }else{
-                        onProgress("Ana gündemden sonuç alınamadı; Din taraması ertelendi")
+                        onProgress("Türkiye/Dünya haberleri alınamadı; Din taraması ertelendi")
                     }
 
                     dao.scan(
