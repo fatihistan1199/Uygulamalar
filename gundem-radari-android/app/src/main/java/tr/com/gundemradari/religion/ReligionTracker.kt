@@ -72,16 +72,18 @@ object ReligionTracker {
 
     // Cübbeli Ahmet gibi birden fazla yaygın adlandırması olan kişiler için
     // ikinci ad da bağımsız aranır; sonuçlar URL bazında tekilleştirilir.
-    val searchQueries=profiles
-        .flatMap{profile->
+    val titleKeywordQueries=listOf("tarikat","cemaat")
+
+    val searchQueries=(
+        profiles.flatMap{profile->
             buildList{
                 add(profile.name)
                 profile.aliases
                     .filterNot{it.equals(profile.name,true)}
                     .forEach{add(it)}
             }
-        }
-        .distinct()
+        } + titleKeywordQueries
+    ).distinct()
 
     fun cutoff(now:Long=System.currentTimeMillis()):Long=
         now-RELIGION_MAX_AGE_MS
@@ -102,25 +104,12 @@ object ReligionTracker {
         .trim()
 }
 
-object ReligionTopicFilter {
+object ReligionTitleKeywordFilter {
     private val locale=Locale("tr","TR")
 
-    private val strongTerms=listOf(
-        "kur'an","kuran","ayet","sure","hadis","sünnet","tefsir","fıkıh","fikih",
-        "akaid","kelam","ilahiyat","islâm","islam","müslüman","müslümanlık",
-        "namaz","oruç","ramazan","hac","umre","zekât","zekat","kurban",
-        "cami","mescit","hutbe","vaaz","imam","müftü","müftülük","diyanet",
-        "fetva","dua","peygamber","sahabe","mezhep","tarikat","tasavvuf",
-        "şeriat","helal","haram","caiz","kandil","mevlid","ezan","abdest",
-        "cenaze namazı","nikâh","nikah","hafız","hafizlik","hafızlık",
-        "kur'an kursu","kuran kursu","din görevlisi","dini nikah","dinî nikâh"
-    )
-
-    private val supportingTerms=listOf(
-        "dinî","dini","inanç","iman","ibadet","manevi","maneviyat","ahlak",
-        "ahlâk","cemaat","itikad","itikât","mukabele","mahya","minare",
-        "müezzin","kıble","secde","oruclu","oruçlu","iftar","sahur",
-        "bayram namazı","cuma namazı","cuma hutbesi","kutsal","vahiy"
+    private val patterns=linkedMapOf(
+        "tarikat" to Regex("""\btarikat\p{L}*\b"""),
+        "cemaat" to Regex("""\bcemaat\p{L}*\b""")
     )
 
     private fun normalize(text:String)=text
@@ -129,27 +118,15 @@ object ReligionTopicFilter {
         .replace(Regex("\\s+")," ")
         .trim()
 
-    private fun countDistinct(text:String,terms:List<String>):Int=
-        terms.count{term->text.contains(term)}
-
-    fun isRelevant(title:String,summary:String):Boolean{
-        val titleN=normalize(title)
-        val summaryN=normalize(summary)
-
-        val titleStrong=countDistinct(titleN,strongTerms)
-        if(titleStrong>=1)return true
-
-        val titleSupport=countDistinct(titleN,supportingTerms)
-        if(titleSupport>=2)return true
-
-        val bodyStrong=countDistinct(summaryN,strongTerms)
-        val bodySupport=countDistinct(summaryN,supportingTerms)
-
-        // Özet tek başına daha sık gürültü taşıdığı için burada daha sıkı eşik.
-        return bodyStrong>=2 ||
-            (bodyStrong>=1 && bodySupport>=1) ||
-            bodySupport>=3
+    fun matchedKeyword(title:String):String?{
+        val normalized=normalize(title)
+        return patterns.entries
+            .firstOrNull{(_,pattern)->pattern.containsMatchIn(normalized)}
+            ?.key
     }
+
+    fun matches(title:String):Boolean=
+        matchedKeyword(title)!=null
 }
 
 data class ReligionMatch(
@@ -175,12 +152,28 @@ object ReligionWatchEngine {
         ReligionTracker.profileFor(title,summary)?.name
 
     fun evaluate(source:SourceEntity,title:String,summary:String):ReligionMatch{
-        val person=matchedPerson(title,summary) ?: return ReligionMatch(false,0,null)
+        val person=matchedPerson(title,summary)
+        val titleKeyword=ReligionTitleKeywordFilter.matchedKeyword(title)
+
+        if(person==null && titleKeyword==null){
+            return ReligionMatch(false,0,null)
+        }
+
         val titleN=normalize(title)
-        val direct=directSpeech.any{titleN.contains(it)} ||
+        val direct=person!=null && (
+            directSpeech.any{titleN.contains(it)} ||
             title.contains(":") ||
             title.contains("\"") ||
             source.kind=="religion_youtube"
-        return ReligionMatch(true,if(direct)3 else 2,person)
+        )
+
+        val priority=when{
+            direct->3
+            person!=null->2
+            titleKeyword!=null->2
+            else->0
+        }
+
+        return ReligionMatch(true,priority,person)
     }
 }
