@@ -98,4 +98,28 @@ class ResearchSummaryQualityTest {
         assertTrue(summary.whyImportant.isNotEmpty())
     }
 
+
+    @Test
+    fun publisherDescriptionPreventsEmptyWhatHappened(){
+        val article=ResearchedArticle(
+            sourceName="Doğrudan yayıncı",
+            title="İsrafil Balcı yeni açıklamada bulundu",
+            url="https://example.com/d",
+            description="İlahiyatçı İsrafil Balcı, yaptığı konuşmada tartışılan konuya ilişkin görüşlerini açıkladı ve önceki değerlendirmelerine açıklık getirdi.",
+            paragraphs=emptyList(),
+            publishedAt=4L,
+            isPrimary=true,
+            quality=70.0
+        )
+
+        val summary=summarizeResearch(
+            eventTitle="İsrafil Balcı'dan yeni açıklama",
+            eventSummary="",
+            articles=listOf(article)
+        )
+
+        assertTrue(summary.whatHappened.isNotEmpty())
+        assertTrue(summary.whatHappened.first().contains("İsrafil Balcı"))
+    }
+
 }
