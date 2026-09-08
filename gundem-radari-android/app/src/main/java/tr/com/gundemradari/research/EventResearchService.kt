@@ -1,19 +1,19 @@
 package tr.com.gundemradari.research
 
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import tr.com.gundemradari.data.EventEnrichmentEntity
 import tr.com.gundemradari.data.EventEntity
 import tr.com.gundemradari.data.GundemDao
+import tr.com.gundemradari.data.ResearchItemRow
 import tr.com.gundemradari.web.ArticleReader
 import tr.com.gundemradari.web.NewsWebSearch
 import tr.com.gundemradari.web.ResearchedArticle
-import tr.com.gundemradari.web.summarizeResearch
-import tr.com.gundemradari.web.webSourceQuality
+import tr.com.gundemradari.web.articleContentQuality
 import tr.com.gundemradari.web.cleanResearchText
 import tr.com.gundemradari.web.isUsefulResearchText
+import tr.com.gundemradari.web.summarizeResearch
+import tr.com.gundemradari.web.webSourceQuality
 import java.util.concurrent.ConcurrentHashMap
 
 data class EventResearchReport(
@@ -37,138 +37,50 @@ class EventResearchService(
         val report:EventResearchReport
     )
 
+    private data class LoadedArticle(
+        val article:ResearchedArticle,
+        val contentScore:Double
+    )
+
     private val cache=ConcurrentHashMap<String,CachedReport>()
 
-    suspend fun build(event:EventEntity):EventResearchReport{
+    suspend fun build(
+        event:EventEntity,
+        forceRefresh:Boolean=false
+    ):EventResearchReport{
         val now=System.currentTimeMillis()
-        cache[event.id]?.let{cached->
-            if(
-                cached.eventUpdatedAt==event.updatedAt &&
-                now-cached.createdAt<10L*60*1000
-            ){
-                return cached.report
+        val localEvent=!event.id.startsWith("websearch:")
+
+        if(!forceRefresh){
+            cache[event.id]?.let{cached->
+                if(
+                    cached.eventUpdatedAt==event.updatedAt &&
+                    now-cached.createdAt<10L*60*1000
+                ){
+                    return cached.report
+                }
+            }
+
+            if(localEvent){
+                dao.enrichment(event.id)?.let{saved->
+                    if(
+                        saved.enrichedAt>=event.updatedAt &&
+                        saved.shortSummary.isNotBlank()
+                    ){
+                        val report=reportFromSaved(event,saved)
+                        cache[event.id]=CachedReport(now,event.updatedAt,report)
+                        return report
+                    }
+                }
             }
         }
 
         val report=withContext(Dispatchers.Default){
-            coroutineScope{
-        val rows=dao.researchItems(event.id)
-        val times=rows.map{it.publishedAt?:it.firstSeenAt}
-        val bestRows=rows.sortedByDescending{it.trust}
-        val query=bestRows.firstOrNull{it.originalTitle.isNotBlank()}?.originalTitle ?: event.title
-
-        val primaryArticles=bestRows.distinctBy{it.url}.take(3).mapIndexed{index,row->
-            async{
-                articleReader.read(row.url)?.let{d->
-                    ResearchedArticle(
-                        sourceName=row.sourceName,
-                        title=d.title.ifBlank{row.title},
-                        url=d.finalUrl.ifBlank{row.url},
-                        description=cleanResearchText(d.description)
-                            .takeIf(::isUsefulResearchText)
-                            ?: cleanResearchText(row.summary)
-                                .takeIf(::isUsefulResearchText)
-                            ?: "",
-                        paragraphs=d.paragraphs,
-                        publishedAt=row.publishedAt,
-                        isPrimary=index==0,
-                        quality=row.trust
-                    )
-                } ?: ResearchedArticle(
-                    sourceName=row.sourceName,title=row.title,url=row.url,
-                    description=cleanResearchText(row.summary)
-                        .takeIf(::isUsefulResearchText)
-                        ?: "",
-                    paragraphs=emptyList(),publishedAt=row.publishedAt,
-                    isPrimary=index==0,quality=row.trust
-                )
-            }
-        }.awaitAll()
-
-        val webResults=runCatching{
-            webSearch.search(query,limit=7,expandDescriptions=false)
-        }.getOrElse{emptyList()}
-
-        val webArticles=webResults
-            .filter{wr->primaryArticles.none{it.title.equals(wr.title,true)}}
-            .take(3)
-            .map{wr->
-                async{
-                    articleReader.read(wr.url)?.let{d->
-                        ResearchedArticle(
-                            sourceName=wr.source.ifBlank{d.host.ifBlank{"Web kaynağı"}},
-                            title=d.title.ifBlank{wr.title},
-                            url=d.finalUrl.ifBlank{wr.url},
-                            description=cleanResearchText(d.description)
-                                .takeIf(::isUsefulResearchText)
-                                ?: cleanResearchText(wr.snippet)
-                                    .takeIf(::isUsefulResearchText)
-                                ?: "",
-                            paragraphs=d.paragraphs,
-                            publishedAt=wr.publishedAt,
-                            isPrimary=false,
-                            quality=webSourceQuality(
-                                wr.source.ifBlank{d.host},
-                                d.finalUrl.ifBlank{wr.url}
-                            )
-                        )
-                    } ?: ResearchedArticle(
-                        sourceName=wr.source.ifBlank{"Web kaynağı"},title=wr.title,url=wr.url,
-                        description=cleanResearchText(wr.snippet)
-                            .takeIf(::isUsefulResearchText)
-                            ?: "",
-                        paragraphs=emptyList(),publishedAt=wr.publishedAt,
-                        isPrimary=false,
-                        quality=webSourceQuality(wr.source,wr.url)
-                    )
-                }
-            }.awaitAll()
-
-        val allArticles=(primaryArticles+webArticles)
-            .filter{
-                it.title.isNotBlank() ||
-                it.description.isNotBlank() ||
-                it.paragraphs.isNotEmpty()
-            }
-            .distinctBy{it.url}
-            .take(7)
-
-        val summary=summarizeResearch(
-            eventTitle=event.title,
-            eventSummary=event.summary,
-            articles=allArticles
-        )
-
-        val realPublisherArticles=allArticles.filterNot{
-            val name=it.sourceName.lowercase()
-            name.contains("din takip kişileri") ||
-            name.contains("google news")
-        }
-        val displayPool=if(realPublisherArticles.size>=2){
-            realPublisherArticles
-        }else{
-            allArticles
+            buildFresh(event)
         }
 
-        val visible=displayPool
-            .sortedWith(
-                compareByDescending<ResearchedArticle>{it.quality}
-                    .thenByDescending{it.description.length+it.paragraphs.sumOf{p->p.length}}
-            )
-            .distinctBy{it.sourceName.lowercase()}
-            .take(2)
-            .mapIndexed{index,a->a.copy(isPrimary=index==0)}
-
-        EventResearchReport(
-            event=event,
-            whatHappened=summary.whatHappened,
-            whyImportant=summary.whyImportant,
-            latestSituation=summary.latestSituation,
-            displayArticles=visible,
-            firstAt=times.minOrNull(),
-            latestAt=times.maxOrNull()
-        )
-            }
+        if(localEvent && report.whatHappened.isNotEmpty()){
+            persist(event,report)
         }
 
         cache[event.id]=CachedReport(
@@ -176,14 +88,261 @@ class EventResearchService(
             eventUpdatedAt=event.updatedAt,
             report=report
         )
+        trimCache()
+        return report
+    }
 
-        if(cache.size>32){
-            val oldest=cache.entries
-                .sortedBy{it.value.createdAt}
-                .take(cache.size-24)
-            oldest.forEach{cache.remove(it.key)}
+    suspend fun enrichIfNeeded(eventId:String):Boolean{
+        val event=dao.event(eventId)?:return false
+        val saved=dao.enrichment(eventId)
+
+        if(
+            saved!=null &&
+            saved.enrichedAt>=event.updatedAt &&
+            saved.shortSummary.isNotBlank()
+        ){
+            return false
         }
 
-        return report
+        val report=build(event,forceRefresh=true)
+        return report.whatHappened.isNotEmpty()
+    }
+
+    private suspend fun buildFresh(event:EventEntity):EventResearchReport{
+        val rows=dao.researchItems(event.id)
+        val times=rows.map{it.publishedAt?:it.firstSeenAt}
+        val rankedRows=rows
+            .distinctBy{it.url}
+            .sortedWith(
+                compareByDescending<ResearchItemRow>{it.trust}
+                    .thenByDescending{it.summary.length}
+                    .thenByDescending{it.publishedAt?:it.firstSeenAt}
+            )
+
+        var best:LoadedArticle?=null
+
+        // Teyit için paralel çoklu okuma yok. İlk güçlü yayıncı sayfası yeterliyse dur.
+        for(row in rankedRows.take(2)){
+            val loaded=loadRow(row)
+            if(best==null || loaded.contentScore>best!!.contentScore){
+                best=loaded
+            }
+            if(loaded.contentScore>=55.0)break
+        }
+
+        val query=rankedRows
+            .firstOrNull{it.originalTitle.isNotBlank()}
+            ?.originalTitle
+            ?:event.title
+
+        // Mevcut kaynaklar içerik vermediyse web araması yalnız teknik yedek olarak devreye girer.
+        if(best==null || best!!.contentScore<28.0){
+            val webResults=runCatching{
+                webSearch.search(query,limit=4,expandDescriptions=false)
+            }.getOrElse{emptyList()}
+
+            for(row in webResults.take(2)){
+                val details=articleReader.read(row.url)
+                val contentScore=details?.let(::articleContentQuality)?:0.0
+
+                val article=if(details!=null){
+                    val sourceQuality=webSourceQuality(
+                        row.source.ifBlank{details.host},
+                        details.finalUrl.ifBlank{row.url}
+                    )*100.0
+                    ResearchedArticle(
+                        sourceName=row.source.ifBlank{details.host.ifBlank{"Web kaynağı"}},
+                        title=details.title.ifBlank{row.title},
+                        url=details.finalUrl.ifBlank{row.url},
+                        description=cleanResearchText(details.description)
+                            .takeIf(::isUsefulResearchText)
+                            ?:cleanResearchText(row.snippet)
+                                .takeIf(::isUsefulResearchText)
+                            ?:"",
+                        paragraphs=details.paragraphs,
+                        publishedAt=row.publishedAt,
+                        isPrimary=true,
+                        quality=(sourceQuality*0.30+contentScore*0.70)
+                            .coerceIn(0.0,100.0)
+                    )
+                }else{
+                    ResearchedArticle(
+                        sourceName=row.source.ifBlank{"Web kaynağı"},
+                        title=row.title,
+                        url=row.url,
+                        description=cleanResearchText(row.snippet)
+                            .takeIf(::isUsefulResearchText)
+                            ?:"",
+                        paragraphs=emptyList(),
+                        publishedAt=row.publishedAt,
+                        isPrimary=true,
+                        quality=webSourceQuality(row.source,row.url)*100.0
+                    )
+                }
+
+                val candidate=LoadedArticle(article,contentScore)
+                if(best==null || candidate.contentScore>best!!.contentScore){
+                    best=candidate
+                }
+                if(contentScore>=55.0)break
+            }
+        }
+
+        if(best==null && rankedRows.isNotEmpty()){
+            best=LoadedArticle(
+                rowFallback(rankedRows.first()),
+                8.0
+            )
+        }
+
+        val articles=listOfNotNull(best?.article)
+        val summary=summarizeResearch(
+            eventTitle=event.title,
+            eventSummary=event.summary,
+            articles=articles
+        )
+
+        return EventResearchReport(
+            event=event,
+            whatHappened=summary.whatHappened,
+            whyImportant=summary.whyImportant,
+            latestSituation=summary.latestSituation,
+            displayArticles=articles.take(1),
+            firstAt=times.minOrNull(),
+            latestAt=times.maxOrNull()
+        )
+    }
+
+    private suspend fun loadRow(row:ResearchItemRow):LoadedArticle{
+        val details=articleReader.read(row.url)
+
+        if(details==null){
+            return LoadedArticle(
+                article=rowFallback(row),
+                contentScore=if(isUsefulResearchText(row.summary))10.0 else 0.0
+            )
+        }
+
+        val contentScore=articleContentQuality(details)
+        val sourceQuality=(row.trust*100.0).coerceIn(0.0,100.0)
+
+        return LoadedArticle(
+            article=ResearchedArticle(
+                sourceName=row.sourceName,
+                title=details.title.ifBlank{row.title},
+                url=details.finalUrl.ifBlank{row.url},
+                description=cleanResearchText(details.description)
+                    .takeIf(::isUsefulResearchText)
+                    ?:cleanResearchText(row.summary)
+                        .takeIf(::isUsefulResearchText)
+                    ?:"",
+                paragraphs=details.paragraphs,
+                publishedAt=row.publishedAt,
+                isPrimary=true,
+                quality=(sourceQuality*0.30+contentScore*0.70)
+                    .coerceIn(0.0,100.0)
+            ),
+            contentScore=contentScore
+        )
+    }
+
+    private fun rowFallback(row:ResearchItemRow)=ResearchedArticle(
+        sourceName=row.sourceName,
+        title=row.title,
+        url=row.url,
+        description=cleanResearchText(row.summary)
+            .takeIf(::isUsefulResearchText)
+            ?:"",
+        paragraphs=emptyList(),
+        publishedAt=row.publishedAt,
+        isPrimary=true,
+        quality=(row.trust*100.0).coerceIn(0.0,100.0)
+    )
+
+    private suspend fun persist(
+        event:EventEntity,
+        report:EventResearchReport
+    ){
+        val source=report.displayArticles.firstOrNull()
+        val shortSummary=(
+            report.whatHappened.joinToString(" ")
+                .ifBlank{source?.description.orEmpty()}
+                .ifBlank{event.summary}
+        )
+            .replace(Regex("\\s+")," ")
+            .trim()
+            .take(460)
+
+        if(shortSummary.isBlank())return
+
+        val quality=source?.quality?:event.bestContentQuality
+        val now=System.currentTimeMillis()
+
+        dao.putEnrichment(
+            EventEnrichmentEntity(
+                eventId=event.id,
+                sourceName=source?.sourceName.orEmpty(),
+                sourceUrl=source?.url.orEmpty(),
+                sourceTitle=source?.title.orEmpty(),
+                shortSummary=shortSummary,
+                whatHappened=pack(report.whatHappened),
+                whyImportant=pack(report.whyImportant),
+                latestSituation=pack(report.latestSituation),
+                contentQuality=quality,
+                enrichedAt=now
+            )
+        )
+
+        dao.updateEnrichedSummary(
+            eventId=event.id,
+            summary=shortSummary,
+            quality=quality
+        )
+    }
+
+    private suspend fun reportFromSaved(
+        event:EventEntity,
+        saved:EventEnrichmentEntity
+    ):EventResearchReport{
+        val rows=dao.researchItems(event.id)
+        val times=rows.map{it.publishedAt?:it.firstSeenAt}
+        val source=if(saved.sourceUrl.isNotBlank()){
+            listOf(
+                ResearchedArticle(
+                    sourceName=saved.sourceName.ifBlank{"Kaynak"},
+                    title=saved.sourceTitle,
+                    url=saved.sourceUrl,
+                    description=saved.shortSummary,
+                    paragraphs=emptyList(),
+                    publishedAt=null,
+                    isPrimary=true,
+                    quality=saved.contentQuality
+                )
+            )
+        }else emptyList()
+
+        return EventResearchReport(
+            event=event.copy(summary=saved.shortSummary),
+            whatHappened=unpack(saved.whatHappened),
+            whyImportant=unpack(saved.whyImportant),
+            latestSituation=unpack(saved.latestSituation),
+            displayArticles=source,
+            firstAt=times.minOrNull(),
+            latestAt=times.maxOrNull()
+        )
+    }
+
+    private fun pack(lines:List<String>):String=
+        lines.map{it.trim()}.filter{it.isNotBlank()}.joinToString("\n")
+
+    private fun unpack(value:String):List<String>=
+        value.lineSequence().map{it.trim()}.filter{it.isNotBlank()}.toList()
+
+    private fun trimCache(){
+        if(cache.size<=32)return
+        val oldest=cache.entries
+            .sortedBy{it.value.createdAt}
+            .take(cache.size-24)
+        oldest.forEach{cache.remove(it.key)}
     }
 }
