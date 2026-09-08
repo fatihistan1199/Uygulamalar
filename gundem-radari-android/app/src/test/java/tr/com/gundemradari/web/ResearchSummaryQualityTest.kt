@@ -122,4 +122,123 @@ class ResearchSummaryQualityTest {
         assertTrue(summary.whatHappened.first().contains("İsrafil Balcı"))
     }
 
+
+    @Test
+    fun jsonLdArticleBodyIsExtracted(){
+        val html="""
+            <html>
+            <head>
+              <script type="application/ld+json">
+              {
+                "@context":"https://schema.org",
+                "@type":"NewsArticle",
+                "headline":"Örnek haber başlığı",
+                "description":"Örnek olayla ilgili yeterince uzun ve açıklayıcı bir haber özeti burada yer alıyor.",
+                "datePublished":"2026-09-08T12:30:00+03:00",
+                "articleBody":"Yetkililer olayın sabah saatlerinde başladığını ve ekiplerin bölgeye sevk edildiğini açıkladı. Çalışmaların gün boyunca sürdüğü, ulaşımın ise kontrollü biçimde sağlandığı bildirildi."
+              }
+              </script>
+            </head>
+            <body>
+              <div class="related-news">
+                <p>İlgili haberler bölümünde başka bir spor ve magazin haberi yer alıyor.</p>
+              </div>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val details=ArticleReader().extractHtmlForTest(html)
+
+        assertTrue(details.title.contains("Örnek haber başlığı"))
+        assertTrue(details.paragraphs.joinToString(" ").contains("Yetkililer olayın"))
+        assertFalse(details.paragraphs.joinToString(" ").contains("İlgili haberler"))
+        assertTrue(details.publishedAt!=null)
+    }
+
+    @Test
+    fun densePublisherBodyBeatsPeripheralText(){
+        val html="""
+            <html>
+            <head><title>Test haber</title></head>
+            <body>
+              <aside>
+                <p>Bu kenar alanında başka içeriklere yönlendiren uzun bir tanıtım metni bulunuyor ve haber gövdesi değildir.</p>
+                <p>Bu bölümde kullanıcıyı başka sayfalara götüren ikinci bir öneri metni daha yer alıyor.</p>
+              </aside>
+              <div class="article-content">
+                <p>Belediye ekipleri sabah saatlerinde başlayan arızaya müdahale ederek ana hattaki çalışmayı tamamladı.</p>
+                <p>Yetkililer, hizmetin kademeli biçimde normale döndüğünü ve ek kontrollerin gün içinde süreceğini açıkladı.</p>
+              </div>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val details=ArticleReader().extractHtmlForTest(html)
+
+        val joined=details.paragraphs.joinToString(" ")
+        assertTrue(joined.contains("Belediye ekipleri"))
+        assertTrue(joined.contains("hizmetin kademeli"))
+        assertFalse(joined.contains("kenar alanında"))
+    }
+
+    @Test
+    fun summarySeparatesEventImpactAndLatestState(){
+        val article=ResearchedArticle(
+            sourceName="Yayıncı",
+            title="Yeni ulaşım düzenlemesi açıklandı",
+            url="https://example.com/e",
+            description="Büyükşehir Belediyesi, merkez hattında hafta sonu yeni sefer düzenine geçileceğini açıkladı.",
+            paragraphs=listOf(
+                "Düzenleme, günlük yaklaşık 300 bin yolcunun kullandığı hatta sefer aralıklarını ve aktarma planını değiştirecek.",
+                "Belediye, yeni tarifelerin cumartesi sabahı yürürlüğe gireceğini ve ilk hafta ek ekiplerin sahada olacağını bildirdi."
+            ),
+            publishedAt=10L,
+            isPrimary=true,
+            quality=90.0
+        )
+
+        val summary=summarizeResearch(
+            eventTitle="Merkez hattında yeni sefer düzeni",
+            eventSummary="",
+            articles=listOf(article)
+        )
+
+        val what=summary.whatHappened.joinToString(" ")
+        val why=summary.whyImportant.joinToString(" ")
+        val latest=summary.latestSituation.joinToString(" ")
+
+        assertTrue(what.contains("Belediyesi") || what.contains("sefer düzenine"))
+        assertTrue(why.contains("300 bin") || why.contains("değiştirecek"))
+        assertTrue(latest.contains("cumartesi") || latest.contains("yürürlüğe"))
+        assertTrue(what!=why)
+        assertTrue(what!=latest)
+    }
+
+    @Test
+    fun contextDependentLeadIsPenalized(){
+        val article=ResearchedArticle(
+            sourceName="Yayıncı",
+            title="Yeni karar açıklandı",
+            url="https://example.com/f",
+            description="Bu nedenle uygulamanın önümüzdeki günlerde yeniden değerlendirilmesi bekleniyor.",
+            paragraphs=listOf(
+                "Bakanlık, 15 Eylül'den itibaren başvuruların e-Devlet üzerinden alınacağını açıkladı."
+            ),
+            publishedAt=11L,
+            isPrimary=true,
+            quality=88.0
+        )
+
+        val summary=summarizeResearch(
+            eventTitle="Başvurular için yeni karar",
+            eventSummary="",
+            articles=listOf(article)
+        )
+
+        assertTrue(
+            summary.whatHappened.firstOrNull()?.contains("Bakanlık")==true ||
+            summary.whatHappened.joinToString(" ").contains("15 Eylül")
+        )
+    }
+
 }
