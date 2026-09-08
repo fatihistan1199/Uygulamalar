@@ -491,6 +491,26 @@ class GameEngine {
     return child;
   }
 
+  FamilyMember? _marryNpc(String npcId){
+    final npc=state.npcs[npcId];
+    final player=state.family[state.playerFamilyId];
+    if(npc==null||player==null||!npc.alive||npc.spouseId!=null||player.spouseId!=null)return null;
+    final id='npc_spouse_${npc.id}';
+    final spouse=FamilyMember(
+      id:id,name:npc.name,age:npc.age,cityId:npc.cityId,gender:npc.gender,spouseId:player.id,isPlayerLine:false,
+      networkFactionId:npc.factionId,linkedNpcId:npc.id,standing:55,
+    );
+    state.family[id]=spouse;
+    player.spouseId=id;
+    player.relations[id]=RelationState(trust:npc.relation.trust,respect:npc.relation.respect,affection:math.max(60,npc.relation.affection),suspicion:npc.relation.suspicion,debt:npc.relation.debt);
+    spouse.relations[player.id]=RelationState(trust:npc.relation.trust,respect:npc.relation.respect,affection:math.max(60,npc.relation.affection),suspicion:npc.relation.suspicion,debt:-npc.relation.debt);
+    npc.spouseId='family:${player.id}';
+    final faction=state.factions[npc.factionId];
+    if(faction!=null)faction.reputation=clamp100(faction.reputation+4);
+    state.chronicle.add('${state.day}. gün — ${state.playerName} ile ${npc.name} evlendi; ${faction?.name??'şehir çevresi'} ile aile bağı kuruldu.');
+    return spouse;
+  }
+
   void _addNpcChild(NpcState a,NpcState b){
     final id='born_${state.nextLifeId++}';
     final female=_rng.nextInt(2)==0;
@@ -653,7 +673,16 @@ class GameEngine {
     final first=state.eventFlags['first_work_done']!=true;
     state.eventFlags['first_work_done']=true;
     state.eventFlags['work_count']=((state.eventFlags['work_count'] as int?)??0)+1;
+    state.eventFlags['work_${c.id}']=((state.eventFlags['work_${c.id}'] as int?)??0)+1;
     if(first&&!state.narrativeQueue.contains('milestone_first_work'))state.narrativeQueue.add('milestone_first_work');
+    final workCount=(state.eventFlags['work_count'] as int?)??0;
+    if(workCount>=3&&!state.storyThreads.containsKey('livelihood')){
+      state.storyThreads['livelihood']=workIdentity();
+      if(!state.narrativeQueue.contains('milestone_work_identity'))state.narrativeQueue.add('milestone_work_identity');
+      if(!state.pendingEvents.contains('work_patron_offer'))state.pendingEvents.add('work_patron_offer');
+    }else if(workCount>=3){
+      state.storyThreads['livelihood']=workIdentity();
+    }
     state.chronicle.add('${state.day}. gün — $title; $pay akçe kazandı.');
     _sync();
     final ending=switch(check.outcome){
@@ -1369,9 +1398,28 @@ class GameEngine {
           npc.remember(MemoryEntry(
             text:memory,day:state.day,importance:(effect['importance'] as num?)?.toInt()??30,
             trust:trust,respect:respect,fear:fear,affection:affection,suspicion:suspicion,
+            source:_renderText((effect['source'] as String?)??sourceEventId),
+            kind:(effect['kind'] as String?)??'event',
+            confidence:(effect['confidence'] as num?)?.toInt()??100,
+            decay:(effect['decay'] as num?)?.toInt()??2,
+            permanent:effect['permanent']==true,
+            tags:((effect['tags'] as List?)??[]).cast<String>(),
           ));
           npc.relation.change(debt:debt);
           _scheduleSocialPropagation(npc,trust+respect+affection-suspicion+(debt~/2),memory);
+        }
+      case 'story_thread':
+        final thread=effect['thread'] as String;
+        state.storyThreads[thread]=_renderText(effect['status'] as String);
+      case 'queue_story':
+        final storyId=effect['storyId'] as String;
+        if(!state.narrativeQueue.contains(storyId))state.narrativeQueue.add(storyId);
+      case 'marry_npc':
+        final npcId=effect['npc'] as String;
+        final spouse=_marryNpc(npcId);
+        if(spouse!=null){
+          final thread=effect['thread'] as String?;
+          if(thread!=null)state.storyThreads[thread]='evlilik';
         }
       case 'family_relation':
         final member=_familyRole(effect['role'] as String);
