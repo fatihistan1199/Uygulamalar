@@ -7,51 +7,58 @@ import org.junit.Test
 class ReligionTopicFilterTest {
 
     @Test
-    fun screenshotGeneralNewsAreRejected(){
+    fun unrelatedGeneralNewsAreRejected(){
         assertFalse(
-            ReligionTopicFilter.isRelevant(
-                "Trabzon'da heyelan: 1 evin çatısı yıkıldı, 2 ev tahliye edildi",
-                "Heyelan nedeniyle bir evde hasar oluştu, 2 ev tedbir amacıyla boşaltıldı."
+            ReligionTitleKeywordFilter.matches(
+                "Trabzon'da heyelan: 1 evin çatısı yıkıldı, 2 ev tahliye edildi"
             )
         )
-
         assertFalse(
-            ReligionTopicFilter.isRelevant(
-                "Adana'nın Kozan ilçesinde iki noktada çıkan orman yangınlarına müdahale ediliyor",
-                "Yangınlar havadan ve karadan müdahaleyle kontrol altına alınmaya çalışılıyor."
+            ReligionTitleKeywordFilter.matches(
+                "Adana'nın Kozan ilçesinde iki noktada çıkan orman yangınlarına müdahale ediliyor"
             )
         )
-
         assertFalse(
-            ReligionTopicFilter.isRelevant(
-                "Münbiç'te eğitim imkansızlıklarla başladı",
-                "Savaş mağduru çocuklar tüm imkansızlıklara rağmen eğitimlerine başladı."
+            ReligionTitleKeywordFilter.matches(
+                "Münbiç'te eğitim imkansızlıklarla başladı"
             )
         )
     }
 
     @Test
-    fun clearlyReligiousNewsAreAccepted(){
+    fun tarikatAndCemaatInHeadlineAreAccepted(){
         assertTrue(
-            ReligionTopicFilter.isRelevant(
-                "Diyanet cuma hutbesinin konusunu açıkladı",
-                "Hutbede kul hakkı, ibadet ve ahlak konuları ele alınacak."
+            ReligionTitleKeywordFilter.matches(
+                "Tarikat yapılanmalarına ilişkin yeni araştırma yayımlandı"
             )
         )
         assertTrue(
-            ReligionTopicFilter.isRelevant(
-                "Kur'an kurslarında yeni dönem başladı",
-                "Hafızlık eğitimi ve dini eğitim programları devam ediyor."
+            ReligionTitleKeywordFilter.matches(
+                "Cemaatlerin eğitim faaliyetleri yeniden gündemde"
             )
         )
     }
 
     @Test
-    fun oneGenericSupportingWordIsNotEnough(){
-        assertFalse(
-            ReligionTopicFilter.isRelevant(
-                "Manevi destek toplantısı yapıldı",
-                "Etkinlikte eğitim ve sosyal yardım konuları konuşuldu."
+    fun keywordOnlyInBodyIsIgnored(){
+        val title="Yeni araştırmanın sonuçları açıklandı"
+        val body="Araştırmada tarikat ve cemaat yapıları da ele alındı."
+
+        assertFalse(ReligionTitleKeywordFilter.matches(title))
+        assertTrue(body.contains("tarikat"))
+        assertTrue(body.contains("cemaat"))
+    }
+
+    @Test
+    fun suffixFormsInHeadlineAreAccepted(){
+        assertTrue(
+            ReligionTitleKeywordFilter.matches(
+                "Tarikatların finansman yapısı tartışılıyor"
+            )
+        )
+        assertTrue(
+            ReligionTitleKeywordFilter.matches(
+                "Cemaatlere yönelik yeni düzenleme"
             )
         )
     }
