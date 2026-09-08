@@ -42,6 +42,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import tr.com.gundemradari.data.*
+import tr.com.gundemradari.religion.RELIGION_MAX_AGE_MS
 import tr.com.gundemradari.research.EventResearchReport
 import tr.com.gundemradari.research.EventResearchService
 import tr.com.gundemradari.scan.ScanCoordinator
@@ -94,7 +95,7 @@ class GundemViewModel(context:Context):ViewModel(){
                 FeedTab.SEARCH->searchResults
                 FeedTab.TURKEY->dao.turkeyFeed(now)
                 FeedTab.WORLD->dao.worldFeed(now)
-                FeedTab.RELIGION->dao.religionFeed(now)
+                FeedTab.RELIGION->dao.religionFeed(now,now-RELIGION_MAX_AGE_MS)
             }
             feed.map{list->
                 if(t==FeedTab.SEARCH)list else list.filterNot{it.id in hidden}
