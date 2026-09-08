@@ -403,7 +403,7 @@ private fun fallbackStructuredArticle(raw:String):StructuredArticle?{
             .replace("\\n"," ")
             .replace("\\r"," ")
             .replace("\\t"," ")
-            .replace("\\"","\"")
+            .replace("\\\"", "\"")
             .replace("\\/","/")
             .let(::cleanResearchText)
     }
