@@ -40,12 +40,13 @@ class NewsWebSearch {
     suspend fun search(
         query:String,
         limit:Int=10,
-        expandDescriptions:Boolean=false
+        expandDescriptions:Boolean=false,
+        maxAgeDays:Int?=null
     ):List<WebNewsResult>{
         val compact=compactQuery(query)
         if(compact.isBlank())return emptyList()
 
-        val cacheKey="${compact.lowercase(Locale("tr","TR"))}|$limit|$expandDescriptions"
+        val cacheKey="${compact.lowercase(Locale("tr","TR"))}|$limit|$expandDescriptions|${maxAgeDays?:0}"
         val now=System.currentTimeMillis()
         newsSearchCache[cacheKey]?.let{entry->
             if(now-entry.createdAt<NEWS_SEARCH_CACHE_TTL_MS){
@@ -54,15 +55,26 @@ class NewsWebSearch {
         }
 
         val rows=withContext(Dispatchers.IO){
+            val searchText=if(maxAgeDays!=null){
+                "$compact when:${maxAgeDays.coerceIn(1,365)}d"
+            }else compact
             val q=URLEncoder.encode(
-                compact,
+                searchText,
                 StandardCharsets.UTF_8.toString()
             )
             val endpoint="https://news.google.com/rss/search?q=$q&hl=tr&gl=TR&ceid=TR:tr"
             val xml=download(endpoint)
                 ?: return@withContext emptyList()
 
-            val parsed=parse(xml).take(limit)
+            val cutoff=maxAgeDays?.let{
+                System.currentTimeMillis()-it.coerceIn(1,365)*24L*60*60*1000
+            }
+            val parsed=parse(xml)
+                .filter{row->
+                    cutoff==null ||
+                    (row.publishedAt!=null && row.publishedAt>=cutoff)
+                }
+                .take(limit)
 
             if(!expandDescriptions){
                 parsed
