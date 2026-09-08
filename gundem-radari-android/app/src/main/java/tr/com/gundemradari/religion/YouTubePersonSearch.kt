@@ -3,54 +3,88 @@ package tr.com.gundemradari.religion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
+import org.jsoup.parser.Parser
+import java.time.OffsetDateTime
 
 data class YouTubePersonResult(
     val title:String,
-    val url:String
+    val url:String,
+    val publishedAt:Long
 )
 
 class YouTubePersonSearch {
-    suspend fun search(person:String,limit:Int=5):List<YouTubePersonResult> =
-        withContext(Dispatchers.IO){
-            runCatching{
-                val q=URLEncoder.encode(person,StandardCharsets.UTF_8.toString())
-                val html=Jsoup.connect("https://www.youtube.com/results?search_query=$q")
-                    .userAgent("Mozilla/5.0 (Android) GundemRadari/16")
-                    .timeout(12000)
-                    .get()
-                    .html()
 
-                val regex=Regex(
-                    """\"videoId\":\"([A-Za-z0-9_-]{11})\"[\s\S]{0,1800}?\"title\":\{\"runs\":\[\{\"text\":\"((?:\\.|[^\"\\])*)\"""",
-                    RegexOption.IGNORE_CASE
-                )
+    suspend fun search(
+        profile:ReligionPersonProfile,
+        limit:Int=5
+    ):List<YouTubePersonResult> = withContext(Dispatchers.IO){
+        if(profile.youtubeUrl.isBlank())return@withContext emptyList()
 
-                regex.findAll(html)
-                    .mapNotNull{m->
-                        val id=m.groupValues.getOrNull(1).orEmpty()
-                        val raw=m.groupValues.getOrNull(2).orEmpty()
-                        val title=decodeJsonText(raw)
-                        if(id.isBlank()||title.isBlank())null
-                        else YouTubePersonResult(
+        runCatching{
+            val channelId=resolveChannelId(profile.youtubeUrl)
+                ?:return@runCatching emptyList()
+
+            val xml=Jsoup.connect(
+                "https://www.youtube.com/feeds/videos.xml?channel_id=$channelId"
+            )
+                .userAgent("Mozilla/5.0 (Android) GundemRadari/18")
+                .timeout(12000)
+                .ignoreContentType(true)
+                .execute()
+                .body()
+
+            val doc=Jsoup.parse(xml,"",Parser.xmlParser())
+            doc.select("entry")
+                .mapNotNull{entry->
+                    val title=entry.selectFirst("title")?.text().orEmpty().trim()
+                    val url=entry.selectFirst("link[rel=alternate]")
+                        ?.attr("href")
+                        .orEmpty()
+                    val published=entry.selectFirst("published")?.text().orEmpty()
+                    val publishedAt=runCatching{
+                        OffsetDateTime.parse(published).toInstant().toEpochMilli()
+                    }.getOrNull()
+
+                    if(
+                        title.isBlank() ||
+                        url.isBlank() ||
+                        !ReligionTracker.isFresh(publishedAt)
+                    ){
+                        null
+                    }else{
+                        YouTubePersonResult(
                             title=title,
-                            url="https://www.youtube.com/watch?v=$id"
+                            url=url,
+                            publishedAt=publishedAt!!
                         )
                     }
-                    .filter{ReligionWatchEngine.matchedPerson(it.title,"")!=null}
-                    .distinctBy{it.url}
-                    .take(limit)
-                    .toList()
-            }.getOrElse{emptyList()}
-        }
+                }
+                .filter{row->
+                    // Resmî kanal doğrudan izlendiği için başlıkta kişinin adı
+                    // bulunması zorunlu değildir.
+                    row.title.isNotBlank()
+                }
+                .distinctBy{it.url}
+                .take(limit)
+        }.getOrElse{emptyList()}
+    }
 
-    private fun decodeJsonText(raw:String):String =
-        raw.replace("\\u0026","&")
-            .replace("\\u003d","=")
-            .replace("\\u0027","'")
-            .replace("\\\"","\"")
-            .replace("\\n"," ")
-            .replace("\\/","/")
-            .trim()
+    private fun resolveChannelId(channelUrl:String):String?{
+        val html=Jsoup.connect(channelUrl)
+            .userAgent("Mozilla/5.0 (Android) GundemRadari/18")
+            .timeout(12000)
+            .followRedirects(true)
+            .get()
+            .html()
+
+        val patterns=listOf(
+            Regex("\\"channelId\\":\\"(UC[A-Za-z0-9_-]{20,})\\""),
+            Regex("\\"externalId\\":\\"(UC[A-Za-z0-9_-]{20,})\\""),
+            Regex("channel_id=(UC[A-Za-z0-9_-]{20,})")
+        )
+
+        return patterns.asSequence()
+            .mapNotNull{it.find(html)?.groupValues?.getOrNull(1)}
+            .firstOrNull()
+    }
 }
