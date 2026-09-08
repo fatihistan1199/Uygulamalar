@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import tr.com.gundemradari.data.*
+import tr.com.gundemradari.religion.ReligionTopicFilter
 import tr.com.gundemradari.religion.ReligionTracker
 import tr.com.gundemradari.religion.ReligionWatchEngine
 import tr.com.gundemradari.research.EventResearchService
@@ -244,8 +245,18 @@ class ScanCoordinator(private val db:AppDatabase){
         }
 
         // Kişi özel araması yalnız takip listesindeki kişilerle açık eşleşme kabul eder.
-        // Diyanet gibi doğrudan Din kaynaklarında kişi adı şart değildir.
         if(religionSearch && !religionMatch.accepted){
+            return@withTransaction null
+        }
+
+        // Bir kaynağın "Din" kaynağı olması tek başına yeterli değildir.
+        // Diyanet Haber gibi sitelerdeki heyelan, yangın, eğitim, spor vb.
+        // genel içerikler yalnızca kaynak adına bakılarak Din'e giremez.
+        if(
+            religionDirect &&
+            !religionMatch.accepted &&
+            !ReligionTopicFilter.isRelevant(item.title,item.summary)
+        ){
             return@withTransaction null
         }
 
