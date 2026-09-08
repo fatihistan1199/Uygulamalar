@@ -396,6 +396,7 @@ class GameEngine {
       }
     }
     if(state.day%30!=0)return;
+    _decayMemories();
     final adults=state.npcs.values.where((n)=>n.alive&&n.age>=18&&n.age<=55).toList()..sort((a,b)=>a.id.compareTo(b.id));
     // Mevcut karşılıklı bağlar evliliğe dönüşebilir.
     for(final a in adults){
@@ -422,6 +423,30 @@ class GameEngine {
     _runFamilyHousehold();
   }
 
+  void _decayMemories(){
+    for(final npc in state.npcs.values){
+      for(final memory in npc.memories){
+        if(!memory.permanent)memory.importance=math.max(0,memory.importance-memory.decay);
+      }
+      final anchored=npc.memories.any((m)=>m.permanent&&m.importance>=45);
+      if(!anchored){
+        npc.relation.trust=_toward(npc.relation.trust,50);
+        npc.relation.respect=_toward(npc.relation.respect,50);
+        npc.relation.affection=_toward(npc.relation.affection,30);
+        npc.relation.suspicion=_toward(npc.relation.suspicion,10);
+        npc.relation.fear=_toward(npc.relation.fear,10);
+      }
+    }
+  }
+
+  int _toward(int value,int target){
+    if(value<target)return value+1;
+    if(value>target)return value-1;
+    return value;
+  }
+
+  void decayMemoriesForTest()=>_decayMemories();
+
   void _runFamilyHousehold(){
     final adults=state.family.values.where((m)=>m.alive&&m.age>=18&&m.age<=48).toList()..sort((a,b)=>a.id.compareTo(b.id));
     for(final member in adults){
@@ -444,10 +469,12 @@ class GameEngine {
     final id='family_spouse_${state.nextLifeId++}';
     final spouseGender=member.gender=='female'?'male':'female';
     final names=spouseGender=='female'?['Aysel','Hatice','Meryem','Safiye','Zehra']:['Ali','Mehmed','Yusuf','İlyas','Ömer'];
-    final spouse=FamilyMember(id:id,name:names[_rng.nextInt(names.length)],age:math.max(18,member.age-3+_rng.nextInt(7)),cityId:member.cityId,gender:spouseGender,spouseId:member.id,isPlayerLine:false);
+    final network=switch(member.cityId){'kayseri'=>'tuccar','antalya'=>'tuccar','ankara'=>'ahi','sivas'=>'ahi',_=>'medrese'};
+    final spouse=FamilyMember(id:id,name:names[_rng.nextInt(names.length)],age:math.max(18,member.age-3+_rng.nextInt(7)),cityId:member.cityId,gender:spouseGender,spouseId:member.id,isPlayerLine:false,networkFactionId:network,standing:20+_rng.nextInt(31));
     state.family[id]=spouse;member.spouseId=id;
     member.relations[id]=RelationState(trust:58,affection:60,respect:52);spouse.relations[member.id]=RelationState(trust:58,affection:60,respect:52);
-    state.chronicle.add('${state.day}. gün — ${member.name} ile ${spouse.name} evlendi.');
+    final faction=state.factions[network];if(faction!=null)faction.reputation=clamp100(faction.reputation+2);
+    state.chronicle.add('${state.day}. gün — ${member.name} ile ${spouse.name} evlendi; aile yeni bir toplumsal çevreyle bağ kurdu.');
     return spouse;
   }
 
@@ -896,10 +923,54 @@ class GameEngine {
     result=result.replaceAll('{{rumor}}',rumor?.text??'duyduğun söylenti');
     result=result.replaceAll('{{rumor_source}}',rumor?.source??'belirsiz kaynak');
     result=result.replaceAll('{{verification_result}}',(state.eventFlags['last_verification_result'] as String?)??'Bilginin doğruluğu hâlâ kesinleşmedi.');
+    result=result.replaceAll('{{work_identity}}',workIdentity());
     for(final role in ['spouse','parent','elder_parent','sibling','child','adult_child']){
       result=result.replaceAll('{{$role}}',_familyRole(role)?.name??'yakının');
     }
     return result;
+  }
+
+  static const threadNames=<String,String>{
+    'selma_friendship':'Selma ile dostluk',
+    'nasir_relation':'Nâsır ile saray rekabeti',
+    'leyla_romance':'Leyla ile yakınlık',
+    'halil_romance':'Halil ile yakınlık',
+    'livelihood':'Geçim yolu',
+  };
+
+  List<String> storyThreadSummaries(){
+    final entries=state.storyThreads.entries.toList()..sort((a,b)=>a.key.compareTo(b.key));
+    return entries.map((e)=>'${threadNames[e.key]??e.key}: ${e.value}').toList();
+  }
+
+  String workIdentity(){
+    final counts=<String,int>{
+      'konya':(state.eventFlags['work_konya'] as int?)??0,
+      'kayseri':(state.eventFlags['work_kayseri'] as int?)??0,
+      'sivas':(state.eventFlags['work_sivas'] as int?)??0,
+      'ankara':(state.eventFlags['work_ankara'] as int?)??0,
+      'antalya':(state.eventFlags['work_antalya'] as int?)??0,
+    };
+    var best='konya',max=-1;
+    for(final entry in counts.entries){if(entry.value>max){best=entry.key;max=entry.value;}}
+    if(max<=0)return 'henüz belirginleşmemiş';
+    return switch(best){
+      'kayseri'=>'han ve kervan hesabında tanınan biri',
+      'sivas'=>'yol ve kervan hazırlığında deneyimli biri',
+      'ankara'=>'çarşı teslimatlarında güvenilen biri',
+      'antalya'=>'liman işlerinde deneyim kazanan biri',
+      _=>'han ve şehir işlerinde eli alışmış biri',
+    };
+  }
+
+  String householdNetworkSummary(){
+    final links=<String>[];
+    for(final member in state.family.values){
+      if(!member.alive||member.networkFactionId==null)continue;
+      final faction=state.factions[member.networkFactionId!];
+      if(faction!=null)links.add('${member.name}: ${faction.name}');
+    }
+    return links.isEmpty?'Ailenin henüz belirgin bir dış çevre bağlantısı yok.':links.join(' • ');
   }
 
   String storyDirectorMode(){
@@ -1089,6 +1160,24 @@ class GameEngine {
           if(_latestUnverifiedKnowledge(condition['factId'] as String?)==null)return false;
         case 'world_fact_equals':
           if(state.worldFacts[condition['key']]!=value)return false;
+        case 'player_gender_is':
+          if(state.playerGender!=value)return false;
+        case 'npc_alive':
+          if(state.npcs[condition['npc']]?.alive!=true)return false;
+        case 'npc_unmarried':
+          if(state.npcs[condition['npc']]?.spouseId!=null)return false;
+        case 'npc_in_current_city':
+          if(state.npcs[condition['npc']]?.cityId!=state.currentCityId)return false;
+        case 'npc_relation_at_least':
+          final npc=state.npcs[condition['npc']];if(npc==null||_relationAxis(npc.relation,condition['axis'] as String)<((value as num).toInt()))return false;
+        case 'npc_relation_below':
+          final npc=state.npcs[condition['npc']];if(npc==null||_relationAxis(npc.relation,condition['axis'] as String)>=((value as num).toInt()))return false;
+        case 'thread_status':
+          if(state.storyThreads[condition['thread']]!=value)return false;
+        case 'thread_not_set':
+          if(state.storyThreads.containsKey(condition['thread']))return false;
+        case 'work_count_at_least':
+          if(((state.eventFlags['work_count'] as int?)??0)<((value as num).toInt()))return false;
       }
     }
     return true;
