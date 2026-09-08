@@ -386,14 +386,15 @@ private fun extractStructuredArticle(doc:Document):StructuredArticle{
 
 private fun fallbackStructuredObject(raw:String):JSONObject?{
     fun capture(key:String):String{
-        val match=Regex(
-            "\\""+Regex.escape(key)+"\\"\\s*:\\s*\\"((?:\\\\.|[^\\"])*)\\"",
+        val pattern=Regex(
+            """["]${Regex.escape(key)}["]\s*:\s*["]((?:\\.|[^"])*)["]""",
             setOf(RegexOption.IGNORE_CASE,RegexOption.DOT_MATCHES_ALL)
-        ).find(raw) ?: return ""
+        )
+        val match=pattern.find(raw) ?: return ""
 
         val escaped=match.groupValues.getOrNull(1).orEmpty()
         return runCatching{
-            JSONObject("{\\"v\\":\\"$escaped\\"}").optString("v","")
+            JSONObject("{\"v\":\"$escaped\"}").optString("v","")
         }.getOrDefault(escaped)
     }
 
