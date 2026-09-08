@@ -491,6 +491,8 @@ class GameEngine {
     return child;
   }
 
+  FamilyMember? marryNpcForTest(String npcId){final result=_marryNpc(npcId);_sync();return result;}
+
   FamilyMember? _marryNpc(String npcId){
     final npc=state.npcs[npcId];
     final player=state.family[state.playerFamilyId];
@@ -680,8 +682,6 @@ class GameEngine {
       state.storyThreads['livelihood']=workIdentity();
       if(!state.narrativeQueue.contains('milestone_work_identity'))state.narrativeQueue.add('milestone_work_identity');
       if(!state.pendingEvents.contains('work_patron_offer'))state.pendingEvents.add('work_patron_offer');
-    }else if(workCount>=3){
-      state.storyThreads['livelihood']=workIdentity();
     }
     state.chronicle.add('${state.day}. gün — $title; $pay akçe kazandı.');
     _sync();
@@ -1020,7 +1020,7 @@ class GameEngine {
     final tags=def.tags.toSet();
     if(state.recentEventIds.contains(def.id))weight*=.28;
     if(mode=='recovery'){
-      if(tags.any({'family','social','knowledge','memory','travel'}.contains))weight*=1.55;
+      if(tags.any({'family','social','knowledge','memory','travel','personal','friendship','romance'}.contains))weight*=1.55;
       if(tags.any({'crisis','danger','politics'}.contains))weight*=.48;
     }else if(mode=='pressure'){
       if(tags.any({'crisis','danger','politics','faction'}.contains))weight*=1.5;
@@ -1028,7 +1028,7 @@ class GameEngine {
     }else if(mode=='build'){
       if(tags.any({'economy','faction','rumor','secret'}.contains))weight*=1.25;
     }else{
-      if(tags.any({'social','knowledge','family','travel','memory'}.contains))weight*=1.32;
+      if(tags.any({'social','knowledge','family','travel','memory','personal','friendship','romance'}.contains))weight*=1.32;
       if(tags.contains('crisis'))weight*=.72;
     }
     if(_latestUnverifiedKnowledge()!=null&&tags.any({'knowledge','rumor','secret'}.contains))weight*=1.35;
