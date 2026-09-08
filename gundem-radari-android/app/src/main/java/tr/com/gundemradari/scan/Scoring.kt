@@ -70,6 +70,26 @@ private val routineLowImpact=listOf(
     "panel düzenleyecek","ilk balığı","çok okunanlar","kimdir"
 )
 
+private val systemicEconomy=listOf(
+    "sermaye kontrolü","bankacılık krizi","bankalara el konuldu",
+    "mevduat güvencesi","asgari ücret açıklandı","kur krizi",
+    "döviz işlemleri durduruldu","borsa işlemleri durduruldu",
+    "temerrüt","borç kriz","ülke notu düşürüldü"
+)
+
+private val majorHealth=listOf(
+    "pandemi ilan","salgın ilan","küresel sağlık acil durumu",
+    "dünya sağlık örgütü","dsö acil","yeni varyant",
+    "karantina ilan","ülke genelinde karantina",
+    "aşı onayı","ilaç onayı","salgın nedeniyle"
+)
+
+private val majorScienceTech=listOf(
+    "nükleer kaza","kritik siber saldırı","ülke genelinde internet kesintisi",
+    "büyük veri sızıntısı","uzay aracı fırlatıldı","aya iniş",
+    "mars görevi","nobel ödülü","yapay zeka güvenlik açığı"
+)
+
 private fun normalized(title:String,summary:String):String =
     (" $title $summary ")
         .lowercase(locale)
@@ -157,6 +177,32 @@ fun scores(
     }
 
     if(majorConflict.any{t.contains(it)})importance+=38.0
+
+    if(systemicEconomy.any{t.contains(it)}){
+        importance+=30.0
+    }
+
+    if(majorHealth.any{t.contains(it)}){
+        importance+=26.0
+        if(
+            t.contains("ülke genelinde") ||
+            t.contains("küresel") ||
+            t.contains("dünya sağlık örgütü")
+        ){
+            importance+=10.0
+        }
+    }
+
+    if(majorScienceTech.any{t.contains(it)}){
+        importance+=22.0
+        if(
+            t.contains("nükleer kaza") ||
+            t.contains("kritik siber saldırı") ||
+            t.contains("ülke genelinde internet kesintisi")
+        ){
+            importance+=12.0
+        }
+    }
 
     if(disasterWords.any{t.contains(it)}){
         importance+=24.0

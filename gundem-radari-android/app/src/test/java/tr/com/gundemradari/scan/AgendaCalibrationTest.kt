@@ -118,6 +118,44 @@ class AgendaCalibrationTest {
     }
 
     @Test
+    fun globalHealthEmergencyIsPromoted(){
+        val score=scores(
+            title="Dünya Sağlık Örgütü küresel sağlık acil durumu ilan etti",
+            source=trtTurkey,
+            summary="Salgın nedeniyle uluslararası önlemler devreye alındı."
+        ).first
+
+        assertTrue(score>=50.0)
+    }
+
+    @Test
+    fun criticalNationwideCyberAttackIsPromoted(){
+        val score=scores(
+            title="Kritik siber saldırı: Ülke genelinde internet kesintisi yaşanıyor",
+            source=trtTurkey,
+            summary="Bankacılık ve kamu hizmetlerinde erişim sorunları bildiriliyor."
+        ).first
+
+        assertTrue(score>=55.0)
+    }
+
+    @Test
+    fun systemicEconomicCrisisRanksAboveRoutineNews(){
+        val crisis=scores(
+            title="Bankacılık krizi sonrası döviz işlemleri durduruldu",
+            source=trtTurkey,
+            summary="Merkez bankası olağanüstü önlemler açıkladı."
+        ).first
+        val routine=scores(
+            title="Ekonomi paneli düzenlenecek",
+            source=trtTurkey,
+            summary="Üniversitede ekonomi paneli düzenlenecek."
+        ).first
+
+        assertTrue(crisis>routine+20.0)
+    }
+
+    @Test
     fun cabinetDecisionIsTurkeyPolitics(){
         val e=event(
             title="Cumhurbaşkanlığı Kabinesi toplandı",
