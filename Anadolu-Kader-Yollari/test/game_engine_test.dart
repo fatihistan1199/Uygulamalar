@@ -602,4 +602,120 @@ void main(){
     expect(stories.scenes.containsKey('milestone_work_identity'),isTrue);
   });
 
+
+  test('geçici anılar eskir, kalıcı anılar ilişkiyi sabitler',(){
+    final s=GameEngine.newGame(seed:1801,name:'Hasan',background:'Köylü ailesi');
+    final e=GameEngine(s,catalog);
+    final selma=s.npcs['selma']!;
+    selma.remember(MemoryEntry(text:'Geçici bir yardım',day:s.day,importance:20,trust:5,respect:0,fear:0,affection:2,suspicion:0,decay:3));
+    expect(selma.relation.trust,55);
+    e.decayMemoriesForTest();
+    expect(selma.memories.last.importance,17);
+    expect(selma.relation.trust,54);
+
+    selma.remember(MemoryEntry(text:'Hayat boyu unutmayacağı bir davranış',day:s.day,importance:80,trust:4,respect:3,fear:0,affection:5,suspicion:0,decay:0,permanent:true,tags:['permanent']));
+    final trustAfter=selma.relation.trust;
+    e.decayMemoriesForTest();
+    expect(selma.memories.last.importance,80);
+    expect(selma.memories.last.permanent,isTrue);
+    expect(selma.relation.trust,trustAfter);
+  });
+
+  test('tekrarlanan işler doğal geçim kimliği ve hikâye ipliği oluşturur',(){
+    final s=GameEngine.newGame(seed:1802,name:'Hasan',background:'Köylü ailesi');
+    final e=GameEngine(s,catalog);
+    s.narrativeQueue.clear();
+    e.doLocalWork();e.doLocalWork();e.doLocalWork();
+    expect(s.eventFlags['work_count'],3);
+    expect(e.workIdentity(),isNot('henüz belirginleşmemiş'));
+    expect(s.storyThreads['livelihood'],e.workIdentity());
+    expect(s.pendingEvents,contains('work_patron_offer'));
+    expect(s.narrativeQueue,contains('milestone_work_identity'));
+  });
+
+  test('düzenli iş ağı aylar sonra daha büyük sorumlulukla geri döner',(){
+    final s=GameEngine.newGame(seed:1803,name:'Hasan',background:'Tüccar ailesi');
+    final e=GameEngine(s,catalog);
+    s.eventFlags['work_count']=3;
+    s.storyThreads['livelihood']='han ve şehir işlerinde eli alışmış biri';
+    s.pendingEvents.add('work_patron_offer');
+    final offer=e.pickEvent();
+    expect(offer.id,'work_patron_offer');
+    e.resolve(offer,'accept');
+    final delayed=s.delayedEffects.firstWhere((x)=>x.type=='event_followup'&&x.payload['eventId']=='work_patron_return');
+    expect(delayed.dueDay-s.day,inInclusiveRange(120,210));
+    e.advance(delayed.dueDay-s.day);
+    expect(s.pendingEvents,contains('work_patron_return'));
+    expect(e.pickEvent().id,'work_patron_return');
+  });
+
+  test('Selma dostluğu kalıcı anıya ve yaklaşık iki yıl sonraki sonuca uzanır',(){
+    final s=GameEngine.newGame(seed:1,name:'Hasan',background:'Tüccar ailesi');
+    final e=GameEngine(s,catalog);
+    s.currentCityId='kayseri';
+    s.eventFlags['first_task_done']=true;
+    s.attributes['rhetoric']=100;s.skills['leadership']=100;s.skills['localCulture']=100;
+    s.pendingEvents.add('selma_han_acquaintance');
+    final first=e.pickEvent();
+    expect(first.id,'selma_han_acquaintance');
+    e.resolve(first,'help');
+    expect(s.storyThreads['selma_friendship'],'tanışıklık derinleşiyor');
+    final returns=s.delayedEffects.where((x)=>x.payload['eventId']=='selma_han_return').toList();
+    expect(returns.length,1);
+
+    e.advance(returns.single.dueDay-s.day);
+    final second=e.pickEvent();
+    expect(second.id,'selma_han_return');
+    e.resolve(second,'stand_by');
+    expect(s.storyThreads['selma_friendship'],'dostluk');
+    expect(s.npcs['selma']!.memories.any((m)=>m.permanent&&m.tags.contains('friendship')),isTrue);
+
+    final oldFavor=s.delayedEffects.firstWhere((x)=>x.payload['eventId']=='selma_old_favor');
+    e.advance(oldFavor.dueDay-s.day);
+    final third=e.pickEvent();
+    expect(third.id,'selma_old_favor');
+    e.resolve(third,'waive');
+    expect(s.storyThreads['selma_friendship'],'yakın dostluk');
+
+    final years=s.delayedEffects.firstWhere((x)=>x.payload['eventId']=='selma_years_later');
+    expect(years.dueDay-s.day,inInclusiveRange(600,900));
+    e.advance(years.dueDay-s.day);
+    expect(e.pickEvent().id,'selma_years_later');
+  });
+
+  test('adı olan NPC ile evlilik aileyi gerçek toplumsal ağa bağlar',(){
+    final s=GameEngine.newGame(seed:1,name:'Hasan',background:'Tüccar ailesi',gender:'male');
+    s.currentCityId='antalya';
+    s.storyThreads['leyla_romance']='yakınlık';
+    s.attributes['rhetoric']=100;s.skills['diplomacy']=100;
+    s.pendingEvents.add('leyla_courtship');
+    final e=GameEngine(s,catalog);
+    final event=e.pickEvent();
+    expect(event.id,'leyla_courtship');
+    final beforeRep=s.factions['tuccar']!.reputation;
+    e.resolve(event,'marry');
+    final player=s.family[s.playerFamilyId]!;
+    expect(player.spouseId,isNotNull);
+    final spouse=s.family[player.spouseId!]!;
+    expect(spouse.linkedNpcId,'leyla');
+    expect(spouse.networkFactionId,'tuccar');
+    expect(s.npcs['leyla']!.spouseId,startsWith('family:'));
+    expect(s.storyThreads['leyla_romance'],'evlilik');
+    expect(s.factions['tuccar']!.reputation,greaterThan(beforeRep));
+    expect(e.householdNetworkSummary(),contains('Tüccarlar'));
+    expect(s.narrativeQueue,contains('story_named_marriage'));
+  });
+
+  test('hikâye iplikleri ve kalıcı hafıza save load ile korunur',(){
+    final s=GameEngine.newGame(seed:1806,name:'Hasan',background:'Asker ailesi');
+    s.storyThreads['nasir_relation']='açık rekabet';
+    s.npcs['nasir']!.remember(MemoryEntry(text:'Eski rekabeti unutmadı',day:s.day,importance:88,trust:-4,respect:5,fear:0,affection:0,suspicion:7,permanent:true,decay:0,tags:['rivalry']));
+    final restored=GameState.fromJson(Map<String,dynamic>.from(jsonDecode(jsonEncode(s.toJson()))));
+    expect(restored.storyThreads['nasir_relation'],'açık rekabet');
+    final memory=restored.npcs['nasir']!.memories.last;
+    expect(memory.permanent,isTrue);
+    expect(memory.tags,contains('rivalry'));
+    expect(memory.deltaSummary,contains('şüphe +7'));
+  });
+
 }
