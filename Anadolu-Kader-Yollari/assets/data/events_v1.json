@@ -3315,14 +3315,6 @@
             "partialText": "Kavga büyümedi ama hanın düzeni ancak gece yarısına doğru sağlandı.",
             "failureText": "Kalabalığı yönetemedin; Selma işi sonunda kendi adamlarıyla toparladı.",
             "criticalFailureText": "Araya girmen işleri daha da karıştırdı ve Selma senden uzak durmanı istedi.",
-            "alwaysEffects": [
-              {
-                "type": "schedule_event",
-                "eventId": "selma_han_return",
-                "minDays": 45,
-                "maxDays": 85
-              }
-            ],
             "partialEffects": [
               {
                 "type": "npc_relation",
@@ -3341,6 +3333,12 @@
                 "type": "story_thread",
                 "thread": "selma_friendship",
                 "status": "temkinli tanışıklık"
+              },
+              {
+                "type": "schedule_event",
+                "eventId": "selma_han_return",
+                "minDays": 45,
+                "maxDays": 85
               }
             ],
             "failureEffects": [
@@ -3357,6 +3355,12 @@
                 "memory": "Han işine karıştı ama faydası olmadı",
                 "importance": 26,
                 "decay": 3
+              },
+              {
+                "type": "schedule_event",
+                "eventId": "selma_han_return",
+                "minDays": 55,
+                "maxDays": 95
               }
             ],
             "criticalFailureEffects": [
@@ -3374,6 +3378,12 @@
                 "memory": "Hanı daha da karıştırdı",
                 "importance": 42,
                 "decay": 2
+              },
+              {
+                "type": "schedule_event",
+                "eventId": "selma_han_return",
+                "minDays": 70,
+                "maxDays": 110
               }
             ]
           }
