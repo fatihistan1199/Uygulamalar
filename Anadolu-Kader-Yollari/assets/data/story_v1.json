@@ -133,6 +133,41 @@
       "title": "Liman Defterindeki Eksik Satır",
       "body": "Limanın yakınında bir gümrük kâtibi, gelen malların kaydını tekrar tekrar sayıyor. Bir sandık listede var ama rıhtımda yok. Tercümanlar, gemiciler ve gümrük görevlileri birbirini suçlamadan önce dikkatle susuyor. Deniz ticaretinde kayıp bir sandık bazen yalnız bir sandık değildir.",
       "continueLabel": "Şehre karış"
+    },
+    {
+      "id": "milestone_work_identity",
+      "kicker": "Geçim Yolu",
+      "title": "İnsanlar Seni Tanımaya Başlıyor",
+      "body": "Artık yalnız rastgele gündelik işler yapan biri değilsin. Tekrar ettiğin işler yüzünden şehirde seni {{work_identity}} olarak hatırlayanlar oluşmaya başladı. Bu bir resmî meslek seçimi değil; yaptıklarının senden önce konuşmaya başlaması.",
+      "continueLabel": "Yoluma devam et"
+    },
+    {
+      "id": "story_selma_bond",
+      "kicker": "Kişisel Hikâye",
+      "title": "Bir Hanın Kapısı Sana Açılıyor",
+      "body": "Selma Hatun'la arandaki ilişki sıradan bir alışveriş tanışıklığını aşmaya başladı. Onun hanına girdiğinde artık yabancı muamelesi görmüyorsun. Bu yakınlığın ileride bir iyilik, bir borç veya zor bir seçim olarak geri dönmesi mümkün.",
+      "continueLabel": "Bunu hatırla"
+    },
+    {
+      "id": "story_nasir_rivalry",
+      "kicker": "Kişisel Hikâye",
+      "title": "Nâsır Seni Unutmadı",
+      "body": "Konya'da bazı insanlar yükselmek için dost biriktirir, bazıları rakip. Nâsır Kâtip artık seni önemsiz biri olarak görmüyor. Aranızdaki bağın adı dostluk da olabilir rekabet de; fakat bundan sonra saray çevresindeki bazı kapılar açılırken bazıları özellikle kapanabilir.",
+      "continueLabel": "Konya'daki yerimi koru"
+    },
+    {
+      "id": "story_named_marriage",
+      "kicker": "Aile Hikâyesi",
+      "title": "İki Hayat Bir Haneye Dönüşüyor",
+      "body": "Eşin {{spouse}} artık yalnız kişisel hayatının değil, kurduğun hanenin de parçası. Evlilik yeni bir yakınlık kadar yeni yükümlülükler, akrabalar ve toplumsal bağlantılar getirdi. Bundan sonra bazı kararların yalnız seni değil, aileni de etkileyecek.",
+      "continueLabel": "Ailemle devam et"
+    },
+    {
+      "id": "story_old_choice_returns",
+      "kicker": "Geçmişin Yankısı",
+      "title": "Eski Bir Karar Yeniden Kapında",
+      "body": "Aylar önce verdiğin bir karar kapanıp gitmedi. O gün sana küçük görünen davranış, başka insanların hafızasında yaşamaya devam etti ve şimdi yeniden önüne geliyor. Anadolu'da kader bazen yeni bir yol değil, eski bir yolun tekrar karşına çıkmasıdır.",
+      "continueLabel": "Geçmişimle yüzleş"
     }
   ]
 }
