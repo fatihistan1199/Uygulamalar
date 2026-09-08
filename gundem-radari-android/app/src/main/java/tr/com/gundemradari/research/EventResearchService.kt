@@ -128,7 +128,10 @@ class EventResearchService(
         val rankedRows=rows
             .distinctBy{it.url}
             .sortedWith(
-                compareByDescending<ResearchItemRow>{it.trust}
+                compareByDescending<ResearchItemRow>{
+                    if(it.url.contains("news.google.com"))0 else 1
+                }
+                    .thenByDescending{it.trust}
                     .thenByDescending{it.summary.length}
                     .thenByDescending{it.publishedAt?:it.firstSeenAt}
             )
@@ -136,12 +139,12 @@ class EventResearchService(
         var best:LoadedArticle?=null
 
         // Teyit için paralel çoklu okuma yok. İlk güçlü yayıncı sayfası yeterliyse dur.
-        for(row in rankedRows.take(2)){
+        for(row in rankedRows.take(3)){
             val loaded=loadRow(row,religionAgeDays)?:continue
             if(best==null || loaded.contentScore>best!!.contentScore){
                 best=loaded
             }
-            if(loaded.contentScore>=55.0)break
+            if(loaded.contentScore>=62.0)break
         }
 
         val query=rankedRows
@@ -150,17 +153,17 @@ class EventResearchService(
             ?:event.title
 
         // Mevcut kaynaklar içerik vermediyse web araması yalnız teknik yedek olarak devreye girer.
-        if(best==null || best!!.contentScore<28.0){
+        if(best==null || best!!.contentScore<50.0){
             val webResults=runCatching{
                 webSearch.search(
                     query=query,
-                    limit=4,
+                    limit=6,
                     expandDescriptions=true,
                     maxAgeDays=religionAgeDays
                 )
             }.getOrElse{emptyList()}
 
-            for(row in webResults.take(3)){
+            for(row in webResults.take(4)){
                 if(row.url.contains("news.google.com"))continue
 
                 val details=articleReader.read(row.url)
@@ -221,7 +224,7 @@ class EventResearchService(
                 if(best==null || candidate.contentScore>best!!.contentScore){
                     best=candidate
                 }
-                if(candidate.contentScore>=55.0)break
+                if(candidate.contentScore>=62.0)break
             }
         }
 
@@ -261,7 +264,7 @@ class EventResearchService(
             val direct=runCatching{
                 webSearch.search(
                     query=query,
-                    limit=4,
+                    limit=6,
                     expandDescriptions=true,
                     maxAgeDays=maxAgeDays
                 )
@@ -269,7 +272,7 @@ class EventResearchService(
                 .filterNot{it.url.contains("news.google.com")}
 
             var bestDirect:LoadedArticle?=null
-            for(hit in direct.take(3)){
+            for(hit in direct.take(4)){
                 val d=articleReader.read(hit.url)
                 val effectivePublished=
                     d?.publishedAt ?: hit.publishedAt ?: row.publishedAt
@@ -335,7 +338,7 @@ class EventResearchService(
                 ){
                     bestDirect=candidate
                 }
-                if(candidate.contentScore>=55.0)break
+                if(candidate.contentScore>=62.0)break
             }
 
             if(bestDirect!=null)return bestDirect!!
