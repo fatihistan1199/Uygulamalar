@@ -59,35 +59,52 @@ class NewsWebSearch {
                 System.currentTimeMillis()-it.coerceIn(1,365)*24L*60*60*1000
             }
 
-            fun fresh(rows:List<WebNewsResult>)=rows
+            fun freshRelevant(rows:List<WebNewsResult>)=rows
                 .filter{row->
                     cutoff==null ||
-                    (row.publishedAt!=null && row.publishedAt>=cutoff)
+                    (
+                        row.publishedAt!=null &&
+                        row.publishedAt>=cutoff &&
+                        row.publishedAt<=System.currentTimeMillis()+24L*60*60*1000
+                    )
                 }
+                .filter{row->isSearchRelevant(compact,row)}
                 .distinctBy{row->
-                    row.title.lowercase(Locale("tr","TR"))
+                    normalizeSearchTitle(row.title)
                 }
                 .take(limit)
 
-            // Birincil arama: Bing News RSS. Bağlantılar doğrudan yayıncı
-            // sayfasına gider; böylece özetleyici Google News ara sayfasında kalmaz.
-            val bingQ=URLEncoder.encode(
-                compact,
-                StandardCharsets.UTF_8.toString()
-            )
-            val bingEndpoint=
-                "https://www.bing.com/news/search?q=$bingQ&format=rss"+
-                "&setmkt=tr-TR&cc=TR&qft=sortbydate%3d%221%22"
-            val bingRows=download(bingEndpoint)
-                ?.let(::parse)
-                ?.let(::fresh)
-                .orEmpty()
+            fun bingSearch(qText:String):List<WebNewsResult>{
+                val q=URLEncoder.encode(
+                    qText,
+                    StandardCharsets.UTF_8.toString()
+                )
+                val endpoint=
+                    "https://www.bing.com/news/search?q=$q&format=rss"+
+                    "&setmkt=tr-TR&cc=TR&qft=sortbydate%3d%221%22"
+                return download(endpoint)
+                    ?.let(::parse)
+                    ?.let(::freshRelevant)
+                    .orEmpty()
+            }
 
-            val parsed=if(bingRows.isNotEmpty()){
-                bingRows
+            val variants=searchVariants(compact)
+            val direct=mutableListOf<WebNewsResult>()
+
+            for(variant in variants){
+                direct+=bingSearch(variant)
+                val dedup=direct
+                    .distinctBy{normalizeSearchTitle(it.title)}
+                direct.clear()
+                direct+=dedup
+                if(direct.size>=minOf(limit,4))break
+            }
+
+            val parsed=if(direct.isNotEmpty()){
+                direct.take(limit)
             }else{
-                // Bing sonuç vermezse Google News yalnız keşif yedeğidir.
-                // Tarih yine yerel olarak zorunlu denetlenir.
+                // Google News yalnız son keşif yedeğidir. Tarih ve konu
+                // uygunluğu yine uygulama içinde denetlenir.
                 val searchText=if(maxAgeDays!=null){
                     "$compact when:${maxAgeDays.coerceIn(1,365)}d"
                 }else compact
@@ -99,7 +116,7 @@ class NewsWebSearch {
                     "https://news.google.com/rss/search?q=$googleQ&hl=tr&gl=TR&ceid=TR:tr"
                 download(googleEndpoint)
                     ?.let(::parse)
-                    ?.let(::fresh)
+                    ?.let(::freshRelevant)
                     .orEmpty()
             }
 
@@ -109,16 +126,12 @@ class NewsWebSearch {
                 coroutineScope{
                     parsed.mapIndexed{index,row->
                         async{
-                            if(index<4 && !row.url.contains("news.google.com")){
+                            if(index<5 && !row.url.contains("news.google.com")){
                                 val meta=fetchMetaDescription(row.url)
                                 if(!meta.isNullOrBlank()){
                                     row.copy(snippet=meta)
-                                }else{
-                                    row
-                                }
-                            }else{
-                                row
-                            }
+                                }else row
+                            }else row
                         }
                     }.awaitAll()
                 }
@@ -173,6 +186,80 @@ class NewsWebSearch {
             .ifBlank{clean.take(140)}
     }
 
+    private fun searchVariants(compact:String):List<String>{
+        val tokens=compact.split(" ").filter{it.isNotBlank()}
+        if(tokens.size<=6)return listOf(compact)
+
+        val first=compact
+        val shorter=tokens.take(6).joinToString(" ")
+        val entityHeavy=tokens
+            .filterIndexed{index,token->
+                index<4 || token.firstOrNull()?.isUpperCase()==true || token.any(Char::isDigit)
+            }
+            .take(7)
+            .joinToString(" ")
+
+        return listOf(first,shorter,entityHeavy)
+            .map{it.trim()}
+            .filter{it.isNotBlank()}
+            .distinct()
+    }
+
+    private fun normalizeSearchTitle(text:String):String=
+        cleanResearchText(text)
+            .lowercase(Locale("tr","TR"))
+            .replace(Regex("[^\\p{L}\\p{N}]+")," ")
+            .trim()
+
+    private fun isSearchRelevant(
+        query:String,
+        row:WebNewsResult
+    ):Boolean{
+        val qTokens=searchTokens(query)
+        if(qTokens.isEmpty())return true
+
+        val haystack=searchTokens(
+            row.title+" "+row.snippet.take(500)
+        )
+        if(haystack.isEmpty())return false
+
+        val overlap=qTokens.count{q->
+            haystack.any{h->tokenRelated(q,h)}
+        }
+
+        val titleTokens=searchTokens(row.title)
+        val titleOverlap=qTokens.count{q->
+            titleTokens.any{h->tokenRelated(q,h)}
+        }
+
+        return when{
+            qTokens.size==1->overlap>=1
+            qTokens.size==2->titleOverlap>=1 || overlap>=2
+            qTokens.size<=4->titleOverlap>=1 && overlap>=2
+            else->overlap>=2 && (titleOverlap>=1 || overlap.toDouble()/qTokens.size>=0.34)
+        }
+    }
+
+    private fun searchTokens(text:String):Set<String>{
+        val stop=setOf(
+            "haber","son","yeni","dedi","etti","olan","olarak","göre",
+            "için","ile","bir","ve","veya","ancak","sonra","önce"
+        )
+        return text
+            .lowercase(Locale("tr","TR"))
+            .split(Regex("[^\\p{L}\\p{N}]+"))
+            .filter{it.length>=3 && it !in stop}
+            .toSet()
+    }
+
+    private fun tokenRelated(a:String,b:String):Boolean{
+        if(a==b)return true
+        if(a.length<5 || b.length<5)return false
+        val min=minOf(a.length,b.length)
+        val common=minOf(min,7)
+        return a.take(common)==b.take(common)
+    }
+
     private fun download(url:String):String?{
         val conn=(
             URL(url).openConnection()
@@ -183,7 +270,7 @@ class NewsWebSearch {
             instanceFollowRedirects=true
             setRequestProperty(
                 "User-Agent",
-                "Mozilla/5.0 (Android) GundemRadari/19"
+                "Mozilla/5.0 (Android) GundemRadari/21"
             )
             setRequestProperty(
                 "Accept",
@@ -370,7 +457,7 @@ class NewsWebSearch {
             instanceFollowRedirects=true
             setRequestProperty(
                 "User-Agent",
-                "Mozilla/5.0 (Android) GundemRadari/19"
+                "Mozilla/5.0 (Android) GundemRadari/21"
             )
             setRequestProperty(
                 "Accept",
