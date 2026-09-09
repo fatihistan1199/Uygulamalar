@@ -112,8 +112,12 @@ def find_sheet(sheets, grade, kind):
     raise RuntimeError(f"Sayfa bulunamadı: {kind} {grade}; {list(sheets)}")
 
 def week_number(text):
-    m = re.search(r"(\d+)\s*\.\s*Hafta", clean(text), re.I)
-    return int(m.group(1)) if m else None
+    s = clean(text)
+    m = re.search(r"(\d+)\s*\.\s*Hafta", s, re.I)
+    if m:
+        return int(m.group(1))
+    m = re.search(r"(^|\D)(\d{1,2})\D{0,12}Hafta", s, re.I)
+    return int(m.group(2)) if m else None
 
 ITA_TOPICS = {
     "İTA.8.1.1": "XX. Yüzyıl Başlarında Osmanlı Devleti",
