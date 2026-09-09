@@ -1,0 +1,60 @@
+name: Fetch Izzet Eker Lise TDB
+on:
+  workflow_dispatch:
+  push:
+    branches: [kazanim-v1-build-20260909]
+    paths:
+      - .github/workflows/fetch-izzeteker-lise-tdb.yml
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Query category and download public files
+        shell: bash
+        run: |
+          set -e
+          python - <<'PY'
+          import urllib.request,json,os
+          base='https://api.izzeteker.com'
+          headers={'User-Agent':'Mozilla/5.0','Origin':'https://www.izzeteker.com','Referer':'https://www.izzeteker.com/'}
+          def get(url):
+            return urllib.request.urlopen(urllib.request.Request(url,headers=headers),timeout=30).read()
+          data=get(base+'/contents?categoryOrSubjectId=cg-240')
+          open('lise_tdb_contents.json','wb').write(data)
+          obj=json.loads(data)
+          print(json.dumps(obj,ensure_ascii=False,indent=2)[:40000])
+          os.makedirs('tdb_files',exist_ok=True)
+          for item in obj.get('data',[]):
+            title=item.get('title','')
+            if title.startswith('2026') or title.startswith('2026 - 2027'):
+              cid=item['id']
+              detail=get(base+f'/contents/{cid}')
+              open(f'tdb_files/content_{cid}.json','wb').write(detail)
+              print('DETAIL',cid,json.dumps(json.loads(detail),ensure_ascii=False,indent=2)[:12000])
+              for url in [f'https://www.izzeteker.com/api/contents/download/{cid}', f'{base}/api/contents/download/{cid}', f'{base}/contents/download/{cid}']:
+                try:
+                  req=urllib.request.Request(url,headers=headers)
+                  resp=urllib.request.urlopen(req,timeout=30)
+                  body=resp.read()
+                  print('DL',cid,url,'status',resp.status,'type',resp.headers.get('Content-Type'),'disp',resp.headers.get('Content-Disposition'),'len',len(body))
+                  if len(body)>1000:
+                    ext='bin'
+                    ct=(resp.headers.get('Content-Type') or '').lower()
+                    disp=resp.headers.get('Content-Disposition') or ''
+                    if 'spreadsheet' in ct or '.xlsx' in disp: ext='xlsx'
+                    elif 'ms-excel' in ct or '.xls' in disp: ext='xls'
+                    elif 'word' in ct or '.docx' in disp: ext='docx'
+                    elif '.doc' in disp: ext='doc'
+                    open(f'tdb_files/{cid}.{ext}','wb').write(body)
+                    break
+                except Exception as e:
+                  print('DLERR',cid,url,e)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: izzeteker-lise-tdb
+          path: |
+            lise_tdb_contents.json
+            tdb_files/**
+          retention-days: 3
