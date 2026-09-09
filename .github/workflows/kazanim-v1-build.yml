@@ -257,15 +257,15 @@ jobs:
       - name: Verify APK
         shell: bash
         run: |
-          test -s Kazanim-v8-debug.apk
-          file Kazanim-v8-debug.apk
-          unzip -t Kazanim-v8-debug.apk >/dev/null
+          test -s Kazanim-v8.2-debug.apk
+          file Kazanim-v8.2-debug.apk
+          unzip -t Kazanim-v8.2-debug.apk >/dev/null
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Kazanim-v8.2-debug-apk
-          path: Kazanim-v8-debug.apk
+          path: Kazanim-v8.2-debug.apk
           if-no-files-found: error
           retention-days: 7
 
