@@ -1,6 +1,10 @@
 name: Inspect generated v8 UI
 on:
   workflow_dispatch:
+  push:
+    branches: [kazanim-v1-build-20260909]
+    paths:
+      - .github/workflows/inspect-generated-v8.yml
 jobs:
   inspect:
     runs-on: ubuntu-latest
