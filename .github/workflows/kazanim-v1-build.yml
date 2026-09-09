@@ -50,6 +50,18 @@ jobs:
         shell: bash
         run: |
           python .ci/build_kazanim_v3.py buildsrc/Kazanim_v2
+          python - <<'PY'
+          from pathlib import Path
+          p=Path("buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java")
+          s=p.read_text(encoding="utf-8")
+          if "private void addHorizontalSpace" not in s:
+              marker="    private void addSpace(LinearLayout parent, int valueDp) {"
+              helper="    private void addHorizontalSpace(LinearLayout parent, int valueDp) {\n        Space gap = new Space(this);\n        parent.addView(gap, new LinearLayout.LayoutParams(dp(valueDp), 1));\n    }\n\n"
+              if marker not in s:
+                  raise SystemExit("addSpace marker not found")
+              s=s.replace(marker, helper+marker)
+              p.write_text(s, encoding="utf-8")
+          PY
           grep -q 'versionName = "3"' buildsrc/Kazanim_v2/app/build.gradle.kts
           grep -q 'Screen { HOME, SUBJECT, FAVORITES, COURSE }' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
           grep -q '"math-12"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
