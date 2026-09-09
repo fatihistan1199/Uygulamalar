@@ -1,0 +1,43 @@
+name: Inspect Izzet Eker API
+on:
+  workflow_dispatch:
+  push:
+    branches: [kazanim-v1-build-20260909]
+    paths:
+      - .github/workflows/inspect-izzeteker-api.yml
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch scripts and grep
+        shell: bash
+        run: |
+          set -e
+          python - <<'PY'
+          import urllib.request,re,html,os
+          base='https://www.izzeteker.com'
+          u=base+'/icerik-kategori/plan-zumre/temel-dini-bilgiler-islam-1-2-yillik-plan-cg211'
+          txt=urllib.request.urlopen(urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0'}),timeout=30).read().decode('utf-8','ignore')
+          scripts=re.findall(r'<script[^>]+src=["\']([^"\']+)["\']',txt,re.I)
+          os.makedirs('js',exist_ok=True)
+          for i,s in enumerate(scripts):
+            if s.startswith('http'): url=s
+            else: url=base+s
+            if 'cloudflare' in url: continue
+            try:
+              data=urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'}),timeout=30).read().decode('utf-8','ignore')
+              open(f'js/{i}.js','w',encoding='utf-8').write(data)
+              print('JS',i,url,'LEN',len(data))
+              pats=[r'https?://[^"\']+',r'/api/[^"\']+',r'fetch\([^)]{0,300}',r'axios[^;]{0,300}',r'icerik[^"\']{0,120}',r'category[^"\']{0,120}']
+              for pat in pats:
+                for m in re.findall(pat,data,re.I):
+                  if any(k in m.lower() for k in ['api','fetch','icerik','content','category','search']):
+                    print('MATCH',m[:500])
+            except Exception as e: print('ERR',url,e)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: izzeteker-js
+          path: js/*.js
+          retention-days: 1
