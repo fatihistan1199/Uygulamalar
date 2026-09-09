@@ -1,4 +1,4 @@
-name: Build Kazanim v8 APK
+name: Build Kazanim v8.1 APK
 
 on:
   push:
@@ -172,6 +172,44 @@ jobs:
           print("v8 middle-school validation OK:", total)
           PY
 
+      - name: Apply and validate Kazanim v8.1
+        shell: bash
+        run: |
+          unzip -oq .ci/kazanim_v8_1_overlay.zip -d buildsrc/Kazanim_v2
+          grep -q 'versionName = "8.1"' buildsrc/Kazanim_v2/app/build.gradle.kts
+          grep -q 'versionCode = 9' buildsrc/Kazanim_v2/app/build.gradle.kts
+          grep -q 'private enum Screen { HOME, SCHEDULE, SUBJECT, FAVORITES, COURSE }' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'geçen haftadan not var' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'Kalıcı Not' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'Ders Programı' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'LessonWidgetProvider' buildsrc/Kazanim_v2/app/src/main/AndroidManifest.xml
+          test -f buildsrc/Kazanim_v2/app/src/main/res/layout/widget_lesson.xml
+          test -f buildsrc/Kazanim_v2/app/src/main/res/xml/lesson_widget_info.xml
+          python - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root=Path("buildsrc/Kazanim_v2")
+          main=(root/"app/src/main/java/com/kazanim/app/MainActivity.java").read_text(encoding="utf-8")
+          i1=main.index('⌂\\nAna Sayfa')
+          i2=main.index('▦\\nDers Programı')
+          i3=main.index('★\\nFavoriler')
+          assert i1 < i2 < i3
+          assert 'createWeeklyNotePanel(page)' in main
+          assert 'renderPersistentNotePanel()' in main
+          assert 'ScheduleStore.putEntry' in main
+          assert 'LessonWidgetProvider.refreshAll' in main
+          manifest=root/"app/src/main/AndroidManifest.xml"
+          ET.parse(manifest)
+          for p in [
+              root/"app/src/main/res/layout/widget_lesson.xml",
+              root/"app/src/main/res/drawable/widget_bg.xml",
+              root/"app/src/main/res/drawable/widget_class_bg.xml",
+              root/"app/src/main/res/xml/lesson_widget_info.xml",
+          ]:
+              ET.parse(p)
+          print("v8.1 navigation / notes / schedule / widget validation OK")
+          PY
+
       - name: Build debug APK
         working-directory: buildsrc/Kazanim_v2
         shell: bash
@@ -192,7 +230,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v8-debug-apk
+          name: Kazanim-v8.1-debug-apk
           path: Kazanim-v8-debug.apk
           if-no-files-found: error
           retention-days: 7
@@ -201,7 +239,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v8-build-log
+          name: Kazanim-v8.1-build-log
           path: v8-build.log
           if-no-files-found: ignore
           retention-days: 3
