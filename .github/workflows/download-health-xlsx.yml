@@ -1,0 +1,22 @@
+name: Download health xlsx
+on:
+  workflow_dispatch:
+  push:
+    branches: [kazanim-v1-build-20260909]
+    paths:
+      - .github/workflows/download-health-xlsx.yml
+jobs:
+  dl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download
+        run: |
+          curl -k -fL -A "Mozilla/5.0" "https://www.biyolojihikayesi.com/tutanaklar/9-sinif-saglik-bilgisi-ve-trafik-kulturu-taslak-yillik-plani-20260902142227-4264.xlsx" -o Saglik_Bilgisi_2026_2027.xlsx
+          file Saglik_Bilgisi_2026_2027.xlsx
+          unzip -t Saglik_Bilgisi_2026_2027.xlsx >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: health-xlsx
+          path: Saglik_Bilgisi_2026_2027.xlsx
+          retention-days: 3
