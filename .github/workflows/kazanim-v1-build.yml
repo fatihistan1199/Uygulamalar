@@ -1,4 +1,4 @@
-name: Build Kazanim v7 APK
+name: Build Kazanim v8 APK
 
 on:
   push:
@@ -136,28 +136,64 @@ jobs:
           print("v7 grade10 validation OK:",len(pages))
           PY
 
+      - name: Generate and validate Kazanim v8
+        shell: bash
+        run: |
+          python .ci/build_kazanim_v8.py buildsrc/Kazanim_v2
+          grep -q 'versionName = "8"' buildsrc/Kazanim_v2/app/build.gradle.kts
+          grep -q '"schemaVersion": 8' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q '"science-5"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q '"science-8"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q '"social-5"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q '"social-8"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q 'T.C. İnkılap Tarihi ve Atatürkçülük' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q '"science", "social"' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          python - <<'PY'
+          import json
+          p="buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json"
+          d=json.load(open(p,encoding="utf-8"))
+          total=0
+          for grade in (5,6,7,8):
+              g=next(x for x in d["grades"] if x["grade"]==grade)
+              for sid in ("science","social"):
+                  c=next(x for x in g["courses"] if x["subjectId"]==sid)
+                  pages=[x for x in c["pages"] if x.get("type")=="week" and x.get("outcome")]
+                  assert 30 <= len(pages) <= 36, (grade,sid,len(pages))
+                  for x in pages:
+                      h=x.get("hints")
+                      assert h and len(h["plans"])==2
+                      for plan in h["plans"]:
+                          assert sum(b["minutes"] for b in plan["blocks"])==30
+                          assert min(b["minutes"] for b in plan["blocks"])>=5
+                  total += len(pages)
+          assert total >= 250, total
+          s8=next(c for g in d["grades"] if g["grade"]==8 for c in g["courses"] if c["subjectId"]=="social")
+          assert s8["subjectName"]=="T.C. İnkılap Tarihi ve Atatürkçülük"
+          print("v8 middle-school validation OK:", total)
+          PY
+
       - name: Build debug APK
         working-directory: buildsrc/Kazanim_v2
         shell: bash
         run: |
           set -o pipefail
-          gradle :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee ../../v7-build.log
+          gradle :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee ../../v8-build.log
 
       - name: Prepare APK
-        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v7-debug.apk
+        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v8-debug.apk
 
       - name: Verify APK
         shell: bash
         run: |
-          test -s Kazanim-v7-debug.apk
-          file Kazanim-v7-debug.apk
-          unzip -t Kazanim-v7-debug.apk >/dev/null
+          test -s Kazanim-v8-debug.apk
+          file Kazanim-v8-debug.apk
+          unzip -t Kazanim-v8-debug.apk >/dev/null
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v7-debug-apk
-          path: Kazanim-v7-debug.apk
+          name: Kazanim-v8-debug-apk
+          path: Kazanim-v8-debug.apk
           if-no-files-found: error
           retention-days: 7
 
@@ -165,7 +201,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v7-build-log
-          path: v7-build.log
+          name: Kazanim-v8-build-log
+          path: v8-build.log
           if-no-files-found: ignore
           retention-days: 3
