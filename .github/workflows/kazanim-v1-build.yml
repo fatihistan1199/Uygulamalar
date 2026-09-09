@@ -1,4 +1,4 @@
-name: Build Kazanim v1 APK
+name: Build Kazanim v2 APK
 
 on:
   push:
@@ -34,27 +34,35 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Reconstruct and unpack project
+      - name: Reconstruct and unpack v2 project
         shell: bash
         run: |
-          cat .ci/kazanim_zip_b64/part-01 .ci/kazanim_zip_b64/part-02 .ci/kazanim_zip_b64/part-03 .ci/kazanim_zip_b64/part-04 | base64 --decode > Kazanim_v1_Kaynak.fixed.zip
-          unzip -t Kazanim_v1_Kaynak.fixed.zip
+          cat .ci/kazanim_v2_b64/part-01 .ci/kazanim_v2_b64/part-02 .ci/kazanim_v2_b64/part-03 .ci/kazanim_v2_b64/part-04 .ci/kazanim_v2_b64/part-05 | base64 --decode > Kazanim_v2_Kaynak.zip
+          unzip -t Kazanim_v2_Kaynak.zip
           rm -rf buildsrc
           mkdir -p buildsrc
-          unzip -q Kazanim_v1_Kaynak.fixed.zip -d buildsrc
-          sed -i 's/\.setTextAllCaps(false)/.setAllCaps(false)/g' buildsrc/Kazanim_v1/app/src/main/java/com/kazanim/app/MainActivity.java
+          unzip -q Kazanim_v2_Kaynak.zip -d buildsrc
+          test -f buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'versionName = "2"' buildsrc/Kazanim_v2/app/build.gradle.kts
 
       - name: Build debug APK
-        working-directory: buildsrc/Kazanim_v1
+        working-directory: buildsrc/Kazanim_v2
         run: gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Prepare APK
-        run: cp buildsrc/Kazanim_v1/app/build/outputs/apk/debug/app-debug.apk Kazanim-v1-debug.apk
+        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v2-debug.apk
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          test -s Kazanim-v2-debug.apk
+          file Kazanim-v2-debug.apk
+          unzip -t Kazanim-v2-debug.apk >/dev/null
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v1-debug-apk
-          path: Kazanim-v1-debug.apk
+          name: Kazanim-v2-debug-apk
+          path: Kazanim-v2-debug.apk
           if-no-files-found: error
           retention-days: 7
