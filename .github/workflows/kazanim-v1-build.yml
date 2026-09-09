@@ -1,4 +1,4 @@
-name: Build Kazanim v2 APK
+name: Build Kazanim v3 APK
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,18 +23,20 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android 35
+      - name: Install Android 35 and RAR support
         shell: bash
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          sudo apt-get update -y
+          sudo apt-get install -y unrar-free
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Reconstruct and unpack v2 project
+      - name: Reconstruct v2 base
         shell: bash
         run: |
           cat .ci/kazanim_v2_b64/part-01 .ci/kazanim_v2_b64/part-02 .ci/kazanim_v2_b64/part-03 .ci/kazanim_v2_b64/part-04 .ci/kazanim_v2_b64/part-05 | base64 --decode > Kazanim_v2_Kaynak.zip
@@ -43,26 +45,35 @@ jobs:
           mkdir -p buildsrc
           unzip -q Kazanim_v2_Kaynak.zip -d buildsrc
           test -f buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
-          grep -q 'versionName = "2"' buildsrc/Kazanim_v2/app/build.gradle.kts
+
+      - name: Generate Kazanim v3
+        shell: bash
+        run: |
+          python .ci/build_kazanim_v3.py buildsrc/Kazanim_v2
+          grep -q 'versionName = "3"' buildsrc/Kazanim_v2/app/build.gradle.kts
+          grep -q 'Screen { HOME, SUBJECT, FAVORITES, COURSE }' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q '"math-12"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q '"english-9"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q '"history-12"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
 
       - name: Build debug APK
         working-directory: buildsrc/Kazanim_v2
         run: gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Prepare APK
-        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v2-debug.apk
+        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v3-debug.apk
 
       - name: Verify APK
         shell: bash
         run: |
-          test -s Kazanim-v2-debug.apk
-          file Kazanim-v2-debug.apk
-          unzip -t Kazanim-v2-debug.apk >/dev/null
+          test -s Kazanim-v3-debug.apk
+          file Kazanim-v3-debug.apk
+          unzip -t Kazanim-v3-debug.apk >/dev/null
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v2-debug-apk
-          path: Kazanim-v2-debug.apk
+          name: Kazanim-v3-debug-apk
+          path: Kazanim-v3-debug.apk
           if-no-files-found: error
           retention-days: 7
