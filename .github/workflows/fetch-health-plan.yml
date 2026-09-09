@@ -14,23 +14,18 @@ jobs:
         shell: bash
         run: |
           set -e
+          curl -k -L -A "Mozilla/5.0" "https://biyolojihikayesi.com/dokumanlar.php" -o health_page.html
           python - <<'PY'
-          import urllib.request,re,html,os
-          u='https://biyolojihikayesi.com/dokumanlar.php'
-          req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0'})
-          txt=urllib.request.urlopen(req,timeout=30).read().decode('utf-8','ignore')
-          open('health_page.html','w',encoding='utf-8').write(txt)
+          import re,html
+          txt=open('health_page.html',encoding='utf-8',errors='ignore').read()
           print('LEN',len(txt))
-          for key in ['2026-2027','Sağlık Bilgisi','Yıllık Plan','saglik','yillik']:
-            print('KEY',key,txt.lower().find(key.lower()))
           for m in re.finditer(r'Sağlık Bilgisi|Saglik Bilgisi|saglik',txt,re.I):
-            print('CTX',txt[max(0,m.start()-1200):m.start()+2200].replace('\n',' ')[:4000])
-          for m in re.findall(r'href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',txt,re.I|re.S):
-            href,body=m
-            label=re.sub('<[^>]+>',' ',body)
-            label=re.sub(r'\s+',' ',html.unescape(label)).strip()
-            if 'sağlık' in label.lower() or 'saglik' in label.lower() or 'yıllık' in label.lower():
-              print('LINK',label[:250],'=>',html.unescape(href))
+              print('CTX',txt[max(0,m.start()-1400):m.start()+2600].replace('\n',' ')[:5000])
+          for href,body in re.findall(r'href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',txt,re.I|re.S):
+              label=re.sub('<[^>]+>',' ',body)
+              label=re.sub(r'\s+',' ',html.unescape(label)).strip()
+              if 'sağlık' in label.lower() or 'saglik' in label.lower() or 'yıllık' in label.lower():
+                  print('LINK',label[:300],'=>',html.unescape(href))
           PY
       - uses: actions/upload-artifact@v4
         with:
