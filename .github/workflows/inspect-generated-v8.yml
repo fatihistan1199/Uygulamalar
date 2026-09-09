@@ -38,6 +38,12 @@ jobs:
           python .ci/v6_ui_patch.py src/Kazanim_v2
           python .ci/v7_grade10_curated.py src/Kazanim_v2
           python .ci/build_kazanim_v8.py src/Kazanim_v2
+      - name: Upload generated v8 source
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-v8-source
+          path: src/Kazanim_v2
+          retention-days: 2
       - name: Print relevant source
         shell: bash
         run: |
