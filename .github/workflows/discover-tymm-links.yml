@@ -1,0 +1,31 @@
+name: Discover TYMM plan links
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - kazanim-v1-build-20260909
+    paths:
+      - .github/workflows/discover-tymm-links.yml
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch page
+        shell: bash
+        run: |
+          python - <<'PY'
+          import urllib.request, re
+          u='https://tymm.meb.gov.tr/taslak-cerceve-planlari/ortaogretim'
+          html=urllib.request.urlopen(u).read().decode('utf-8','ignore')
+          print('LEN', len(html))
+          for m in re.findall(r'href=["\']([^"\']+)["\']', html, re.I):
+              if any(x in m.lower() for x in ['xlsx','xls','zip','rar','download','dosya','plan']):
+                  print(m)
+          open('page.html','w',encoding='utf-8').write(html)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tymm-page
+          path: page.html
+          retention-days: 1
