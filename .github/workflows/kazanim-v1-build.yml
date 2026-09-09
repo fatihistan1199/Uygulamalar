@@ -1,4 +1,4 @@
-name: Build Kazanim v6 APK
+name: Build Kazanim v7 APK
 
 on:
   push:
@@ -112,15 +112,39 @@ jobs:
           print("v6 hint validation OK:",len(hint_pages))
           PY
 
+      - name: Generate and validate Kazanim v7
+        shell: bash
+        run: |
+          python .ci/v7_grade10_curated.py buildsrc/Kazanim_v2
+          grep -q 'versionName = "7"' buildsrc/Kazanim_v2/app/build.gradle.kts
+          grep -q '"schemaVersion": 7' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q 'curated-official-2026' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q '10. sınıf • TYMM temelli' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q 'hintSubtitle' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          python - <<'PY'
+          import json
+          p="buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json"
+          d=json.load(open(p,encoding="utf-8"))
+          g=next(x for x in d["grades"] if x["grade"]==10)
+          c=next(x for x in g["courses"] if x["subjectId"]=="dkab")
+          pages=[x for x in c["pages"] if x.get("type")=="week" and x.get("outcome")]
+          assert len(pages)==34
+          assert all(x["hints"]["qualityLevel"]=="curated-official-2026" for x in pages)
+          assert all(len(x["hints"]["plans"])==2 for x in pages)
+          assert all(sum(b["minutes"] for b in plan["blocks"])==30 for x in pages for plan in x["hints"]["plans"])
+          assert all(min(b["minutes"] for b in plan["blocks"])>=5 for x in pages for plan in x["hints"]["plans"])
+          print("v7 grade10 validation OK:",len(pages))
+          PY
+
       - name: Build debug APK
         working-directory: buildsrc/Kazanim_v2
         shell: bash
         run: |
           set -o pipefail
-          gradle :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee ../../v6-build.log
+          gradle :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee ../../v7-build.log
 
       - name: Prepare APK
-        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v6-debug.apk
+        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v7-debug.apk
 
       - name: Verify APK
         shell: bash
@@ -132,7 +156,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v6-debug-apk
+          name: Kazanim-v7-debug-apk
           path: Kazanim-v6-debug.apk
           if-no-files-found: error
           retention-days: 7
@@ -141,7 +165,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v6-build-log
-          path: v6-build.log
+          name: Kazanim-v7-build-log
+          path: v7-build.log
           if-no-files-found: ignore
           retention-days: 3
