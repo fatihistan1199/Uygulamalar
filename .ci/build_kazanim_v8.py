@@ -537,6 +537,8 @@ def make_course(subject_id, subject_name, grade, records, calendar):
     pages = []
     for base in calendar:
         p = copy.deepcopy(base)
+        # Takvim yalnız tarih/hafta iskeleti olarak kullanılır; kaynak dersin ipuçlarını taşımayın.
+        p.pop("hints", None)
         if p["type"] == "holiday":
             p.update(unit="", topic="", outcome="", special=None)
         else:
