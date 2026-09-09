@@ -175,7 +175,9 @@ jobs:
       - name: Apply and validate Kazanim v8.1
         shell: bash
         run: |
-          unzip -oq .ci/kazanim_v8_1_overlay.zip -d buildsrc/Kazanim_v2
+          cat .ci/kazanim_v8_1_b64/part-01 .ci/kazanim_v8_1_b64/part-02 .ci/kazanim_v8_1_b64/part-03 .ci/kazanim_v8_1_b64/part-04 .ci/kazanim_v8_1_b64/part-05 | base64 --decode > /tmp/kazanim-v8.1-overlay.zip
+          unzip -t /tmp/kazanim-v8.1-overlay.zip
+          unzip -oq /tmp/kazanim-v8.1-overlay.zip -d buildsrc/Kazanim_v2
           grep -q 'versionName = "8.1"' buildsrc/Kazanim_v2/app/build.gradle.kts
           grep -q 'versionCode = 9' buildsrc/Kazanim_v2/app/build.gradle.kts
           grep -q 'private enum Screen { HOME, SCHEDULE, SUBJECT, FAVORITES, COURSE }' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
