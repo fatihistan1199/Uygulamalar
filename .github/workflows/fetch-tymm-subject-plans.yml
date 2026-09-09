@@ -1,0 +1,37 @@
+name: Fetch official TYMM subject plans
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - kazanim-v1-build-20260909
+    paths:
+      - .github/workflows/fetch-tymm-subject-plans.yml
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install rar support
+        run: sudo apt-get update -y && sudo apt-get install -y unrar-free
+      - name: Download official archives
+        shell: bash
+        run: |
+          set -e
+          mkdir -p official_subject_plans
+          base="https://tymm.meb.gov.tr"
+          curl -fL --retry 3 "$base/assets/file/matematik-dersi-taslak-yillik-planlar_20260827_083834_941.zip" -o official_subject_plans/matematik.zip
+          curl -fL --retry 3 "$base/assets/file/tarih-dersi-taslak-yillik-planlar_20260827_083900_546.zip" -o official_subject_plans/tarih.zip
+          curl -fL --retry 3 "$base/assets/file/ingilizce-dersi-taslak-yillik-planlar_20260827_111530_896.rar" -o official_subject_plans/ingilizce.rar
+          echo "FILES"
+          ls -lh official_subject_plans
+          echo "MATH"
+          unzip -l official_subject_plans/matematik.zip
+          echo "HISTORY"
+          unzip -l official_subject_plans/tarih.zip
+          echo "ENGLISH"
+          unrar-free -t official_subject_plans/ingilizce.rar || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: official-tymm-subject-plans
+          path: official_subject_plans/*
+          retention-days: 2
