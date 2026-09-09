@@ -1,0 +1,58 @@
+name: Inspect official English sheets
+on:
+  workflow_dispatch:
+  push:
+    branches: [kazanim-v1-build-20260909]
+    paths:
+      - .github/workflows/inspect-english-official.yml
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y unrar-free >/dev/null
+      - shell: bash
+        run: |
+          python - <<'PY'
+          import urllib.request,subprocess,tempfile,zipfile,re
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          url='https://tymm.meb.gov.tr/assets/file/ingilizce-dersi-taslak-yillik-planlar_20260827_111530_896.rar'
+          with tempfile.TemporaryDirectory() as td:
+            td=Path(td); rar=td/'e.rar'
+            urllib.request.urlretrieve(url,rar)
+            out=td/'out'; out.mkdir()
+            q=subprocess.run(['unrar-free','-x',str(rar),str(out)+'/'])
+            if q.returncode: q=subprocess.run(['unrar-free','--extract',str(rar),str(out)+'/'])
+            print('FILES', [p.name for p in out.rglob('*.xlsx')])
+            xls=next(p for p in out.rglob('*.xlsx') if 'HAZIRLIK SINIFI BULUNMAYAN' in p.name.upper())
+            z=zipfile.ZipFile(xls)
+            NS='http://schemas.openxmlformats.org/spreadsheetml/2006/main'; R='http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+            shared=[]
+            if 'xl/sharedStrings.xml' in z.namelist():
+              rr=ET.fromstring(z.read('xl/sharedStrings.xml'))
+              shared=[''.join(t.text or '' for t in si.iter('{%s}t'%NS)) for si in rr.findall('{%s}si'%NS)]
+            wb=ET.fromstring(z.read('xl/workbook.xml')); relroot=ET.fromstring(z.read('xl/_rels/workbook.xml.rels'))
+            rel={r.attrib['Id']:r.attrib['Target'] for r in relroot}
+            for sh in wb.find('{%s}sheets'%NS):
+              name=sh.attrib['name']
+              if name not in ['9. SINIF','10. SINIF','11. SINIF','12. SINIF']: continue
+              target=rel[sh.attrib['{%s}id'%R]]
+              path=target.lstrip('/') if target.startswith('/') else 'xl/'+target.lstrip('/')
+              root=ET.fromstring(z.read(path))
+              vals={}
+              for c in root.iter('{%s}c'%NS):
+                ref=c.attrib.get('r',''); typ=c.attrib.get('t'); v=c.find('{%s}v'%NS); ins=c.find('{%s}is'%NS)
+                if not ref: continue
+                value=''
+                if typ=='s' and v is not None: value=shared[int(v.text)]
+                elif typ=='inlineStr' and ins is not None: value=''.join(t.text or '' for t in ins.iter('{%s}t'%NS))
+                elif v is not None: value=v.text or ''
+                vals[ref]=value
+              codes=[]
+              for value in vals.values():
+                codes += re.findall(r'ENG\.\d+\.\d+\.[A-Z]\d+', value)
+              print(name, codes[:20])
+          PY
