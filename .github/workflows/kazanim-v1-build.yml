@@ -1,4 +1,4 @@
-name: Build Kazanim v5 APK
+name: Build Kazanim v6 APK
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -79,28 +79,68 @@ jobs:
           grep -q '"tdb1-12"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
           grep -q '"tdb2-12"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
           grep -q '"health-9"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
-          grep -q 'renderFavorites();' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
-          grep -q 'Hafta - ' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
-          grep -q 'Sağlık Bilgisi ve Trafik Kültürü' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+
+      - name: Generate and validate Kazanim v6
+        shell: bash
+        run: |
+          python .ci/build_kazanim_v6.py buildsrc/Kazanim_v2
+          grep -q 'versionName = "6"' buildsrc/Kazanim_v2/app/build.gradle.kts
+          grep -q '"schemaVersion": 6' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q 'createHintPanel' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          python - <<'PY'
+          import json
+          p="buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json"
+          d=json.load(open(p,encoding="utf-8"))
+          hint_pages=[]
+          for g in d["grades"]:
+              for c in g["courses"]:
+                  for page in c["pages"]:
+                      if "hints" in page:
+                          hint_pages.append((g["grade"],c["subjectId"],page))
+          assert len(hint_pages)==102, len(hint_pages)
+          assert all(g in (9,10,11) and sid=="dkab" for g,sid,_ in hint_pages)
+          for _,_,page in hint_pages:
+              plans=page["hints"]["plans"]
+              assert len(plans)==2
+              assert plans[0]["style"] != plans[1]["style"]
+              for plan in plans:
+                  assert 1 <= len(plan["blocks"]) <= 3
+                  assert sum(b["minutes"] for b in plan["blocks"]) == 30
+                  assert min(b["minutes"] for b in plan["blocks"]) >= 5
+                  assert all(b["title"].strip() and b["text"].strip() for b in plan["blocks"])
+          print("v6 hint validation OK:",len(hint_pages))
+          PY
 
       - name: Build debug APK
         working-directory: buildsrc/Kazanim_v2
-        run: gradle :app:assembleDebug --stacktrace --no-daemon
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee ../../v6-build.log
 
       - name: Prepare APK
-        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v5-debug.apk
+        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v6-debug.apk
 
       - name: Verify APK
         shell: bash
         run: |
-          test -s Kazanim-v5-debug.apk
-          file Kazanim-v5-debug.apk
-          unzip -t Kazanim-v5-debug.apk >/dev/null
+          test -s Kazanim-v6-debug.apk
+          file Kazanim-v6-debug.apk
+          unzip -t Kazanim-v6-debug.apk >/dev/null
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v5-debug-apk
-          path: Kazanim-v5-debug.apk
+          name: Kazanim-v6-debug-apk
+          path: Kazanim-v6-debug.apk
           if-no-files-found: error
           retention-days: 7
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kazanim-v6-build-log
+          path: v6-build.log
+          if-no-files-found: ignore
+          retention-days: 3
