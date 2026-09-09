@@ -1,4 +1,4 @@
-name: Build Kazanim v4 APK
+name: Build Kazanim v5 APK
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,7 +62,6 @@ jobs:
               s=s.replace(marker, helper+marker)
               p.write_text(s, encoding="utf-8")
           PY
-          grep -q 'versionName = "3"' buildsrc/Kazanim_v2/app/build.gradle.kts
 
       - name: Generate Kazanim v4
         shell: bash
@@ -70,32 +69,38 @@ jobs:
           python .ci/build_kazanim_v4.py buildsrc/Kazanim_v2
           grep -q 'versionName = "4"' buildsrc/Kazanim_v2/app/build.gradle.kts
           grep -q '"schemaVersion": 4' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
-          grep -q '"tde-12"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
-          grep -q '"physics-12"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
-          grep -q '"chemistry-12"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
-          grep -q '"biology-12"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
-          grep -q '"geography-12"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
-          grep -q '"philosophy-11"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
-          grep -q 'Türk Dili ve Edebiyatı' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+
+      - name: Generate Kazanim v5
+        shell: bash
+        run: |
+          python .ci/build_kazanim_v5.py buildsrc/Kazanim_v2
+          grep -q 'versionName = "5"' buildsrc/Kazanim_v2/app/build.gradle.kts
+          grep -q '"schemaVersion": 5' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q '"tdb1-12"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q '"tdb2-12"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q '"health-9"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
+          grep -q 'renderFavorites();' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q '"Hafta - "' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'Sağlık Bilgisi ve Trafik Kültürü' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
 
       - name: Build debug APK
         working-directory: buildsrc/Kazanim_v2
         run: gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Prepare APK
-        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v4-debug.apk
+        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v5-debug.apk
 
       - name: Verify APK
         shell: bash
         run: |
-          test -s Kazanim-v4-debug.apk
-          file Kazanim-v4-debug.apk
-          unzip -t Kazanim-v4-debug.apk >/dev/null
+          test -s Kazanim-v5-debug.apk
+          file Kazanim-v5-debug.apk
+          unzip -t Kazanim-v5-debug.apk >/dev/null
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v4-debug-apk
-          path: Kazanim-v4-debug.apk
+          name: Kazanim-v5-debug-apk
+          path: Kazanim-v5-debug.apk
           if-no-files-found: error
           retention-days: 7
