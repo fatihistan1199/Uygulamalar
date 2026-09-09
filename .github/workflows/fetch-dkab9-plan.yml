@@ -1,0 +1,21 @@
+name: Fetch DKAB9 official plan
+on:
+  workflow_dispatch:
+  push:
+    branches: [kazanim-v1-build-20260909]
+    paths:
+      - .github/workflows/fetch-dkab9-plan.yml
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download official DKAB9 plan
+        run: |
+          curl -fL --retry 3 -A "Mozilla/5.0" "https://dogm.meb.gov.tr/pdf/CerceveYillikPlan/2025DKAB/dkab9_TYMM.xlsx" -o dkab9_TYMM.xlsx
+          unzip -t dkab9_TYMM.xlsx >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dkab9-official-plan
+          path: dkab9_TYMM.xlsx
+          retention-days: 2
