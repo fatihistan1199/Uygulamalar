@@ -1,0 +1,31 @@
+name: Discover v8 official sources
+on:
+  workflow_dispatch:
+  push:
+    branches: [kazanim-v1-build-20260909]
+    paths:
+      - .github/workflows/discover-v8-sources.yml
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discover TYMM links
+        shell: bash
+        run: |
+          python - <<'PY'
+          import urllib.request, re, html
+          url='https://tymm.meb.gov.tr/taslak-cerceve-planlari/temel-egitim'
+          req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+          txt=urllib.request.urlopen(req,timeout=30).read().decode('utf-8','replace')
+          print('HTML',len(txt))
+          links=re.findall(r'href=["\']([^"\']+)["\']',txt,re.I)
+          for x in links:
+              y=html.unescape(x)
+              low=y.lower()
+              if any(k in low for k in ['fen','sosyal','inkilap','inkılap']):
+                  print(y)
+          print('ASSETS')
+          for y in links:
+              if 'assets/file' in y.lower():
+                  print(html.unescape(y))
+          PY
