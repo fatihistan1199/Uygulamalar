@@ -1,0 +1,43 @@
+name: Inspect Izzet Eker TDB
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - kazanim-v1-build-20260909
+    paths:
+      - .github/workflows/inspect-izzeteker-tdb.yml
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch category and inspect
+        shell: bash
+        run: |
+          set -e
+          python - <<'PY'
+          import urllib.request,re,html
+          urls=[
+            'https://www.izzeteker.com/icerik-kategori/plan-zumre/temel-dini-bilgiler-islam-1-2-yillik-plan-cg211',
+            'https://izzeteker.com/icerik-kategori/plan-zumre/temel-dini-bilgiler-islam-1-2-yillik-plan-cg211'
+          ]
+          for i,u in enumerate(urls):
+            req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0'})
+            try:
+              txt=urllib.request.urlopen(req,timeout=30).read().decode('utf-8','ignore')
+            except Exception as e:
+              print('ERR',u,e); continue
+            open(f'izzet_{i}.html','w',encoding='utf-8').write(txt)
+            print('URL',u,'LEN',len(txt))
+            for pat in ['2026','Temel Dini','İslam 1','İslam 2','api','fetch','axios','icerik-detay','download','dosya','file']:
+              if pat.lower() in txt.lower(): print('HAS',pat)
+            for m in re.findall(r'href=["\']([^"\']+)["\']',txt,re.I):
+              if any(k in m.lower() for k in ['icerik','dosya','download','plan','api']): print('HREF',html.unescape(m))
+            for m in re.findall(r'<script[^>]+src=["\']([^"\']+)["\']',txt,re.I):
+              print('SCRIPT',html.unescape(m))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: izzeteker-tdb-html
+          path: izzet_*.html
+          retention-days: 2
