@@ -1,0 +1,58 @@
+name: Inspect v8.2 widget and footer
+on:
+  workflow_dispatch:
+  push:
+    branches: [kazanim-v1-build-20260909]
+    paths:
+      - .github/workflows/inspect-v82-widget-footer.yml
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: |
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y unrar-free >/dev/null
+      - name: Reconstruct v8.2
+        shell: bash
+        run: |
+          cat .ci/kazanim_v2_b64/part-01 .ci/kazanim_v2_b64/part-02 .ci/kazanim_v2_b64/part-03 .ci/kazanim_v2_b64/part-04 .ci/kazanim_v2_b64/part-05 | base64 --decode > base.zip
+          mkdir src && unzip -q base.zip -d src
+          python .ci/build_kazanim_v3.py src/Kazanim_v2
+          python - <<'PY'
+          from pathlib import Path
+          p=Path("src/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java")
+          s=p.read_text(encoding="utf-8")
+          if "private void addHorizontalSpace" not in s:
+              marker="    private void addSpace(LinearLayout parent, int valueDp) {"
+              helper="    private void addHorizontalSpace(LinearLayout parent, int valueDp) {\n        Space gap = new Space(this);\n        parent.addView(gap, new LinearLayout.LayoutParams(dp(valueDp), 1));\n    }\n\n"
+              if marker in s:
+                  s=s.replace(marker,helper+marker); p.write_text(s,encoding="utf-8")
+          PY
+          python .ci/build_kazanim_v4.py src/Kazanim_v2
+          python .ci/build_kazanim_v5.py src/Kazanim_v2
+          python .ci/v6_hint_engine.py src/Kazanim_v2
+          python .ci/v6_ui_patch.py src/Kazanim_v2
+          python .ci/v7_grade10_curated.py src/Kazanim_v2
+          python .ci/build_kazanim_v8.py src/Kazanim_v2
+          cat .ci/kazanim_v8_1_b64/part-01 .ci/kazanim_v8_1_b64/part-02 .ci/kazanim_v8_1_b64/part-03 .ci/kazanim_v8_1_b64/part-04 .ci/kazanim_v8_1_b64/part-05 | base64 --decode > /tmp/o.zip
+          unzip -oq /tmp/o.zip -d src/Kazanim_v2
+          python .ci/v8_2_patch.py src/Kazanim_v2
+      - name: Print exact targets
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          root=Path("src/Kazanim_v2")
+          main=(root/"app/src/main/java/com/kazanim/app/MainActivity.java").read_text(encoding="utf-8")
+          for pat in ["private void renderCourse(Course selectedCourse)", "private void updateFooter", "private void renderPersistentNotePanel"]:
+              i=main.find(pat)
+              print("\n###",pat,"@",i)
+              if i>=0: print(main[i:i+12000])
+          print("\n### WIDGET PROVIDER")
+          print((root/"app/src/main/java/com/kazanim/app/widget/LessonWidgetProvider.java").read_text(encoding="utf-8"))
+          print("\n### WIDGET XML")
+          print((root/"app/src/main/res/layout/widget_lesson.xml").read_text(encoding="utf-8"))
+          PY
