@@ -1,0 +1,27 @@
+name: Extract official English plans
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - kazanim-v1-build-20260909
+    paths:
+      - .github/workflows/extract-english-plans.yml
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install and extract
+        shell: bash
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y unrar-free
+          mkdir -p english_extracted
+          curl -fL --retry 3 "https://tymm.meb.gov.tr/assets/file/ingilizce-dersi-taslak-yillik-planlar_20260827_111530_896.rar" -o english.rar
+          unrar-free -x english.rar english_extracted/ || unrar-free --extract english.rar english_extracted/
+          find english_extracted -type f -maxdepth 4 -print
+      - uses: actions/upload-artifact@v4
+        with:
+          name: official-english-extracted
+          path: english_extracted/**
+          retention-days: 2
