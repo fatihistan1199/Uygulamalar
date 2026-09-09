@@ -1,4 +1,4 @@
-name: Build Kazanim v8.2 APK
+name: Build Kazanim v8.3 APK
 
 on:
   push:
@@ -244,28 +244,55 @@ jobs:
           print("v8.2 English / notes / wheel time / favorites validation OK")
           PY
 
+      - name: Apply and validate Kazanim v8.3
+        shell: bash
+        run: |
+          python .ci/v8_3_patch.py buildsrc/Kazanim_v2
+          grep -q 'versionName = "8.3"' buildsrc/Kazanim_v2/app/build.gradle.kts
+          grep -q 'versionCode = 11' buildsrc/Kazanim_v2/app/build.gradle.kts
+          grep -q 'showPersistentNoteEditor' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'editor.setTextSize(19f)' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'counterText.setVisibility(View.GONE)' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'page.setTranslationX(forward ? dp(58) : -dp(58))' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'alarm.setExactAndAllowWhileIdle' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/widget/LessonWidgetProvider.java
+          grep -q 'android:textSize="16sp"' buildsrc/Kazanim_v2/app/src/main/res/layout/widget_lesson.xml
+          grep -q 'android:textSize="14sp"' buildsrc/Kazanim_v2/app/src/main/res/layout/widget_lesson.xml
+          python - <<'PY'
+          from pathlib import Path
+          main=Path("buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java").read_text(encoding="utf-8")
+          assert 'Önceki hafta");' in main and 'Sonraki hafta");' in main
+          assert 'label("‹", 38' in main and 'label("›", 38' in main
+          assert 'counterText.setVisibility(View.GONE)' in main
+          assert 'statusText.setVisibility(View.GONE)' in main
+          assert 'SOFT_INPUT_STATE_ALWAYS_VISIBLE' in main
+          widget=Path("buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/widget/LessonWidgetProvider.java").read_text(encoding="utf-8")
+          assert 'currentOrNextToday' in widget
+          assert 'setExactAndAllowWhileIdle' in widget
+          print("v8.3 persistent popup / footer / swipe / widget validation OK")
+          PY
+
       - name: Build debug APK
         working-directory: buildsrc/Kazanim_v2
         shell: bash
         run: |
           set -o pipefail
-          gradle :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee ../../v8.2-build.log
+          gradle :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee ../../v8.3-build.log
 
       - name: Prepare APK
-        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v8.2-debug.apk
+        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v8.3-debug.apk
 
       - name: Verify APK
         shell: bash
         run: |
-          test -s Kazanim-v8.2-debug.apk
-          file Kazanim-v8.2-debug.apk
-          unzip -t Kazanim-v8.2-debug.apk >/dev/null
+          test -s Kazanim-v8.3-debug.apk
+          file Kazanim-v8.3-debug.apk
+          unzip -t Kazanim-v8.3-debug.apk >/dev/null
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v8.2-debug-apk
-          path: Kazanim-v8.2-debug.apk
+          name: Kazanim-v8.3-debug-apk
+          path: Kazanim-v8.3-debug.apk
           if-no-files-found: error
           retention-days: 7
 
@@ -273,7 +300,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v8.2-build-log
-          path: v8.2-build.log
+          name: Kazanim-v8.3-build-log
+          path: v8.3-build.log
           if-no-files-found: ignore
           retention-days: 3
