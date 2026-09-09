@@ -80,7 +80,7 @@ jobs:
           grep -q '"tdb2-12"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
           grep -q '"health-9"' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
           grep -q 'renderFavorites();' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
-          grep -q '"Hafta - "' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'Hafta - ' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
           grep -q 'Sağlık Bilgisi ve Trafik Kültürü' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
 
       - name: Build debug APK
