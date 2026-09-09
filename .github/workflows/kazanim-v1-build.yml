@@ -1,4 +1,4 @@
-name: Build Kazanim v8.1 APK
+name: Build Kazanim v8.2 APK
 
 on:
   push:
@@ -212,15 +212,47 @@ jobs:
           print("v8.1 navigation / notes / schedule / widget validation OK")
           PY
 
+      - name: Apply and validate Kazanim v8.2
+        shell: bash
+        run: |
+          python .ci/v8_2_patch.py buildsrc/Kazanim_v2
+          grep -q 'versionName = "8.2"' buildsrc/Kazanim_v2/app/build.gradle.kts
+          grep -q 'versionCode = 10' buildsrc/Kazanim_v2/app/build.gradle.kts
+          grep -q 'showWheelTimePicker' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'NumberPicker' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'scheduleCourses' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          grep -q 'windowSoftInputMode="adjustResize"' buildsrc/Kazanim_v2/app/src/main/AndroidManifest.xml
+          ! grep -q 'Önceki hafta' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          ! grep -q 'Sonraki hafta' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          ! grep -q 'Hafta değişse de burada kalır' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("buildsrc/Kazanim_v2")
+          d=json.load(open(root/"app/src/main/assets/curriculum_2026_2027.json",encoding="utf-8"))
+          for grade in (9,10):
+              g=next(x for x in d["grades"] if x["grade"]==grade)
+              c=next(x for x in g["courses"] if x.get("subjectId")=="english")
+              assert len([p for p in c["pages"] if p.get("type")=="week"])==37
+          main=(root/"app/src/main/java/com/kazanim/app/MainActivity.java").read_text(encoding="utf-8")
+          assert 'englishExpandable' in main
+          assert 'englishOutcome' in main
+          assert 'setMaxLines(2)' in main
+          assert 'Kalıcı Not", 19' in main
+          assert 'edit.setTextSize(16.5f)' in main
+          assert 'if (isFavorite(c)) scheduleCourses.add(c)' in main
+          print("v8.2 English / notes / wheel time / favorites validation OK")
+          PY
+
       - name: Build debug APK
         working-directory: buildsrc/Kazanim_v2
         shell: bash
         run: |
           set -o pipefail
-          gradle :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee ../../v8-build.log
+          gradle :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee ../../v8.2-build.log
 
       - name: Prepare APK
-        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v8-debug.apk
+        run: cp buildsrc/Kazanim_v2/app/build/outputs/apk/debug/app-debug.apk Kazanim-v8.2-debug.apk
 
       - name: Verify APK
         shell: bash
@@ -232,7 +264,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v8.1-debug-apk
+          name: Kazanim-v8.2-debug-apk
           path: Kazanim-v8-debug.apk
           if-no-files-found: error
           retention-days: 7
@@ -241,7 +273,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Kazanim-v8.1-build-log
-          path: v8-build.log
+          name: Kazanim-v8.2-build-log
+          path: v8.2-build.log
           if-no-files-found: ignore
           retention-days: 3
