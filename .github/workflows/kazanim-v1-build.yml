@@ -83,7 +83,8 @@ jobs:
       - name: Generate and validate Kazanim v6
         shell: bash
         run: |
-          python .ci/v6_hint_engine.py buildsrc/Kazanim_v2\n          python .ci/v6_ui_patch.py buildsrc/Kazanim_v2
+          python .ci/v6_hint_engine.py buildsrc/Kazanim_v2
+          python .ci/v6_ui_patch.py buildsrc/Kazanim_v2
           grep -q 'versionName = "6"' buildsrc/Kazanim_v2/app/build.gradle.kts
           grep -q '"schemaVersion": 6' buildsrc/Kazanim_v2/app/src/main/assets/curriculum_2026_2027.json
           grep -q 'createHintPanel' buildsrc/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java
