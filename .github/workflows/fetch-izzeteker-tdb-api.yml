@@ -1,0 +1,45 @@
+name: Fetch Izzet Eker TDB contents
+on:
+  workflow_dispatch:
+  push:
+    branches: [kazanim-v1-build-20260909]
+    paths:
+      - .github/workflows/fetch-izzeteker-tdb-api.yml
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Query API
+        shell: bash
+        run: |
+          set -e
+          python - <<'PY'
+          import urllib.request,json
+          base='https://api.izzeteker.com'
+          urls=[
+            base+'/contents?categoryOrSubjectId=cg-211',
+            base+'/contents/menu?id=cg-1',
+            base+'/contents/search?searchText=2026%202027%20Temel%20Dini%20Bilgiler',
+            base+'/contents/search?searchText=Temel%20Dini%20Bilgiler%20%C4%B0slam%201%20Y%C4%B1ll%C4%B1k%20Plan',
+            base+'/contents/search?searchText=Temel%20Dini%20Bilgiler%20%C4%B0slam%202%20Y%C4%B1ll%C4%B1k%20Plan'
+          ]
+          headers={'User-Agent':'Mozilla/5.0','Origin':'https://www.izzeteker.com','Referer':'https://www.izzeteker.com/'}
+          for i,u in enumerate(urls):
+            try:
+              data=urllib.request.urlopen(urllib.request.Request(u,headers=headers),timeout=30).read()
+              open(f'api_{i}.json','wb').write(data)
+              print('URL',u,'LEN',len(data))
+              try:
+                obj=json.loads(data)
+                print(json.dumps(obj,ensure_ascii=False,indent=2)[:25000])
+              except Exception:
+                print(data[:3000])
+            except Exception as e:
+              print('ERR',u,e)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: izzeteker-tdb-api
+          path: api_*.json
+          retention-days: 2
