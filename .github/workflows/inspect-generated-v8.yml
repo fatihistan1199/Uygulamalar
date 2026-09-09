@@ -1,0 +1,64 @@
+name: Inspect generated v8 UI
+on:
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install RAR support
+        run: |
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y unrar-free >/dev/null
+      - name: Reconstruct and generate v8
+        shell: bash
+        run: |
+          cat .ci/kazanim_v2_b64/part-01 .ci/kazanim_v2_b64/part-02 .ci/kazanim_v2_b64/part-03 .ci/kazanim_v2_b64/part-04 .ci/kazanim_v2_b64/part-05 | base64 --decode > base.zip
+          mkdir src && unzip -q base.zip -d src
+          python .ci/build_kazanim_v3.py src/Kazanim_v2
+          python - <<'PY'
+          from pathlib import Path
+          p=Path("src/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java")
+          s=p.read_text(encoding="utf-8")
+          if "private void addHorizontalSpace" not in s:
+              marker="    private void addSpace(LinearLayout parent, int valueDp) {"
+              helper="    private void addHorizontalSpace(LinearLayout parent, int valueDp) {\n        Space gap = new Space(this);\n        parent.addView(gap, new LinearLayout.LayoutParams(dp(valueDp), 1));\n    }\n\n"
+              if marker in s:
+                  s=s.replace(marker,helper+marker)
+                  p.write_text(s,encoding="utf-8")
+          PY
+          python .ci/build_kazanim_v4.py src/Kazanim_v2
+          python .ci/build_kazanim_v5.py src/Kazanim_v2
+          python .ci/v6_hint_engine.py src/Kazanim_v2
+          python .ci/v6_ui_patch.py src/Kazanim_v2
+          python .ci/v7_grade10_curated.py src/Kazanim_v2
+          python .ci/build_kazanim_v8.py src/Kazanim_v2
+      - name: Print relevant source
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          files=[
+            "src/Kazanim_v2/app/src/main/java/com/kazanim/app/MainActivity.java",
+            "src/Kazanim_v2/app/src/main/java/com/kazanim/app/data/PlanRepository.java",
+            "src/Kazanim_v2/app/src/main/java/com/kazanim/app/model/Course.java",
+            "src/Kazanim_v2/app/src/main/java/com/kazanim/app/model/PlanPage.java",
+            "src/Kazanim_v2/app/src/main/AndroidManifest.xml",
+          ]
+          pats=["enum Screen","onCreate","renderCourse","weekCard","bottomNav","renderFavorites","current","findCurrent","dateLabel","showSearch"]
+          for fn in files:
+              s=Path(fn).read_text(encoding="utf-8")
+              print("\n===== FILE",fn,"=====")
+              if fn.endswith("MainActivity.java"):
+                  for p in pats:
+                      start=0
+                      while True:
+                          i=s.find(p,start)
+                          if i<0: break
+                          a=max(0,i-600); b=min(len(s),i+5200)
+                          print("\n---",p,"@",i,"---\n",s[a:b])
+                          start=i+len(p)
+              else:
+                  print(s[:30000])
+          PY
