@@ -1,0 +1,31 @@
+name: Fetch official TYMM v4 plans
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - kazanim-v1-build-20260909
+    paths:
+      - .github/workflows/fetch-tymm-v4-plans.yml
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download official archives
+        shell: bash
+        run: |
+          set -e
+          mkdir -p v4plans
+          base="https://tymm.meb.gov.tr/assets/file"
+          curl -fL --retry 3 "$base/biyoloji-dersi-taslak-yillik-planlar_20260831_190639_106.zip" -o v4plans/biyoloji.zip
+          curl -fL --retry 3 "$base/cografya-dersi-taslak-yillik-planlar_20260827_083607_902.zip" -o v4plans/cografya.zip
+          curl -fL --retry 3 "$base/felsefe-dersi-taslak-yillik-planlar_20260827_123428_620.zip" -o v4plans/felsefe.zip
+          curl -fL --retry 3 "$base/fizik-dersi-taslak-yillik-planlar_20260827_083757_124.zip" -o v4plans/fizik.zip
+          curl -fL --retry 3 "$base/kimya-dersi-taslak-yillik-planlar_20260827_083820_533.zip" -o v4plans/kimya.zip
+          curl -fL --retry 3 "$base/turk-dili-ve-edebiyati-dersi-taslak-yillik-planlar_20260827_142401_066.zip" -o v4plans/tde.zip
+          for f in v4plans/*.zip; do echo "=== $f ==="; unzip -l "$f" | sed -n '1,120p'; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: official-tymm-v4-plans
+          path: v4plans/*.zip
+          retention-days: 2
