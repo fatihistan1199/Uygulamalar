@@ -1,0 +1,82 @@
+name: Parse v8 weekly records
+on:
+  workflow_dispatch:
+  push:
+    branches: [kazanim-v1-build-20260909]
+    paths:
+      - .github/workflows/parse-v8-weekly.yml
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse official weekly rows
+        shell: bash
+        run: |
+          python - <<'PY'
+          import urllib.request, zipfile, io, re, html
+          from xml.etree import ElementTree as ET
+          NS='http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+          RNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+          urls={
+            'fen':'https://tymm.meb.gov.tr/assets/file/fen-bilimleri-dersi-taslak-yillik-planlar_20260903_122025_920.zip',
+            'sos':'https://tymm.meb.gov.tr/assets/file/sosyal-bilgiler-dersi-yillik-planlar_20260903_120026_880.zip',
+            'ita':'https://tymm.meb.gov.tr/assets/file/tc-inkilap-tarihi-ve-ataturkculuk-dersi-taslak-yillik-planlar_20260903_120043_922.zip',
+          }
+          def coln(s):
+            n=0
+            for ch in s: n=n*26+ord(ch)-64
+            return n
+          def splitref(ref):
+            m=re.match(r'([A-Z]+)(\d+)',ref); return (int(m.group(2)),coln(m.group(1)))
+          def parse_xlsx(data):
+            z=zipfile.ZipFile(io.BytesIO(data)); shared=[]
+            if 'xl/sharedStrings.xml' in z.namelist():
+              rr=ET.fromstring(z.read('xl/sharedStrings.xml'))
+              shared=[''.join(t.text or '' for t in si.iter('{%s}t'%NS)) for si in rr.findall('{%s}si'%NS)]
+            wb=ET.fromstring(z.read('xl/workbook.xml')); relr=ET.fromstring(z.read('xl/_rels/workbook.xml.rels'))
+            rel={r.attrib['Id']:r.attrib['Target'] for r in relr}
+            out={}
+            for sh in wb.find('{%s}sheets'%NS):
+              name=sh.attrib['name']; rid=sh.attrib['{%s}id'%RNS]; target=rel[rid]
+              path=target.lstrip('/') if target.startswith('/') else 'xl/'+target.lstrip('/')
+              root=ET.fromstring(z.read(path)); vals={}
+              for c in root.iter('{%s}c'%NS):
+                ref=c.attrib.get('r'); 
+                if not ref: continue
+                rc=splitref(ref); typ=c.attrib.get('t'); v=c.find('{%s}v'%NS); ins=c.find('{%s}is'%NS)
+                value=''
+                if typ=='s' and v is not None: value=shared[int(v.text)]
+                elif typ=='inlineStr' and ins is not None: value=''.join(t.text or '' for t in ins.iter('{%s}t'%NS))
+                elif v is not None: value=v.text or ''
+                vals[rc]=re.sub(r'\s+',' ',value).strip()
+              # expand merges, but never overwrite an explicit value
+              merges=root.find('{%s}mergeCells'%NS)
+              if merges is not None:
+                for mc in merges:
+                  ref=mc.attrib['ref']
+                  if ':' not in ref: continue
+                  a,b=ref.split(':'); r1,c1=splitref(a); r2,c2=splitref(b); base=vals.get((r1,c1),'')
+                  if base:
+                    for r in range(r1,r2+1):
+                      for c in range(c1,c2+1):
+                        vals.setdefault((r,c),base)
+              out[name]=vals
+            return out
+          for key,url in urls.items():
+            req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+            arch=zipfile.ZipFile(io.BytesIO(urllib.request.urlopen(req,timeout=60).read()))
+            for fn in arch.namelist():
+              if not fn.lower().endswith('.xlsx'): continue
+              sheets=parse_xlsx(arch.read(fn))
+              for sn,vals in sheets.items():
+                if not (('FEN BİLİMLERİ 5' in sn) or ('FEN BİLİMLERİ 6' in sn) or ('FEN BİLİMLERİ 7' in sn) or ('FEN BİLİMLERİ 8' in sn) or ('5. SINIF YILLIK' in sn) or ('6. SINIF YILLIK' in sn) or ('7. SINIF YILLIK' in sn) or (key=='ita' and '8. SINIF' in sn)):
+                  continue
+                print('\n===',key,sn,'===')
+                for (r,c),v in sorted(vals.items()):
+                  if c==2:
+                    m=re.search(r'(\d+)\s*\.\s*Hafta',v,re.I)
+                    if not m: continue
+                    w=int(m.group(1))
+                    row=[vals.get((r,k),'') for k in range(1,11)]
+                    print('WEEK',w,'ROW',r,'||',' || '.join(f'{chr(64+k)}={row[k-1]}' for k in range(1,11) if row[k-1]))
+          PY
